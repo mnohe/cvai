@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title }} · CVAI</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="header-left">
+        <a class="brand" href="/"><img class="brand-logo" src="/static/cvai-h.svg" alt=""><span class="brand-text">CVAI</span></a>
+        <h1 class="header-title">{{ title }}</h1>
+      </div>
+      <nav class="nav-tabs" aria-label="Primary">
+        <a class="nav-tab" href="/" title="Active roles ordered by the repository backlog, with status and follow-up work visible at a glance.">Dashboard</a>
+        <a class="nav-tab" href="/cv/" title="Edit the structured CV data used by layouts, role matching, and PDF generation.">CV</a>
+        <a class="nav-tab" href="/tasks" title="Open evidence and follow-up tasks ordered by ETA, shortest first.">Tasks</a>
+      </nav>
+      <details class="nav-menu">
+        <summary>Menu</summary>
+        <div class="nav-menu-list">
+          <a href="/" title="Active roles ordered by the repository backlog, with status and follow-up work visible at a glance.">Dashboard</a>
+          <a href="/cv/" title="Edit the structured CV data used by layouts, role matching, and PDF generation.">CV</a>
+          <a href="/tasks" title="Open evidence and follow-up tasks ordered by ETA, shortest first.">Tasks</a>
+        </div>
+      </details>
+      <a class="button primary ingest-action" href="/intake">Ingest Role</a>
+    </div>
+  </header>
+  <main class="page">
+    {% if flash %}
+      <div class="flash{% if flash[0] == 'error' %} error{% endif %}">{{ flash[1] }}</div>
+    {% endif %}
+    {% block body %}{% endblock %}
+  </main>
+  <script>
+    function cvModalRepeatTarget(button) {
+      if (button.dataset.target === "previous") return button.closest(".nested-list").querySelector("[data-repeat]");
+      if (button.dataset.target === "positions") return button.closest(".nested-list").querySelector('[data-repeat="positions"]');
+      if (button.dataset.target === "links") return button.closest(".nested-list").querySelector('[data-repeat="links"]');
+      return null;
+    }
+    function cvModalReindexList(list, tokens) {
+      Array.from(list.children).filter((child) => child.matches("[data-item]")).forEach((item, index) => {
+        const nextTokens = {...tokens};
+        if (list.dataset.repeat === "positions" || list.dataset.repeat === "links") nextTokens.j = index;
+        if (!list.dataset.repeat) nextTokens.k = index;
+        item.querySelectorAll("[data-name-template]").forEach((control) => {
+          control.name = control.dataset.nameTemplate
+            .replaceAll("__j__", nextTokens.j ?? 0)
+            .replaceAll("__k__", nextTokens.k ?? 0);
+        });
+        item.querySelectorAll("[data-repeat]").forEach((nested) => {
+          if (nested.closest("[data-item]") === item) cvModalReindexList(nested, nextTokens);
+        });
+      });
+    }
+    function cvModalReindex(modal) {
+      modal.querySelectorAll("[data-repeat]").forEach((list) => {
+        if (!list.closest("[data-item]")) cvModalReindexList(list, {});
+      });
+    }
+    document.addEventListener("click", (event) => {
+      const button = event.target.closest("button");
+      if (!button || !button.closest("#cv-modal")) return;
+      if (button.dataset.addTemplate) {
+        const target = cvModalRepeatTarget(button);
+        const template = document.getElementById(button.dataset.addTemplate);
+        if (!target || !template) return;
+        const fragment = template.content.cloneNode(true);
+        const item = fragment.firstElementChild;
+        if (button.dataset.addTemplate === "tpl-modal-text-row") {
+          const firstInput = target.querySelector("[data-name-template]");
+          const prefix = firstInput ? firstInput.dataset.nameTemplate.replace(/\.\d+$/, "").replace(/\.__k__$/, "") : "";
+          item.querySelector("[data-name-template]").dataset.nameTemplate = prefix + ".__k__";
+        }
+        target.appendChild(item);
+        cvModalReindex(button.closest("#cv-modal"));
+      }
+      if (button.dataset.remove !== undefined) {
+        button.closest("[data-item]").remove();
+        cvModalReindex(button.closest("#cv-modal"));
+      }
+    });
+    document.addEventListener("submit", (event) => {
+      const modal = event.target.closest("#cv-modal");
+      if (modal) cvModalReindex(modal);
+    });
+    function cvReindexRows(section) {
+      document.querySelectorAll(`[data-cv-row][data-section="${section}"]`).forEach((row, index) => {
+        row.dataset.index = index;
+        row.querySelectorAll("[data-move-form]").forEach((form) => {
+          const url = `/cv/${section}/${index}/move`;
+          form.action = url;
+          form.setAttribute("hx-post", url);
+        });
+        const editButton = row.querySelector("[data-edit-button]");
+        if (editButton) editButton.setAttribute("hx-get", `/cv/${section}/${index}/edit`);
+        row.querySelectorAll('form[action$="/delete"]').forEach((form) => {
+          const url = `/cv/${section}/${index}/delete`;
+          form.action = url;
+          form.setAttribute("hx-post", url);
+        });
+      });
+    }
+    document.addEventListener("submit", (event) => {
+      const form = event.target.closest("[data-move-form]");
+      if (!form) return;
+      const row = form.closest("[data-cv-row]");
+      const direction = new FormData(form).get("direction");
+      const sibling = direction === "up" ? row.previousElementSibling : row.nextElementSibling;
+      if (!sibling || !sibling.matches("[data-cv-row]")) return;
+      if (direction === "up") row.parentElement.insertBefore(row, sibling);
+      if (direction === "down") row.parentElement.insertBefore(sibling, row);
+      setTimeout(() => cvReindexRows(row.dataset.section), 0);
+    });
+    document.body.addEventListener("htmx:beforeRequest", (event) => {
+      if (event.target.matches("[data-edit-button]")) {
+        document.querySelectorAll("#cv-modal").forEach((modal) => modal.remove());
+      }
+    });
+    document.body.addEventListener("htmx:afterSwap", () => {
+      document.querySelectorAll("#cv-modal").forEach((modal) => {
+        if (!modal.open) modal.showModal();
+      });
+    });
+  </script>
+</body>
+</html>

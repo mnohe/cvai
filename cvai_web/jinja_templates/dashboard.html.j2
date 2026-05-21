@@ -1,0 +1,94 @@
+{% extends "base.html.j2" %}
+
+{% block body %}
+<section class="grid cards" style="margin-bottom:24px;">
+  <article class="card">
+    <h3>Active roles</h3>
+    <div style="font-size:34px;font-weight:700;">{{ roles|length }}</div>
+    <div class="muted">Ordered by cvai-data roles.yaml</div>
+  </article>
+  <article class="card">
+    <h3>Session intake jobs</h3>
+    <div style="font-size:34px;font-weight:700;">{{ jobs|length }}</div>
+    <div class="muted">Background runs launched since this app started</div>
+  </article>
+</section>
+
+<section class="role-list" style="margin-bottom:24px;">
+  {% for role in roles %}
+    {% set role_record = role.role %}
+    {% set badge = dashboard_status_badge(role_record) %}
+    {% set task_label = "open task" if role.open_task_count == 1 else "open tasks" %}
+    <article class="role-row">
+      <div>
+        <div class="role-title-line">
+          <a class="role-title" href="/roles/{{ role_record.canonical_slug }}">{{ role_record.role }}</a>
+          <span class="pill {{ badge[1] }}">{{ badge[0] }}</span>
+        </div>
+        <div class="role-subtitle">{{ role_record.company }}, {{ role_record.location }}</div>
+        <div class="role-meta">
+          {% if role.open_task_count %}
+            <span class="task-notice">{{ role.open_task_count }} {{ task_label }}</span>
+          {% endif %}
+          <span class="muted">{{ role_record.role_status|status_sentence }}</span>
+        </div>
+      </div>
+      <div class="role-actions">
+        <a class="button primary" href="/roles/{{ role_record.canonical_slug }}">Details</a>
+        <button
+          type="button"
+          data-title="{{ role_record.company }} · {{ role_record.role }}"
+          data-action="/roles/{{ role_record.canonical_slug }}/update-prompt"
+          onclick="openRoleUpdateDialog(this.dataset.title, this.dataset.action)"
+        >Update</button>
+      </div>
+    </article>
+  {% else %}
+    <div class="list-item muted">No active roles found.</div>
+  {% endfor %}
+</section>
+
+<dialog class="dialog" id="role-update-dialog">
+  <form method="dialog" style="margin-bottom:14px;">
+    <div class="toolbar" style="justify-content:space-between;align-items:flex-start;">
+      <h3 id="role-update-title">Update role</h3>
+      <button type="submit">Close</button>
+    </div>
+  </form>
+  <form id="role-update-form" method="post" action="">
+    <label>Update prompt
+      <textarea name="prompt" required placeholder="Rejected on 2026-05-16 with this rationale: ..."></textarea>
+    </label>
+    <button class="primary" type="submit">Apply update</button>
+  </form>
+</dialog>
+<script>
+  function openRoleUpdateDialog(title, action) {
+    const dialog = document.getElementById("role-update-dialog");
+    document.getElementById("role-update-title").textContent = title;
+    document.getElementById("role-update-form").action = action;
+    dialog.showModal();
+  }
+</script>
+
+<section class="grid" style="margin-top:18px;">
+  <article class="card">
+    <h3>Recent intake jobs</h3>
+    <div class="list">
+      {% for job in jobs[:6] %}
+        <div class="list-item">
+          <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;">
+            <div>
+              <strong>{{ job.kind.upper() }} ingestion</strong><br>
+              <span class="muted">{{ job.status }}</span>
+            </div>
+            <a href="/jobs/{{ job.id }}">Open</a>
+          </div>
+        </div>
+      {% else %}
+        <div class="list-item muted">No intake jobs yet in this session.</div>
+      {% endfor %}
+    </div>
+  </article>
+</section>
+{% endblock %}

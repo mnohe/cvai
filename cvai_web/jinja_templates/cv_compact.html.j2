@@ -1,0 +1,163 @@
+{% extends "base.html.j2" %}
+
+{% macro field(name, label, value="", type="text", required=True) %}
+  <label>{{ label }}
+    <input type="{{ type }}" name="{{ name }}" value="{{ value or "" }}"{% if required %} required{% endif %}>
+  </label>
+{% endmacro %}
+
+{% macro move_form(section, index, direction, label) %}
+  <form method="post" action="/cv/{{ section }}/{{ index }}/move" hx-post="/cv/{{ section }}/{{ index }}/move" hx-swap="none" data-move-form>
+    <input type="hidden" name="direction" value="{{ direction }}">
+    <button type="submit" class="move-button" aria-label="Move {{ direction }}" title="Move {{ direction }}">{{ label }}</button>
+  </form>
+{% endmacro %}
+
+{% macro item_row(section, index, title, description="", movable=False) %}
+  <tr data-cv-row data-section="{{ section }}" data-index="{{ index }}">
+    <td>
+      <div class="cv-title-cell">
+        {% if movable %}
+          <div class="move-stack table-move-stack">
+            {{ move_form(section, index, "up", "▲") }}
+            {{ move_form(section, index, "down", "▼") }}
+          </div>
+        {% endif %}
+        <span class="cv-table-title">{{ title or "Untitled" }}</span>
+      </div>
+    </td>
+    <td class="cv-table-description">{{ description }}</td>
+    <td>
+      <div class="row-actions cv-table-actions">
+        <button type="button" hx-get="/cv/{{ section }}/{{ index }}/edit" hx-target="#modal-root" hx-swap="innerHTML" data-edit-button>Edit</button>
+        <form method="post" action="/cv/{{ section }}/{{ index }}/delete" hx-post="/cv/{{ section }}/{{ index }}/delete" hx-confirm="Remove this CV entry?">
+          <button type="submit" class="danger subtle-danger">Remove</button>
+        </form>
+      </div>
+    </td>
+  </tr>
+{% endmacro %}
+
+{% macro section_list(section, heading, add_label) %}
+  <section class="card">
+    <div class="section-heading toolbar">
+      <h2>{{ heading }}</h2>
+      <button type="button" hx-get="/cv/{{ section }}/new" hx-target="#modal-root" hx-swap="innerHTML">{{ add_label }}</button>
+    </div>
+    <table class="cv-table">
+      <tbody>
+      {{ caller() }}
+      </tbody>
+    </table>
+  </section>
+{% endmacro %}
+
+{% block body %}
+{% if document.valid %}
+  <div class="toolbar page-actions">
+    <a class="download-link" href="/download/generic-cv">Download current PDF</a>
+  </div>
+{% endif %}
+
+{% if document.is_empty %}
+  <section class="card">
+    <h2>Start your CV</h2>
+    <p class="muted">No base CV exists yet. Create <code>cv/cv.yaml</code> or use the upcoming PDF import flow once it is enabled.</p>
+    <p>The CV must follow the CVAI CV schema and include summary, contact, languages, certifications, education, experience, and portfolio items.</p>
+  </section>
+{% elif issues %}
+  <section class="card">
+    <h2>Fix CV data</h2>
+    <p class="muted">The CV data could not be edited safely because it does not match the expected structure.</p>
+    <div class="list" style="margin-top:14px;">
+      {% for issue in issues %}
+        <div class="list-item"><strong>{{ issue.path }}</strong><br><span class="muted">{{ issue.message }}</span></div>
+      {% endfor %}
+    </div>
+  </section>
+{% else %}
+  {% set cv = document.data %}
+  <section class="grid cards" style="margin-bottom:24px;">
+    <article class="card">
+      <div class="section-heading toolbar">
+        <h3>{{ cv.contact.name }} {{ cv.contact.surname }}</h3>
+        <button type="button" hx-get="/cv/contact/edit" hx-target="#modal-root" hx-swap="innerHTML">Edit contact</button>
+      </div>
+      <div class="muted">{{ cv.contact.email }}</div>
+      {% if cv.contact.linkedin %}
+        <div><a class="download-link" href="https://www.linkedin.com/in/{{ cv.contact.linkedin }}" target="_blank" rel="noreferrer">LinkedIn</a></div>
+      {% endif %}
+      {% if cv.contact.github %}
+        <div><a class="download-link" href="https://github.com/{{ cv.contact.github }}" target="_blank" rel="noreferrer">GitHub</a></div>
+      {% endif %}
+    </article>
+    <article class="card">
+      <h3>PDF artifacts</h3>
+      <div class="list compact-list">
+        {% for pdf in pdfs %}
+          <div><a class="download-link" href="/download/file?path=cv/{{ pdf.name }}">{{ pdf.name }}</a></div>
+        {% else %}
+          <div class="muted">No PDF has been built yet.</div>
+        {% endfor %}
+      </div>
+    </article>
+  </section>
+
+  <form id="cv-summary" class="cv-form" method="post" action="/cv/summary">
+    <section class="card">
+      <h2>Summary</h2>
+      <label>Profile summary
+        <textarea name="summary" required>{{ cv.summary }}</textarea>
+      </label>
+      <div class="sticky-actions">
+        <button class="primary" type="submit">Save summary</button>
+      </div>
+    </section>
+  </form>
+
+  {% call section_list("languages", "Languages", "Add language") %}
+    {% for language in cv.languages %}
+      {{ item_row("languages", loop.index0, language.name, language.level, True) }}
+    {% endfor %}
+  {% endcall %}
+
+  {% call section_list("certifications", "Certifications", "Add certification") %}
+    {% for certification in cv.certifications %}
+      {{ item_row("certifications", loop.index0, certification.name, certification.issuer ~ " · " ~ certification.year) }}
+    {% endfor %}
+  {% endcall %}
+
+  {% call section_list("education", "Education", "Add education") %}
+    {% for item in cv.education %}
+      {{ item_row("education", loop.index0, item.name, item.issuer ~ " · " ~ item.year) }}
+    {% endfor %}
+  {% endcall %}
+
+  {% call section_list("experience", "Experience", "Add company") %}
+    {% for entry in cv.experience %}
+      {% set position_count = entry.positions|length %}
+      {{ item_row("experience", loop.index0, entry.company, position_count ~ " position" ~ ("" if position_count == 1 else "s")) }}
+    {% endfor %}
+  {% endcall %}
+
+  <section class="card">
+    <div class="section-heading toolbar">
+      <h2>Portfolio</h2>
+      <button type="button" hx-get="/cv/projects/new" hx-target="#modal-root" hx-swap="innerHTML">Add portfolio item</button>
+    </div>
+    <form class="cv-inline-form" method="post" action="/cv/projects-url">
+      {{ field("projects.url", "Portfolio URL", cv.projects.url, "url", False) }}
+      <button class="primary" type="submit">Save URL</button>
+    </form>
+    <table class="cv-table">
+      <tbody>
+    {% for project in cv.projects["items"] %}
+      {{ item_row("projects", loop.index0, project.name, project.summary, True) }}
+    {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <div id="modal-root"></div>
+{% endif %}
+{% endblock %}

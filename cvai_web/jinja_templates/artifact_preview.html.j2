@@ -1,0 +1,15 @@
+<dialog class="dialog markdown-dialog" id="artifact-preview" open>
+  <form method="dialog" class="modal-header">
+    <div>
+      <h3>{{ filename }}</h3>
+      <div class="muted">{{ path }}</div>
+    </div>
+    <button type="submit">Close</button>
+  </form>
+  <div class="markdown-preview">
+    {{ content_html|safe }}
+  </div>
+  <div class="modal-actions toolbar">
+    <a class="button secondary" href="/download/file?path={{ path|urlencode }}">Download</a>
+  </div>
+</dialog>

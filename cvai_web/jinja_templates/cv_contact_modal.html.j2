@@ -1,0 +1,38 @@
+{% macro field(name, label, value="", type="text", required=True) %}
+  <label>{{ label }}
+    <input type="{{ type }}" name="{{ name }}" value="{{ value or "" }}"{% if required %} required{% endif %}>
+  </label>
+{% endmacro %}
+
+<dialog id="cv-modal" class="dialog cv-modal">
+  <div class="modal-header">
+    <h3>Edit Contact</h3>
+    <button type="button" class="icon-button" aria-label="Close" onclick="this.closest('dialog').remove()">×</button>
+  </div>
+
+  {% if issues %}
+    <div class="flash error">
+      {% for issue in issues %}
+        <div><strong>{{ issue.path }}</strong>: {{ issue.message }}</div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <form class="cv-form" method="post" action="/cv/contact" hx-post="/cv/contact" hx-target="#cv-modal" hx-swap="outerHTML">
+    <div class="form-grid">
+      {{ field("contact.name", "Name", contact.name) }}
+      {{ field("contact.surname", "Surname", contact.surname) }}
+      {{ field("contact.email", "Email", contact.email, "email") }}
+      {{ field("contact.linkedin", "LinkedIn", contact.linkedin) }}
+      {{ field("contact.github", "GitHub", contact.github, "text", False) }}
+      {{ field("contact.www", "Website", contact.www, "url", False) }}
+      {{ field("contact.phone.prefix", "Phone prefix", contact.phone.prefix) }}
+      {{ field("contact.phone.number", "Phone number", contact.phone.number) }}
+    </div>
+
+    <div class="row-actions modal-actions">
+      <button class="success" type="submit">Save</button>
+      <button class="danger" type="button" onclick="this.closest('dialog').remove()">Cancel</button>
+    </div>
+  </form>
+</dialog>

@@ -1,0 +1,64 @@
+{% extends "base.html.j2" %}
+
+{% block body %}
+<div class="toolbar page-actions">
+  <span class="pill {{ task.status|task_status_class }}">{{ task.status|task_status_label }}</span>
+  <span class="muted">{{ task|task_eta_label }}</span>
+</div>
+<section class="split" style="margin-bottom:24px;">
+  <article class="card">
+    <h3>Gap</h3>
+    <p>{{ task.description or "No description recorded." }}</p>
+    {% if task.status_detail %}
+      <p class="muted">{{ task.status_detail }}</p>
+    {% endif %}
+  </article>
+  <article class="card">
+    <h3>Status</h3>
+    <form method="post" action="/tasks/{{ task.id }}/status">
+      <label>Status
+        <select name="status">
+          <option value="open"{% if task.status == "open" %} selected{% endif %}>Open</option>
+          <option value="completed"{% if task.status == "completed" %} selected{% endif %}>Completed</option>
+          <option value="wont_do"{% if task.status == "wont_do" %} selected{% endif %}>Won't do</option>
+        </select>
+      </label>
+      <label>Evidence or note
+        <textarea name="detail" placeholder="Evidence that closes the gap, or why this will not be done.">{{ task.status_detail }}</textarea>
+      </label>
+      <button class="action" type="submit">Update task</button>
+    </form>
+  </article>
+</section>
+<section class="grid" style="margin-bottom:24px;">
+  <article class="card">
+    <div class="toolbar" style="justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <h3 style="margin:0;">Acceptance criteria</h3>
+      <form method="post" action="/tasks/{{ task.id }}/reassess" style="margin:0;">
+        <button type="submit">Reassess</button>
+      </form>
+    </div>
+    <ul>
+      {% for item in task.acceptance_criteria %}
+        <li>{{ item }}</li>
+      {% else %}
+        <li class="muted">No acceptance criteria recorded.</li>
+      {% endfor %}
+    </ul>
+  </article>
+  <article class="card">
+    <h3>Closing evidence</h3>
+    <p class="muted">{{ task.status_detail or "No closing note recorded yet." }}</p>
+  </article>
+  <article class="card">
+    <h3>Used by requirements</h3>
+    <ul>
+      {% for role in role_states %}
+        <li><a href="/roles/{{ role.canonical_slug }}">{{ role.role }}</a> <span class="muted">{{ role.company }}, {{ role.location }}</span></li>
+      {% else %}
+        <li class="muted">No current requirements reference this task.</li>
+      {% endfor %}
+    </ul>
+  </article>
+</section>
+{% endblock %}

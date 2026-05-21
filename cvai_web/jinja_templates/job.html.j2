@@ -1,0 +1,12 @@
+{% extends "base.html.j2" %}
+
+{% block body %}
+<section class="hero">
+  <div>
+    <h1>Ingestion job {{ job.id }}</h1>
+    <p>{{ job.kind.upper() }} intake is running in the background. This page updates while the job is active.</p>
+  </div>
+</section>
+
+{% include "job_fragment.html.j2" %}
+{% endblock %}

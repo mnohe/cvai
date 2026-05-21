@@ -1,0 +1,133 @@
+{% extends "base.html.j2" %}
+
+{% block body %}
+{% set analysis = role.analysis or {} %}
+{% set summary = analysis.get("summary", {}) %}
+{% set rationale = summary.get("rationale") or role.rationale or role.verdict_label or "No rationale captured yet." %}
+{% set recommendation = summary.get("recommendation") or {} %}
+<section class="split" style="margin-bottom:24px;">
+  <article class="card">
+    <h2 style="margin:0 0 4px;font-size:22px;">{{ role.role }}</h2>
+    <div class="muted" style="margin-bottom:14px;">{{ role.company }}, {{ role.location }}</div>
+    <span class="verdict-badge {{ role.verdict|verdict_class }}">{{ role.verdict_label }}</span>
+    <p class="muted" style="margin:14px 0 0;">{{ rationale }}</p>
+    {% if recommendation.get("value") or summary.get("notes") or recommendation.get("reason") %}
+      <div class="toolbar" style="margin-top:14px;">
+        {% if recommendation.get("value") %}
+          <span class="pill">{{ recommendation.get("value").replace("_", " ").title() }}</span>
+        {% endif %}
+        {% for note in summary.get("notes") or [] %}
+          <span class="pill">{{ note|string|replace("_", " ")|title }}</span>
+        {% endfor %}
+        {% if recommendation.get("reason") %}
+          <div class="muted" style="margin-top:10px;">{{ recommendation.get("reason") }}</div>
+        {% endif %}
+      </div>
+    {% endif %}
+  </article>
+  <article class="card">
+    <h3>Latest status</h3>
+    <p>{{ role.role_status|status_sentence }}</p>
+    <form method="post" action="/roles/{{ role.canonical_slug }}/update-prompt">
+      <label>Update prompt
+        <textarea name="prompt" required placeholder="Rejected on 2026-05-16 with this rationale: ..."></textarea>
+      </label>
+      <button class="action" type="submit">Record update</button>
+    </form>
+  </article>
+</section>
+
+<section class="grid" style="margin-bottom:24px;">
+  <article class="card">
+    <div class="toolbar" style="justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <h3 style="margin:0;">Requirement coverage</h3>
+      <form method="post" action="/roles/{{ role.canonical_slug }}/reassess" style="margin:0;">
+        <button type="submit">Reassess</button>
+      </form>
+    </div>
+    <table class="event-table">
+      <thead><tr><th>Requirement</th><th>Type</th><th>Coverage</th><th>Evidence</th><th>Gaps</th></tr></thead>
+      <tbody>
+        {% for req in analysis.get("requirements", []) %}
+          <tr>
+            <td>{{ req.get("text", "") }}</td>
+            <td><span class="pill">{{ req.get("category", "inferred_requirement")|category_label }}</span></td>
+            <td><span class="pill {{ req.get("fulfillment", "unknown")|fulfillment_class }}">{{ req.get("fulfillment", "unknown")|fulfillment_label }}</span></td>
+            <td>
+              {% for item in req.get("evidence", []) %}
+                <div>{{ item.get("text", "") }}</div>
+              {% else %}
+                <span class="muted">No direct evidence mapped.</span>
+              {% endfor %}
+            </td>
+            <td>
+              {% for task_ref in req.get("task_refs", []) %}
+                <a class="download-link" href="/tasks/{{ task_ref }}">{{ task_titles.get(task_ref, "Open task") }}</a>
+              {% endfor %}
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="5" class="muted">No requirement coverage recorded yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </article>
+  <article class="card">
+    <h3>Work plan</h3>
+    {% if analysis.get("work_items") %}
+      <ul>
+        {% for item in analysis.get("work_items", []) %}
+          <li><strong>{{ item.get("title", "") }}</strong><br><span class="muted">{{ item.get("detail", "") }}</span></li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+    {% if analysis.get("timeline") %}
+      <table class="event-table">
+        <tbody>
+          {% for entry in analysis.get("timeline", []) %}
+            <tr><td class="muted">{{ entry.get("period", "") }}</td><td>{{ entry.get("items", [])|join("; ") }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% endif %}
+    {% if not analysis.get("work_items") and not analysis.get("timeline") %}
+      <p class="muted">No work plan recorded yet.</p>
+    {% endif %}
+  </article>
+</section>
+
+<section class="grid" style="margin-bottom:24px;">
+  <article class="card">
+    <h3>Artifacts</h3>
+    <div class="toolbar">
+      {% for path in role.artifacts %}
+        {% if path.endswith(".md") %}
+          <button type="button" hx-get="/preview/file?path={{ path|urlencode }}" hx-target="#artifact-preview-root" hx-swap="innerHTML">{{ path.split("/")[-1] }}</button>
+        {% else %}
+          <a class="download-link" href="/download/file?path={{ path|urlencode }}">{{ path.split("/")[-1] }}</a>
+        {% endif %}
+      {% else %}
+        <span class="muted">No generated artifacts found yet.</span>
+      {% endfor %}
+    </div>
+    <div id="artifact-preview-root"></div>
+  </article>
+  <article class="card">
+    <h3>Event log</h3>
+    <table class="event-table">
+      <thead><tr><th>Type</th><th>Date</th><th>Event</th></tr></thead>
+      <tbody>
+        {% for event in role.decision_events %}
+          <tr>
+            <td><span class="pill">{{ event.type.replace("_", " ").title() or "Event" }}</span></td>
+            <td class="muted">{{ event.date }}</td>
+            <td>{{ event.detail }}</td>
+          </tr>
+        {% else %}
+          <tr><td colspan="3" class="muted">No events recorded yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </article>
+</section>
+{% endblock %}

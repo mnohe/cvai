@@ -1,0 +1,26 @@
+version: 1
+role_id: sample_remote_platform_engineer
+summary:
+  verdict: POSSIBLE_FIT
+  verdict_label: Possible fit
+  recommendation:
+    value: APPLY_NOW
+    reason: Fixture recommendation.
+  rationale: Fixture rationale.
+  notes: []
+requirements:
+- id: req_001
+  text: Backend systems
+  category: hard_requirement
+  fulfillment: partial
+  evidence: []
+  gap: ''
+  task_refs:
+  - task_platform_story
+strengths: []
+gaps: []
+work_items: []
+timeline: []
+gap_tasks: {}
+comments: []
+llm_context: {}

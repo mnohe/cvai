@@ -1,0 +1,31 @@
+<section
+  id="job-status"
+  {% if not finished %}
+    hx-get="/jobs/{{ job.id }}/fragment"
+    hx-trigger="load delay:3s, every 3s"
+    hx-swap="outerHTML"
+  {% endif %}
+>
+  <div class="toolbar" style="justify-content:flex-end;margin-bottom:18px;">
+    <span class="pill">{{ job.status }}</span>
+  </div>
+
+  {% if job.result %}
+    <article class="card" style="margin-bottom:24px;">
+      <h3>Created files</h3>
+      <div class="list">
+        {% for path in job.result.paths.values() %}
+          <div class="list-item"><code>{{ path }}</code></div>
+        {% endfor %}
+      </div>
+      <div class="toolbar" style="margin-top:14px;">
+        <a class="button primary" href="/roles/{{ job.result.canonical_slug }}">Open role</a>
+      </div>
+    </article>
+  {% endif %}
+
+  <article class="card">
+    <h3>Job log</h3>
+    <pre>{{ job.log }}</pre>
+  </article>
+</section>

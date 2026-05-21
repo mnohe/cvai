@@ -1,0 +1,38 @@
+name: docker
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t cvai:ci .
+      - name: Smoke test image
+        run: |
+          cid="$(docker run -d -p 8080:8080 cvai:ci)"
+          trap 'docker rm -f "$cid"' EXIT
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://localhost:8080/healthz; then
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs "$cid"
+          exit 1
+      - name: Log in to GHCR
+        if: github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Push image
+        if: github.event_name == 'push'
+        run: |
+          docker tag cvai:ci ghcr.io/${{ github.repository }}:latest
+          docker push ghcr.io/${{ github.repository }}:latest

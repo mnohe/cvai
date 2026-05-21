@@ -1,0 +1,7 @@
+events:
+- id: event-550e8400-e29b-41d4-a716-446655440000
+  role_id: example_dublin_backend_engineer
+  type: submitted
+  date: '2026-05-19'
+  detail: Example application submitted.
+  artifacts: []

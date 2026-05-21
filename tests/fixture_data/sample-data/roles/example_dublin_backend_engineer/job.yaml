@@ -1,0 +1,30 @@
+version: 1
+role_id: example_dublin_backend_engineer
+company: Example
+title: Backend Engineer
+location: Dublin
+source_url: https://example.test/backend
+captured_on: '2026-05-19T09:00:00+00:00'
+posting:
+  raw_text: Fixture posting.
+  date_posted: ''
+  employment_type: ''
+  location_mode: unknown
+  posting_id: ''
+extracted:
+  responsibilities: []
+  hard_requirements:
+  - Backend systems
+  soft_requirements: []
+  inferred_requirements: []
+  skills:
+  - Backend systems
+  interview_focus: []
+requirements:
+- id: req_001
+  text: Backend systems
+  category: hard_requirement
+  fulfillment: met
+  evidence: []
+  gap: ''
+  task_refs: []

@@ -1,0 +1,154 @@
+{% macro field(name, label, value="", type="text", required=True) %}
+  <label>{{ label }}
+    <input type="{{ type }}" name="{{ name }}" data-name-template="{{ name }}" value="{{ value or "" }}"{% if required %} required{% endif %}>
+  </label>
+{% endmacro %}
+
+{% macro boolean_select(name, label, value=True) %}
+  <label>{{ label }}
+    <select name="{{ name }}">
+      <option value="true"{% if value %} selected{% endif %}>Yes</option>
+      <option value="false"{% if not value %} selected{% endif %}>No</option>
+    </select>
+  </label>
+{% endmacro %}
+
+{% macro text_list(prefix, values, label) %}
+  <div class="nested-list" data-list>
+    <div class="section-heading toolbar">
+      <strong>{{ label }}</strong>
+      <button type="button" data-add-template="tpl-modal-text-row" data-target="previous">Add</button>
+    </div>
+    <div class="repeat-list" data-repeat>
+      {% for value in values or [""] %}
+        <div class="repeat-row modal-repeat-row" data-item>
+          <input name="{{ prefix }}.{{ loop.index0 }}" data-name-template="{{ prefix }}.__k__" value="{{ value }}">
+          <button type="button" data-remove>Remove</button>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+{% endmacro %}
+
+<dialog id="cv-modal" class="dialog cv-modal">
+  <div class="modal-header">
+    <h3>{{ "Add" if mode == "new" else "Edit" }} {{ "Portfolio item" if section == "projects" else section|replace("_", " ")|title }}</h3>
+    <button type="button" class="icon-button" aria-label="Close" onclick="this.closest('dialog').remove()">×</button>
+  </div>
+
+  {% if issues %}
+    <div class="flash error">
+      {% for issue in issues %}
+        <div><strong>{{ issue.path }}</strong>: {{ issue.message }}</div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <form class="cv-form" method="post" action="/cv/{{ section }}/{{ index }}" hx-post="/cv/{{ section }}/{{ index }}" hx-target="#cv-modal" hx-swap="outerHTML">
+    {% if section == "languages" %}
+      <div class="form-grid">
+        {{ field("languages." ~ index ~ ".name", "Language", item.name) }}
+        {{ field("languages." ~ index ~ ".level", "Level", item.level) }}
+      </div>
+    {% elif section == "certifications" %}
+      <div class="form-grid">
+        {{ field("certifications." ~ index ~ ".name", "Name", item.name) }}
+        {{ field("certifications." ~ index ~ ".id", "Credential ID", item.id) }}
+        {{ field("certifications." ~ index ~ ".issuer", "Issuer", item.issuer) }}
+        {{ field("certifications." ~ index ~ ".year", "Year", item.year, "number") }}
+      </div>
+    {% elif section == "education" %}
+      <div class="form-grid">
+        {{ field("education." ~ index ~ ".name", "Name", item.name) }}
+        {{ field("education." ~ index ~ ".type", "Type", item.type, "text", False) }}
+        {{ field("education." ~ index ~ ".issuer", "Issuer", item.issuer) }}
+        {{ field("education." ~ index ~ ".year", "Year", item.year, "number") }}
+      </div>
+    {% elif section == "experience" %}
+      {{ field("experience." ~ index ~ ".company", "Company", item.company) }}
+      {{ boolean_select("experience." ~ index ~ ".visible", "Show this company in generated CVs", item.visible is not defined or item.visible) }}
+      <div class="nested-list">
+        <div class="section-heading toolbar">
+          <strong>Positions</strong>
+          <button type="button" data-add-template="tpl-modal-position" data-target="positions">Add position</button>
+        </div>
+        <div class="repeat-list" data-repeat="positions">
+          {% for position in item.positions or [] %}
+            {% set position_index = loop.index0 %}
+            <details class="editor-card nested-card" data-item open>
+              <summary>{{ position.roles|join(", ") or "Position" }}</summary>
+              <div class="form-grid">
+                {{ field("experience." ~ index ~ ".positions." ~ position_index ~ ".start", "Start", position.start) }}
+                {{ field("experience." ~ index ~ ".positions." ~ position_index ~ ".end", "End", position.end, "text", False) }}
+                {{ field("experience." ~ index ~ ".positions." ~ position_index ~ ".location", "Location", position.location) }}
+              </div>
+              {{ text_list("experience." ~ index ~ ".positions." ~ position_index ~ ".roles", position.roles, "Roles") }}
+              {{ text_list("experience." ~ index ~ ".positions." ~ position_index ~ ".tasks", position.tasks, "Tasks") }}
+              {{ text_list("experience." ~ index ~ ".positions." ~ position_index ~ ".keywords", position.keywords, "Keywords") }}
+              <hr class="modal-separator">
+              <div class="row-actions"><button type="button" class="danger" data-remove>Remove position</button></div>
+            </details>
+          {% endfor %}
+        </div>
+      </div>
+    {% elif section == "projects" %}
+      <div class="form-grid">
+        {{ field("projects.items." ~ index ~ ".name", "Name", item.name) }}
+        {{ field("projects.items." ~ index ~ ".url", "URL", item.url, "url") }}
+      </div>
+      {{ boolean_select("projects.items." ~ index ~ ".visible", "Show this portfolio item in generated CVs", item.visible is not defined or item.visible) }}
+      <label>Summary
+        <textarea name="projects.items.{{ index }}.summary" required>{{ item.summary }}</textarea>
+      </label>
+      <label>Description
+        <textarea name="projects.items.{{ index }}.description" required>{{ item.description }}</textarea>
+      </label>
+      {{ text_list("projects.items." ~ index ~ ".keywords", item.keywords, "Keywords") }}
+      <div class="nested-list">
+        <div class="section-heading toolbar">
+          <strong>Links</strong>
+          <button type="button" data-add-template="tpl-modal-project-link" data-target="links">Add link</button>
+        </div>
+        <div class="repeat-list" data-repeat="links">
+          {% for link in item.links or [] %}
+            <div class="repeat-row modal-repeat-row" data-item>
+              {{ field("projects.items." ~ index ~ ".links." ~ loop.index0 ~ ".label", "Label", link.label) }}
+              {{ field("projects.items." ~ index ~ ".links." ~ loop.index0 ~ ".url", "URL", link.url, "url") }}
+              <button type="button" data-remove>Remove</button>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    {% endif %}
+
+    <div class="row-actions modal-actions">
+      <button class="success" type="submit">Save</button>
+      <button class="danger" type="button" onclick="this.closest('dialog').remove()">Cancel</button>
+    </div>
+  </form>
+
+  <template id="tpl-modal-text-row">
+    <div class="repeat-row modal-repeat-row" data-item>
+      <input data-name-template="__prefix__.__k__" value="">
+      <button type="button" data-remove>Remove</button>
+    </div>
+  </template>
+  <template id="tpl-modal-position">
+    <details class="editor-card nested-card" data-item open>
+      <summary>New position</summary>
+      <div class="form-grid">{{ field("experience." ~ index ~ ".positions.__j__.start", "Start") }}{{ field("experience." ~ index ~ ".positions.__j__.end", "End", "", "text", False) }}{{ field("experience." ~ index ~ ".positions.__j__.location", "Location") }}</div>
+      {{ text_list("experience." ~ index ~ ".positions.__j__.roles", [""], "Roles") }}
+      {{ text_list("experience." ~ index ~ ".positions.__j__.tasks", [""], "Tasks") }}
+      {{ text_list("experience." ~ index ~ ".positions.__j__.keywords", [""], "Keywords") }}
+      <hr class="modal-separator">
+      <div class="row-actions"><button type="button" class="danger" data-remove>Remove position</button></div>
+    </details>
+  </template>
+  <template id="tpl-modal-project-link">
+    <div class="repeat-row modal-repeat-row" data-item>
+      {{ field("projects.items." ~ index ~ ".links.__j__.label", "Label") }}
+      {{ field("projects.items." ~ index ~ ".links.__j__.url", "URL", "", "url") }}
+      <button type="button" data-remove>Remove</button>
+    </div>
+  </template>
+</dialog>

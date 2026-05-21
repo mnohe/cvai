@@ -1,0 +1,19 @@
+services:
+  cvai:
+    build: .
+    image: cvai:local
+    ports:
+      - "8080:8080"
+    volumes:
+      - ${CVAI_DATA:-../cvai-data}:/data
+    environment:
+      CVAI_DATA: /data
+      LLM_PROVIDER: ${LLM_PROVIDER:-openai}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-gpt-4o}
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://api.openai.com/v1}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

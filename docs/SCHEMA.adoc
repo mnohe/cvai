@@ -1,0 +1,472 @@
+= CVAI Data Schema
+:toc:
+:toclevels: 3
+
+This document is the stable contract for a CVAI data directory.
+It is bundled with `cvai` because deployment creates private data directories from scratch in the configured `CVAI_DATA` location.
+There is no public sample `cvai-data` repository to clone.
+
+The web app initializes missing root files and validates this layout on startup.
+You can also run the tool directly:
+
+[source,sh]
+----
+PYTHONPATH=. python3 -m cvai_web init /path/to/private-data
+PYTHONPATH=. python3 -m cvai_web validate /path/to/private-data
+----
+
+== Design Rules
+
+* YAML files are the source of truth for role process state.
+* Markdown files are artifacts for humans or downloads; the app must not parse them to render pages.
+* LLM workflows may create or reassess YAML, but normal reads are deterministic.
+* Role IDs are human-readable slugs using `a-z`, `0-9`, and `_`.
+* If a slug collides, add a deterministic human-readable suffix such as the posting ID or `_2`; do not use UUIDs.
+
+== Root Files
+
+=== `roles.yaml`
+
+[cols="1,1,3"]
+|===
+| Field | Type | Notes
+
+| `roles`
+| list
+| Global role index.
+
+| `roles[].id`
+| string
+| Canonical role slug. Must match `roles/<role_id>/`.
+
+| `roles[].company`
+| string
+| Display company name.
+
+| `roles[].title`
+| string
+| Position title.
+
+| `roles[].location`
+| string
+| Display location.
+
+| `roles[].source_url`
+| string
+| Original posting URL, empty if unavailable.
+
+| `roles[].captured_on`
+| string
+| ISO8601 capture date or datetime.
+
+| `roles[].priority_rank`
+| integer or null
+| Dashboard order. Lower comes first.
+
+| `roles[].active`
+| boolean
+| Whether the role is part of the active corpus.
+|===
+
+=== `applications.yaml`
+
+[cols="1,1,3"]
+|===
+| Field | Type | Notes
+
+| `applications`
+| list
+| One role state row per role.
+
+| `applications[].role_id`
+| string
+| Must exist in `roles.yaml`.
+
+| `applications[].status`
+| enum
+| `draft`, `submitted`, `interviewing`, `accepted`, `rejected`, `closed`, `inactive`, `unknown`.
+
+| `applications[].status_date`
+| string or null
+| ISO8601 date or datetime for the latest status.
+
+| `applications[].status_detail`
+| string
+| Human-readable detail without duplicating the status/date.
+
+| `applications[].status_artifacts`
+| list of strings
+| Artifact paths used for the status event.
+
+| `applications[].verdict`
+| enum
+| `CLEAR_FIT`, `FIT`, `FIT_WITH_TARGETED_UPSKILLING`, `OVERQUALIFIED`, `POSSIBLE_FIT`, `STRETCH`, `WEAK_FIT`, `UNFIT`, `NOT_A_GOOD_FIT`.
+
+| `applications[].verdict_label`
+| string
+| Display label for the verdict.
+
+| `applications[].rationale`
+| string
+| Short suitability rationale.
+|===
+
+=== `tasks.yaml`
+
+[cols="1,1,3"]
+|===
+| Field | Type | Notes
+
+| `tasks`
+| list
+| General task catalog. Requirements link to these IDs.
+
+| `tasks[].id`
+| string
+| Stable task ID.
+
+| `tasks[].role_id`
+| string or null
+| Optional role association.
+
+| `tasks[].status`
+| enum
+| `open`, `completed`, `wont_do`.
+
+| `tasks[].kind`
+| string
+| Examples: `gap_evidence`, `project`, `follow_up`.
+
+| `tasks[].title`
+| string
+| Short display name.
+
+| `tasks[].description`
+| string
+| What gap or action the task covers.
+
+| `tasks[].estimated_days`
+| integer or null
+| Estimated elapsed work.
+
+| `tasks[].feasible_within_one_week`
+| boolean or null
+| Whether current data suggests completion within seven days.
+
+| `tasks[].acceptance_criteria`
+| list of strings
+| Evidence checklist needed to close the task.
+
+| `tasks[].evidence_refs`
+| list of strings
+| Structured references proving closure after completion.
+
+| `tasks[].status_detail`
+| string
+| Completion rationale, evidence note, or won't-do reason.
+|===
+
+=== `events.yaml`
+
+[cols="1,1,3"]
+|===
+| Field | Type | Notes
+
+| `events`
+| list
+| Global event log. Role-specific events are mirrored under each role.
+
+| `events[].id`
+| string
+| Stable UUID with the `event-` prefix, for example `event-550e8400-e29b-41d4-a716-446655440000`.
+
+| `events[].role_id`
+| string or null
+| Role ID, or null for general repository/CV events.
+
+| `events[].type`
+| enum
+| `captured`, `submitted`, `interviewing`, `accepted`, `rejected`, `closed`, `decision`, `note`.
+
+| `events[].date`
+| string
+| ISO8601 event date or datetime.
+
+| `events[].detail`
+| string
+| Event body.
+
+| `events[].artifacts`
+| list of strings
+| Artifact paths mentioned by the event.
+|===
+
+== Per-Role Files
+
+Each role lives under `roles/<role_id>/`.
+
+=== `role.yaml`
+
+The per-role metadata mirror of `roles.yaml`.
+`id`, `company`, `title`, `location`, `source_url`, `captured_on`, `priority_rank`, and `active` must match the global row when present.
+
+=== `application.yaml`
+
+The per-role mirror of the corresponding `applications.yaml` row.
+`role_id`, `status`, and `verdict` must match the global row.
+
+=== `job.yaml`
+
+[cols="1,1,3"]
+|===
+| Field | Type | Notes
+
+| `version`
+| integer
+| Current value: `1`.
+
+| `role_id`, `company`, `title`, `location`, `source_url`, `captured_on`
+| scalar fields
+| Role identity and source metadata.
+
+| `posting.raw_text`
+| string
+| Captured posting text. This is stored for audit and future LLM workflows, not page rendering.
+
+| `posting.date_posted`
+| string
+| Posting date if known.
+
+| `posting.employment_type`
+| string
+| Employment type if known.
+
+| `posting.location_mode`
+| string
+| `remote`, `hybrid`, `onsite`, or `unknown`.
+
+| `posting.posting_id`
+| string
+| External posting identifier if known.
+
+| `extracted.responsibilities`
+| list of strings
+| Responsibilities that are not necessarily CV-answerable requirements.
+
+| `extracted.hard_requirements`
+| list of strings
+| Explicit must-have requirements.
+
+| `extracted.soft_requirements`
+| list of strings
+| Explicit nice-to-have or weaker signal requirements.
+
+| `extracted.inferred_requirements`
+| list of strings
+| Non-explicit requirements worth checking.
+
+| `extracted.skills`
+| list of strings
+| Role-relevant skills, tools, domains, methods, or technologies named by the posting. For technical roles this naturally includes languages, frameworks, platforms, and infrastructure.
+
+| `extracted.interview_focus`
+| list of strings
+| Likely interview topics.
+
+| `requirements`
+| list
+| Same requirement coverage shape as `analysis.yaml`.
+|===
+
+=== `analysis.yaml`
+
+[cols="1,1,3"]
+|===
+| Field | Type | Notes
+
+| `version`
+| integer
+| Current value: `1`.
+
+| `role_id`
+| string
+| Must match the folder name.
+
+| `summary.verdict`
+| enum
+| Same verdict enum as `applications.yaml`.
+
+| `summary.verdict_label`
+| string
+| Display label.
+
+| `summary.recommendation`
+| mapping
+| Contains at least `value` and `reason` when available.
+
+| `summary.rationale`
+| string
+| Suitability rationale displayed on the role page.
+
+| `summary.notes`
+| list of strings
+| Short notes or flags.
+
+| `requirements`
+| list
+| Requirement coverage table.
+
+| `strengths`, `gaps`
+| list
+| Retained for LLM context; normally not surfaced directly.
+
+| `work_items`, `timeline`
+| list
+| Optional preparation plan data shown on the role detail page.
+
+| `gap_tasks`
+| mapping
+| Proposed task definitions keyed by task ID.
+
+| `comments`
+| list
+| Structured or semi-structured comments available to reassessment workflows.
+
+| `llm_context`
+| mapping
+| Private matching context. May include responsibilities, must-haves, nice-to-haves, and interview focus.
+|===
+
+=== Requirement Coverage Row
+
+[cols="1,1,3"]
+|===
+| Field | Type | Notes
+
+| `id`
+| string
+| Stable within the role, e.g. `req_001`.
+
+| `text`
+| string
+| Requirement text.
+
+| `category`
+| enum
+| `hard_requirement`, `soft_requirement`, `inferred_requirement`.
+
+| `fulfillment`
+| enum
+| `met`, `partial`, `unmet`, `unknown`.
+
+| `evidence`
+| list
+| Evidence summaries and refs. Each item should include `text` and `refs`.
+
+| `gap`
+| string
+| Gap summary. Empty when fully met.
+
+| `task_refs`
+| list of strings
+| IDs from root `tasks.yaml`. Must be empty when `fulfillment` is `met`.
+
+| `feasible`
+| boolean
+| Whether the gap appears feasible for this application.
+|===
+
+=== `artifacts.yaml`
+
+[cols="1,1,3"]
+|===
+| Field | Type | Notes
+
+| `artifacts`
+| list
+| Downloadable or human-readable artifacts for the role.
+
+| `artifacts[].kind`
+| string
+| Artifact category, e.g. `resume`, `cover_letter`, `story_bank`.
+
+| `artifacts[].path`
+| string
+| Must point under `roles/<role_id>/artifacts/` and exist on disk.
+|===
+
+=== `tasks.yaml`
+
+Per-role task file. Currently reserved; root `tasks.yaml` is the canonical task catalog.
+
+=== `events.yaml`
+
+Per-role event mirror with the same row shape as root `events.yaml`.
+If `role_id` is present, it must match the folder name.
+
+== Candidate Context And Evidence
+
+`context/context.yaml` and `library/evidence.yaml` are created by initialization as empty structured projections for LLM matching and reassessment.
+They are intentionally looser than role/role process state while the matching vocabulary settles.
+Markdown files in `context/` and `library/` are human-authored source notes; workflows should consume the YAML projections.
+
+== CV Format Schema
+
+The canonical CV format is JSON Schema `schemas/cv.schema.json` in the public `cvai` repository.
+Initialization copies that schema into `cv/cv-schema.json` for each private data directory so local editors and validators can use it without network access.
+The schema has a stable public `$id` suitable for publishing on a CVAI website: `https://mnohe.github.io/cvai/schemas/cv.schema.json`.
+
+== PDF Layouts
+
+PDF layouts live under `pdf/layouts/<layout_id>/` in the configured data directory.
+They are data assets rather than Python package files so installations can keep custom layouts and licensed fonts outside the public application repository.
+
+[cols="1,1,3"]
+|===
+| Path | Type | Notes
+
+| `pdf/layouts/<layout_id>/cv.typ`
+| file
+| Required Typst entry point. CVAI passes the selected `cv/cv.yaml` path as the Typst input named `cv`.
+
+| `pdf/layouts/<layout_id>/fonts/`
+| directory
+| Optional layout-owned fonts. Each first-level subdirectory is passed to Typst as a font path.
+
+| `pdf/layouts/<layout_id>/README.md`
+| file
+| Optional human documentation for the layout.
+
+| `pdf/layouts/<layout_id>/layout.yaml`
+| file
+| Reserved manifest for importable layout packs.
+|===
+
+== Validator
+
+Run:
+
+[source,sh]
+----
+PYTHONPATH=. python3 -m cvai_web.schema /path/to/private-data
+PYTHONPATH=. python3 -m cvai_web.schema --init /path/to/private-data
+PYTHONPATH=. python3 -m cvai_core.schema /path/to/private-data
+----
+
+The validator checks:
+
+* required files and top-level list fields;
+* enum values;
+* slug format;
+* global/per-role mirror consistency;
+* requirement task references;
+* artifact path existence;
+* per-role event role IDs.
+
+== Why The Validator Is Python
+
+The validator is Python because CVAI is Python, already depends on PyYAML, and needs cross-file checks close to the repository code.
+This keeps validation in the same test suite and avoids a second build toolchain.
+
+A Go validator could be useful later if `cvai-data` becomes a standalone repository with CI that should not install Python application dependencies.
+That trade-off is not worth it yet: the current validator is small, dependency-light, and easier to keep aligned with the app.

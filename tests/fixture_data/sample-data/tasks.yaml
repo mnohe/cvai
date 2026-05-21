@@ -1,0 +1,13 @@
+tasks:
+- id: task_platform_story
+  role_id: sample_remote_platform_engineer
+  status: open
+  kind: gap_evidence
+  title: Platform story
+  description: Prepare platform ownership evidence.
+  estimated_days: 2
+  feasible_within_one_week: true
+  acceptance_criteria:
+  - Evidence references one platform project.
+  evidence_refs: []
+  status_detail: ''

@@ -1,0 +1,31 @@
+version: 1
+role_id: sample_remote_platform_engineer
+company: Sample
+title: Platform Engineer
+location: Remote
+source_url: https://sample.test/platform
+captured_on: '2026-05-19T10:00:00+00:00'
+posting:
+  raw_text: Fixture posting.
+  date_posted: ''
+  employment_type: ''
+  location_mode: unknown
+  posting_id: ''
+extracted:
+  responsibilities: []
+  hard_requirements:
+  - Backend systems
+  soft_requirements: []
+  inferred_requirements: []
+  skills:
+  - Backend systems
+  interview_focus: []
+requirements:
+- id: req_001
+  text: Backend systems
+  category: hard_requirement
+  fulfillment: partial
+  evidence: []
+  gap: ''
+  task_refs:
+  - task_platform_story

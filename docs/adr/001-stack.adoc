@@ -1,0 +1,95 @@
+= ADR-001: Interface architecture and storage approach
+
+Status: Accepted +
+Date: 2026-05-19
+
+== Context
+
+=== Domain problem
+
+Running a job search across many concurrent applications is cognitively expensive.
+Each role has its own lifecycle (e.g. ingestion → assessment → application → interviews → decision), its own set of tailored materials (CV variant, cover letter, interview prep, upskill tasks), and its own decision log and open tasks.
+Without tooling, one needs to track this across scattered notes and files, which quickly becomes unwieldy past a handful of active roles, and invariably leads to errors and frustration.
+
+CVAI addresses this by considering three distinct sub-problems:
+
+Assessment::
+  Evaluating fit at ingestion time and re-evaluating it as the CV data changes, using structured LLM output that the application can read back without a subsequent LLM call.
+
+Tailoring::
+  Generating role-specific artefacts (CV variant, cover letter, requirement matrix) with LLM assistance, grounded in the author's structured CV and project data.
+
+Tracking::
+  Maintaining a structured record of every tracked role, its current status, the decision log, and outstanding tasks, queryable at a glance without opening individual files.
+
+Assessment and Tailoring are only as good as the structured data they draw on.
+The tool therefore also maintains the author's own data (CV, skills, project evidence, certifications) as structured files alongside the role data.
+This is a precondition for the three sub-problems above, not a goal in itself.
+
+NOTE: LinkedIn holds most of a professional's work history in structured form, but its API restricts full profile access to formal commercial partners (ATS vendors, recruitment platforms).
+Independent applications can only read a name, headline, and email address.
+The rich profile data (work history, education, skills, certifications) is not available via the API, which is why the tool must maintain its own structured CV data rather than sourcing it from LinkedIn.
+
+=== Interface requirements
+
+The three sub-problems impose two distinct interaction patterns:
+
+*Visual, interactive workflows* (Tracking, Tailoring, Assessment):
+
+* require displaying multiple roles simultaneously, with status badges, task counts, and sortable priority
+* involve long-running background operations (LLM calls, 10-180 s) that must report progress without blocking user interaction
+* are used sporadically and casually throughout a job search; the interface must be immediately accessible without recalling commands or flags
+* produce downloadable artefacts (PDFs, Markdown) that the user retrieves on demand
+
+*Composable, scriptable operations* (ingest a posting, validate the data directory):
+
+* have bounded, single-responsibility scope
+* produce structured output consumable by other tools
+* are naturally schedulable (cron, CI pipelines) and composable via shell pipelines
+* benefit from predictable exit codes and function-like behaviour
+
+[CAUTION]
+====
+A native desktop GUI would require separate implementations for Windows, macOS, multiple Linux toolkits (GTK, Qt, and others), and mobile operating systems, each with its own UI framework, packaging toolchain, and maintenance burden.
+A web browser is the universal runtime already present on every target platform, requiring no additional installation.
+Server-side rendering from structured files keeps the interface deterministic: the same data always produces the same HTML without client-side state to synchronise.
+====
+
+=== Deployment scenario
+
+Due to the highly sensitive nature of the data in this application, the intended deployment scenario is local (running on localhost or a trusted LAN, e.g. a home lab).
+Authentication is not provided at the application layer in the initial release, and the data layer stores files in plaintext.
+Network-level access controls (firewall, VPN) are assumed to be sufficient for the local scenario.
+
+The architecture is designed to accommodate authentication in a future release without changing business logic.
+
+=== Cross-cutting constraints
+
+* No mandatory external service dependencies (no database server, no message queue).
+* Data files must be human-readable and directly editable in a text editor without special tooling.
+* LLM calls are limited to approved write workflows; normal reads must never invoke an LLM.
+* The tool must be self-hostable without requiring custom changes on the target environment.
+  Since a common lamguage runtime cannot be expected across platforms, Docker or Podman are required to be installed.
+
+== Decisions
+
+=== User interface: web application and CLI tools
+
+The visual, interactive workflows require a browser-based interface: multiple concurrent roles with dynamic status cannot be expressed practically in terminal output, and progress from long-running LLM operations cannot be conveyed without either blocking the terminal or requiring repeated manual polling calls.
+The composable operations require a CLI: they must be scriptable, schedulable, and composable with other tools without a running server.
+
+The two interfaces are complementary and share a common data directory.
+Neither requires the other to be running.
+
+*Decision:* The tool provides a web application for the Tracking, Tailoring, and Assessment workflows, and standalone CLI tools for the ingest and validate operations.
+
+=== Data layer: file-based storage
+
+A database engine (embedded or external) would introduce operational complexity: a service to run, schema migration tooling, and binary files that are neither directly inspectable nor meaningfully version-controllable.
+At the expected data scale (a personal job-search catalogue of tens to a few hundred roles), the advantages of a relational engine (indexed queries, concurrent write safety, ACID transactions) do not justify that trade-off.
+
+Structured files are directly editable in any text editor, trivially versioned with git, and require no external service.
+They can be inspected and manually corrected between sessions without launching the application.
+
+*Decision:* Application state is stored as structured, human-readable files under a configurable directory.
+The specific file format and directory structure are out of this ADR's scope.

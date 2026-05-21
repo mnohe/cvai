@@ -1,0 +1,142 @@
+= ADR-002: Web application stack
+
+Status: Accepted +
+Date: 2026-05-19
+
+== Context
+
+ADR-001 established that the Tracking, Tailoring, and Assessment workflows are delivered through a web application with server-side rendering.
+This record decides the language, framework, template engine, and supporting components that form that application.
+
+Requirements inherited from ADR-001:
+
+[cols="2,3", options="header"]
+|===
+| Requirement | Reason
+
+| Server-side rendering
+| LLM API keys must not reach the browser; HTML produced from structured data must be deterministic
+
+| Async background job execution
+| LLM calls take 10-180 s; the HTTP request/response cycle must not block
+
+| Template engine suited to data-rich layouts
+| Dashboard grid, role detail, task list — structured tabular data with display labels and status colours
+
+| File serving
+| Artefacts (PDFs, Markdown) are downloaded directly from the data directory
+
+| Minimal build pipeline
+| Maintainability cost must be kept low
+
+| SSRF protection
+| URL intake fetches arbitrary URLs; the server must not reach private network ranges
+|===
+
+== Decision
+
+The stack is evaluated as a *bundle* (language, framework, and template engine together) because these choices are tightly coupled.
+Changing the language changes the template ergonomics, the YAML manipulation story, and the async concurrency model simultaneously.
+
+=== Bundle A — Python + FastAPI + Jinja2 (chosen)
+
+FastAPI handles request parsing, dependency injection, and ASGI routing via type annotations.
+It makes no ORM assumption, which aligns with the file-based data layer.
+
+Jinja2 templates are expressive for data-rich layouts: filters, macros, and template inheritance cover the dashboard, role detail, and task pages without verbosity.
+The syntax is familiar; the filter ecosystem is mature.
+
+Python's dynamic typing is well-suited to the YAML-heavy data manipulation in the core library: parsing YAML into dictionary and list structures, patching individual fields, and writing back requires no struct definition per schema shape.
+
+An asyncio-native server enables non-blocking LLM calls and is the natural upgrade path to Server-Sent Events when job log streaming is improved from polling.
+
+=== Bundle B — Go + Chi/Gin + html/template
+
+Go's `html/template` is auto-escaping and structurally safer than Jinja2, but significantly more verbose for data-rich templates.
+Filters are not composable in the Jinja2 sense; each helper must be registered as a function.
+Rendering a dashboard row (company, role, location, status badge, verdict label, task count) requires more boilerplate than the equivalent Jinja2 template.
+
+Go's static typing makes the YAML-heavy data layer more ceremonial: every distinct YAML shape requires a struct definition, or code falls back to untyped maps with type assertions throughout.
+Given that data is schema-validated at write time, Python's dynamic typing is a better fit for the read path.
+
+Go's strongest argument (a single static binary with no runtime to install) is not a differentiating factor when Docker is the distribution model.
+
+=== Bundle C — Node.js + Fastify/Hono + Nunjucks
+
+Node.js is the right choice if browser-based execution or a reactive frontend is the priority.
+A TypeScript build step adds friction with no user-visible benefit.
+Dependency management for Node.js projects produces large, opaque dependency trees that are worse than a Python virtual environment in a minimal container image.
+
+=== Summary
+
+*Python + FastAPI + Jinja2.*
+The bundle satisfies all requirements without gaps: async-capable, expressive templates for structured data, ergonomic YAML manipulation, no build pipeline, no external service dependencies.
+
+The feedback effect from the data storage decision (ADR-004) mildly reinforces this choice: Python's dynamic typing is more ergonomic than Go's for YAML parsing and in-memory manipulation.
+
+== Supporting decisions within the Python layer
+
+=== LLM integration
+
+LLM use is restricted to four approved workflows: role extraction from a URL or text, artefact bundle generation, free-form status prompt interpretation (with a fast-path for unambiguous phrases that avoids an LLM call), and role re-assessment from updated CV data.
+All other reads are served from files without an LLM call.
+
+Both target providers expose an HTTP API.
+Provider-specific SDKs add versioned dependencies for functionality that is fully expressible using a standard HTTP client from the language's standard library.
+A general-purpose LLM orchestration framework adds a large dependency tree for three specific call patterns.
+
+A provider-agnostic interface, with concrete implementations selected at startup via a configuration variable, provides full flexibility without SDK dependencies.
+Common configuration variable names (for the API key, model identifier, and base URL) apply to any OpenAI-compatible endpoint without code changes.
+
+*Decision:* Standard library HTTP client for all LLM calls; provider-agnostic interface with implementations selected via a configuration variable.
+
+=== PDF rendering
+
+CV YAML must be compiled to formatted PDF with publishing-grade typography.
+The rendering engine must be available in a minimal container image.
+
+LaTeX requires a multi-gigabyte TeX distribution.
+WeasyPrint is CSS/HTML-based and less expressive for structured document layout.
+Puppeteer and headless Chrome add approximately 300 MB and significant security surface.
+Pure Python PDF libraries expose low-level drawing APIs where layouts are written imperatively rather than declaratively.
+
+Typst is a single binary (approximately 8 MB), available in minimal container images, and compiles PDFs from a declarative layout language suited to structured documents.
+Layout packs (a layout entry point, supporting files, and optional fonts) live in the data directory rather than the application code, so they are versioned with the data.
+
+*Decision:* Typst, invoked as a subprocess.
+
+=== Authentication
+
+The initial release targets local and trusted-LAN deployment; no authentication is provided at the application layer.
+The initial local release does not implement application-layer authentication.
+Operators should bind or proxy the service so it is only reachable by trusted clients, and must not expose it directly to the public internet.
+
+When public multi-user access is required, the planned approach is OAuth (Google, GitHub) as the identity layer.
+The application would generate a per-user AES-256 key on first login and store it in the identity provider's user-profile space.
+No user table, password hash, or session database would be stored server-side (the OAuth provider and the user's own key form the entire trust chain), avoiding an external service dependency.
+
+*Decision:* No authentication in the initial release; loopback restriction by default; an optional bearer token for self-hosted single-user deployments. OAuth with an identity-provider-stored encryption key is the planned mechanism for public multi-user access.
+
+=== Distribution
+
+Source checkouts require the user to manage a Python version and a virtual environment, and do not provide a consistent execution environment across operating systems.
+Platform-specific packages (deb, rpm, Homebrew formulae) impose a per-platform maintenance burden that is not justified without specific user request.
+Installing via a Python application manager is viable for users who already have Python and prefer not to run a container; however, it would require supporting and testing for several Python versions, so it is not offered as an option.
+
+A container image provides a consistent, self-contained environment on any platform that supports Docker or Podman.
+It bundles the application, its Python dependencies, and the Typst binary into a single artefact.
+The data directory is mounted as a volume, keeping private data outside the image.
+Configuration is provided via environment variables, requiring no config file.
+
+A secondary benefit of the container model is that the Python version question collapses into the base image version.
+The application is tested against exactly one Python version: whichever the chosen base image provides.
+Updating the Python runtime is a base image tag change, not a separate dependency management task, and the range of Python versions the application must support is always exactly one.
+
+*Decision:* Container image (Alpine-based) as the only distribution unit.
+All runtime configuration is via environment variables. Docker Compose is supported, and deployment with it is documented. Kubernetes is known to work, but it is not fully supported, as it cannot be safely deployed in a multi-replica environment.
+
+== Consequences
+
+* The separation between the data layer and the HTTP layer localises future changes: a new storage backend touches only the data access code; a new LLM provider touches only the LLM integration code; neither requires changes to the HTTP routing or templates.
+* Adding authentication middleware for public exposure requires changes only to the HTTP layer, not to business logic or the data layer.
+* Adding a new LLM provider is a single implementation of the provider interface, with no changes to routes or templates.

@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cvai"
+version = "0.1.0"
+description = "Local job-application tracker with structured YAML state and CV PDF rendering."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+  "PyYAML>=6.0",
+  "fastapi>=0.111",
+  "httpx>=0.28",
+  "jinja2>=3.1",
+  "python-multipart>=0.0.9",
+  "uvicorn>=0.30",
+]
+
+[project.scripts]
+cvai = "cvai_web.__main__:main"
+
+[tool.setuptools]
+packages = ["cvai_core", "cvai_web"]
+include-package-data = true
+
+[tool.setuptools.package-data]
+cvai_web = ["jinja_templates/*.j2", "jinja_templates/*.md", "static/*.css", "static/*.svg"]
+cvai_core = ["schemas/*.json"]

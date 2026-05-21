@@ -1,0 +1,60 @@
+= ADR-005: CLI tool language
+
+Status: Accepted +
+Date: 2026-05-19
+
+== Context
+
+ADR-001 established that two operations are delivered as standalone CLI tools: ingesting a job posting (URL fetch → LLM call → structured file write) and validating the data directory against the schema.
+
+These tools must:
+
+* accept a URL or piped text and write a fully-populated role directory to the data store
+* use the same configuration variables as the web server so that a single shared configuration file drives both
+* implement SSRF protection equivalent to the web server's URL intake
+* produce output that the web server can read without modification
+* be composable in shell scripts and CI pipelines
+* exit with a non-zero code and a clear message on any failure
+
+ADR-002 chose Python for the web application layer.
+The question here is whether the CLI tools should use the same language or a different one.
+
+== Alternatives considered
+
+=== Python
+
+Using Python for the CLI tools would allow sharing library code (particularly the YAML schema definitions and the LLM prompt templates) with the web layer.
+A single language and toolchain reduces cognitive context-switching.
+
+The disadvantages are practical rather than technical: a Python CLI requires either a virtual environment on the host, installation via a Python application manager, or a container.
+None of these are onerous for the author's own use, but they reduce composability in environments where Python is not installed.
+
+More substantively, Python adds nothing to the CLI use case that justifies its overhead: the operations are pure I/O, there is no template rendering, and the dynamic typing that benefits the YAML-heavy web layer is not needed in a tool with a single, narrow data path.
+
+=== Go
+
+Go produces a single static binary with no runtime dependency.
+Its strengths (fast startup, deterministic error handling, explicit I/O) match the CLI use case precisely.
+
+SSRF protection (hostname resolution, RFC 1918/loopback/link-local rejection) is idiomatic in Go's standard library and easily testable in isolation.
+The LLM HTTP call is plain HTTPS, handled by the standard library with no SDK dependency.
+
+The static typing that is a disadvantage in the web layer's YAML-heavy read path is not a disadvantage here: the ingestion tool writes a fixed set of known YAML shapes, so struct definitions are not ceremonial (they are the schema).
+
+The single-binary distribution advantage is meaningful for a CLI tool in a way that it is not for a server distributed as a container image.
+The binary is composable as a single file in any shell environment without installation steps.
+
+== Decision
+
+The strengths and weaknesses of Go and Python are inverted between the web layer and the CLI layer.
+Where the web layer benefits from Python's dynamic typing and Jinja2's template ergonomics (arguments developed in ADR-002), the CLI tools benefit from Go's static binary, explicit I/O, and the fact that writing a fixed set of file shapes is exactly the problem that static types address well.
+
+*Decision:* Go for the CLI tools, housed in the same repository as the Python web application.
+Both interfaces share the same configuration variables and data directory; neither requires the other to be running.
+
+== Consequences
+
+* The CLI tools are distributed as standalone binaries; no additional runtime is required to use them.
+* SSRF validation must match the web server's implementation exactly; maintaining both in the same repository reduces the risk of divergence.
+* The output format must be compatible with the web server's data layer; the schema documentation is the shared contract.
+* Two languages in the repository are justified because each is the better tool for its component; they communicate only through files on disk.

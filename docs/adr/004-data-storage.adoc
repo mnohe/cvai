@@ -1,0 +1,125 @@
+= ADR-004: Data storage
+
+Status: Accepted +
+Date: 2026-05-19
+
+== Context
+
+ADR-001 established that role process state is stored as structured, human-readable files in a configurable directory, and that the specific format and conditions for future migration are addressed here.
+
+The data to be stored falls into two categories:
+
+Catalogue data:: a global index of tracked roles and their statuses, open tasks, and a cross-role decision log.
+Per-role data:: posting metadata, the structured job description, requirement assessment, artefact references, and a role-specific decision log.
+
+The author's own data (CV, skills, project evidence, certifications) is stored in the same directory and referenced by LLM-assisted workflows.
+
+Key constraints from ADR-001:
+
+* No mandatory external service dependencies.
+* Files must be human-readable and directly editable without special tooling.
+* Normal reads must never invoke an LLM.
+* The deployment scenario is local; data stays on the author's machine.
+
+== Alternatives considered
+
+=== SQLite
+
+SQLite is an embedded relational database stored in a single file, available in the Python standard library.
+
+[cols="2,2", options="header"]
+|===
+| Advantages | Disadvantages
+
+| ACID transactions; safe concurrent writes
+| Not human-readable; inspection requires a dedicated CLI tool or GUI
+
+| SQL filtering and sorting without loading all rows into memory
+| Binary file; not meaningfully diffable with git
+
+| Concurrent readers with one writer (write-ahead log mode)
+| Schema migrations require a migration framework or manual ALTER TABLE scripts
+
+| Scales to millions of rows with proper indexing
+| Adds ORM or raw cursor management to the data access layer
+|===
+
+SQLite would be the correct upgrade path if a single user's catalogue grew large enough that full-file reads dominated dashboard latency (approximately 500-1000 roles).
+A personal job-search catalogue is not expected to approach that threshold.
+
+If adopted later, YAML would remain the import/export and git-committable snapshot format; SQLite would serve as the runtime query layer.
+The data access layer is the defined migration boundary: an alternative implementation of its public interface would require no changes to routes or templates.
+
+=== PostgreSQL
+
+PostgreSQL is appropriate only if the deployment model shifts from "self-hosted per user" to "one hosted instance shared by many users" (a product scope change).
+Running a database server alongside the application increases deployment complexity from one container to a Compose stack at minimum.
+Managed database services introduce cost and a third-party dependency inconsistent with the self-hosting constraint.
+
+=== GitHub / GitLab Contents API
+
+This approach stores data in a private repository on a hosted platform and reads and writes it via the platform's API.
+
+[cols="2,2", options="header"]
+|===
+| Advantages | Disadvantages
+
+| Data is versioned, diffable, and browsable on the platform without additional tooling
+| Private data must reside on an external platform; local control is relinquished
+
+| Platform API enables atomic multi-file commits, which is structurally superior to local file writes
+| Application availability becomes contingent on platform availability and rate limits
+
+| Platform OAuth can serve double duty as authentication
+| Read latency is 100-300 ms per API call, versus sub-millisecond for local file reads; a minimal dashboard load takes 300-900 ms before any rendering
+
+|
+| API rate limits constrain interactive usage (approximately 1 600 dashboard-equivalent page loads per hour at typical limits)
+
+|
+| The implementation requires OAuth token management, per-file revision tracking, a caching strategy, and rate-limit budgeting (significantly more complex than local file operations)
+|===
+
+This architecture is compelling if the product shifts to a hosted variant where users authenticate via a platform OAuth token and the application reads and writes their private data repository directly, eliminating all local setup.
+That design must be built for that model from the start.
+
+=== Structured YAML files
+
+[cols="2,2", options="header"]
+|===
+| Advantages | Disadvantages
+
+| Human-readable and directly editable in any text editor
+| No concurrent write safety; two simultaneous writes to the same file will race
+
+| Git-committable; version history, diffs, and rollback are free
+| Every read loads the full file; no indexing
+
+| Zero external service dependency; works offline
+| Schema migrations require touching every file that contains the old shape
+
+| A new data directory can be initialised in seconds
+| Scales only to a few hundred roles before read time becomes noticeable
+|===
+
+The concurrency gap is an accepted limitation for a single-writer, local deployment.
+The scale limitation is not expected to be reached for a personal job search.
+
+== Decision
+
+*Structured YAML files* in a configurable root directory.
+
+The directory layout uses:
+
+* global catalogue files at the root, covering the role index, application status tracking, the task list, and the cross-role decision log
+* per-role subdirectories, each containing posting metadata, requirement assessment, artefact references, and a role-specific decision log
+* a separate area for background job state, so that job status survives process restarts and is readable by any process sharing the directory
+
+== Consequences
+
+* Data is inspectable and editable between sessions with any text editor or git tooling.
+* SQLite is the defined upgrade path if catalogue size becomes a performance constraint.
+  The data access layer is the migration boundary; routes and templates are unaffected.
+* The platform Contents API architecture is the preferred design for a future hosted multi-user variant (a new product built for that deployment model, not a migration of the current file store).
+* The YAML-heavy data manipulation (reading files, patching fields, writing back) is more ergonomic in Python than in Go, somewhat reinforcing the Python choice in ADR-002.
+  The relationship is not a hard dependency in either direction: the data access interface is storage-agnostic.
