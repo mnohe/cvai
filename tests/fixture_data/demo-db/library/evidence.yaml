@@ -1,0 +1,52 @@
+version: 1
+skills:
+- id: platform_engineering
+  keyword: Platform engineering
+  evidence_pointer: Aurelian Systems control plane, Kubernetes fleet automation, policy-as-code rollout.
+  proof_strength: High
+  notes: Primary theme for platform and SRE roles.
+- id: payments_reconciliation
+  keyword: Payments / reconciliation
+  evidence_pointer: Ledgerly payment reconciliation services and ReconcileKit project.
+  proof_strength: High
+  notes: Strong for ledger, settlement, risk, and operational tooling roles.
+- id: identity_security
+  keyword: Identity / security
+  evidence_pointer: Northstar Identity OAuth2, SAML, PKI, lifecycle APIs, and on-call experience.
+  proof_strength: Medium
+  notes: Good software-security evidence; avoid security-operations overclaiming.
+- id: technical_leadership
+  keyword: Technical leadership
+  evidence_pointer: Staff engineer and tech lead work at Aurelian Systems; mentoring and design reviews.
+  proof_strength: High
+  notes: Supports staff-plus and engineering-manager calibration.
+story_snippets:
+- id: fragmented_developer_environments
+  situation: Developer environments were slow, manually provisioned, and inconsistent across teams.
+  task: Create a safer self-service model without losing auditability or cost control.
+  action: Led a control-plane design with reconciliation loops, policy checks, workload identity, and progressive rollout.
+  result: Reduced lead time from days to under one hour and gave platform teams a single operational model.
+  evidence_ref: cv/cv.yaml -> Aurelian Systems
+- id: payment_reconciliation_drift
+  situation: Settlement drift between processors and the internal ledger required manual investigation.
+  task: Make reconciliation replayable, observable, and safe for support-driven adjustments.
+  action: Reworked batch jobs into event-driven workflows with idempotent consumers, bounded retries, and audit logs.
+  result: Faster investigation and clearer data-integrity boundaries for customer-impacting issues.
+  evidence_ref: cv/cv.yaml -> Ledgerly
+- id: identity_incident_runbooks
+  situation: Identity APIs needed clearer recovery steps during customer-visible incidents.
+  task: Improve on-call readiness while continuing feature delivery.
+  action: Added runbooks, certificate rotation tooling, and admin audit logs.
+  result: Reduced ambiguity during incidents and improved confidence around lifecycle operations.
+  evidence_ref: cv/cv.yaml -> Northstar Identity
+cover_letter_blocks:
+  fit_blocks:
+  - I bring a combination of backend depth, platform ownership, and production operating experience across infrastructure, payments, and identity systems.
+  - My strongest fit is in roles that need pragmatic architecture, reliable delivery, and clear judgment around trade-offs rather than narrow framework specialization.
+  proof_blocks:
+  - At Aurelian Systems, I led control-plane work for developer environments and production Kubernetes operations across a 70-cluster fleet.
+  - At Ledgerly, I worked on payment reconciliation and event-driven settlement workflows where auditability and data integrity mattered.
+  - At Northstar Identity, I built authentication and lifecycle APIs while participating in on-call for identity services.
+  role_specific_motivation_blocks:
+  - I am most interested in teams where platform reliability, secure product foundations, and developer experience are treated as product problems.
+  - I tend to do my best work where the technical domain has real operational consequences and where written reasoning matters.

@@ -44,14 +44,14 @@ Import a local template pack:
 
 [source,sh]
 ----
-cvai templates import /path/to/template-pack /path/to/private-data
+cvai templates import /path/to/template-pack tests/fixture_data/demo-db
 ----
 
 Use `--replace` to overwrite an installed template with the same ID:
 
 [source,sh]
 ----
-cvai templates import --replace /path/to/template-pack /path/to/private-data
+cvai templates import --replace /path/to/template-pack tests/fixture_data/demo-db
 ----
 
 The command copies the pack into:

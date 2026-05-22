@@ -1,0 +1,68 @@
+version: 1
+role_id: ledgerly_remote_staff_backend_engineer_payments
+company: Ledgerly
+title: Staff Backend Engineer, Payments
+location: Remote - EU
+source_url: https://jobs.example.test/ledgerly/staff-backend-payments
+captured_on: '2026-05-02T11:40:00+00:00'
+priority_rank: 2
+active: true
+posting:
+  raw_text: See job.md for the fictional posting.
+extracted:
+  responsibilities:
+  - Lead payment reconciliation architecture.
+  - Design idempotent event workflows.
+  - Mentor backend engineers and set technical direction.
+  hard_requirements:
+  - Backend architecture for financial systems.
+  - Event-driven systems and data integrity.
+  soft_requirements:
+  - Staff-level influence without authority.
+  inferred_requirements:
+  - Comfort with audit trails and operational tooling.
+  skills:
+  - Python
+  - PostgreSQL
+  - Kafka
+  - Payments
+  interview_focus:
+  - Idempotency and replay.
+  - Ledger consistency and reconciliation drift.
+requirements:
+- id: req_001
+  text: Payment reconciliation systems
+  category: hard_requirement
+  fulfillment: met
+  evidence:
+  - text: Ledgerly experience built card, SEPA, and wallet reconciliation services.
+    refs:
+    - cv:ledgerly
+  gap: ''
+  patch_plan: ''
+  task_refs: []
+  feasible: true
+- id: req_002
+  text: Staff-level architecture influence
+  category: soft_requirement
+  fulfillment: partial
+  evidence:
+  - text: Aurelian Systems staff-level leadership and design reviews support level calibration.
+    refs:
+    - cv:aurelian_systems
+  gap: Staff title is recent and not in payments domain.
+  patch_plan: Use staff examples from Aurelian and domain examples from Ledgerly.
+  task_refs: []
+  feasible: true
+- id: req_003
+  text: Payment failure-mode preparation
+  category: inferred_requirement
+  fulfillment: met
+  evidence:
+  - text: Failure-mode examples were added to the interview story bank.
+    refs:
+    - task_payment_failure_modes
+  gap: ''
+  patch_plan: ''
+  task_refs: []
+  feasible: true

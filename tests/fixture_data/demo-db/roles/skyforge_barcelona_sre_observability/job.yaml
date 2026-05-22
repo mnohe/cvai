@@ -1,0 +1,53 @@
+version: 1
+role_id: skyforge_barcelona_sre_observability
+company: Skyforge Observability
+title: Site Reliability Engineer, Telemetry
+location: Barcelona, Spain
+source_url: https://jobs.example.test/skyforge/sre-telemetry
+captured_on: '2026-04-26T08:05:00+00:00'
+priority_rank: 4
+active: true
+posting:
+  raw_text: See job.md for the fictional posting.
+extracted:
+  responsibilities:
+  - Improve telemetry pipeline reliability.
+  - Operate Kubernetes services and SLOs.
+  - Lead incident response improvements.
+  hard_requirements:
+  - Observability and production operations.
+  - Kubernetes experience.
+  soft_requirements:
+  - Calm incident communication.
+  inferred_requirements:
+  - Relocation or hybrid availability in Barcelona.
+  skills:
+  - OpenTelemetry
+  - Kubernetes
+  - SLOs
+  interview_focus:
+  - Incident response.
+  - Telemetry pipeline backpressure.
+requirements:
+- id: req_001
+  text: Observability and reliability experience
+  category: hard_requirement
+  fulfillment: met
+  evidence:
+  - text: Aurelian Systems includes OpenTelemetry, SLOs, incident playbooks, and platform operations.
+    refs:
+    - cv:aurelian_systems
+  gap: ''
+  patch_plan: ''
+  task_refs: []
+  feasible: true
+- id: req_002
+  text: Barcelona relocation decision
+  category: inferred_requirement
+  fulfillment: partial
+  evidence: []
+  gap: Need written offer details before final decision.
+  patch_plan: Compare offer against constraints.
+  task_refs:
+  - task_relocation_decision
+  feasible: true

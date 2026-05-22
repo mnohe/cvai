@@ -15,7 +15,7 @@ class PDFRendererTests(unittest.TestCase):
             source = root / "cv.yaml"
             output = root / "cv.pdf"
             templates_root = root / "pdf" / "templates"
-            template_dir = templates_root / "portrait"
+            template_dir = templates_root / "demo"
             font_dir = template_dir / "fonts" / "archivo"
             template_dir.mkdir(parents=True)
             font_dir.mkdir(parents=True)
@@ -50,7 +50,7 @@ class PDFRendererTests(unittest.TestCase):
     def test_font_paths_accept_direct_fonts_and_missing_fonts(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            template_dir = root / "pdf" / "templates" / "portrait"
+            template_dir = root / "pdf" / "templates" / "demo"
             fonts = template_dir / "fonts"
             renderer = PDFRenderer(root / "pdf" / "templates")
 
@@ -66,7 +66,7 @@ class PDFRendererTests(unittest.TestCase):
             root = Path(temp_dir)
             source = root / "cv" / "cv.yaml"
             output = root / "out" / "cv.pdf"
-            template_dir = root / "pdf" / "templates" / "portrait"
+            template_dir = root / "pdf" / "templates" / "demo"
             template_dir.mkdir(parents=True)
             source.parent.mkdir()
             source.write_text("name: Example\n", encoding="utf-8")

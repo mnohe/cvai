@@ -1,0 +1,8 @@
+role_id: oldtown_remote_java_engineer_legacy
+status: inactive
+status_date: '2026-04-02'
+status_detail: Parked after discovering the role was mostly maintenance with little platform or architecture scope.
+status_artifacts: []
+verdict: UNFIT
+verdict_label: Not a fit
+rationale: Java experience is strong, but the role direction does not match current platform/backend goals.

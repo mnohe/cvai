@@ -1,0 +1,63 @@
+role_states:
+- role_id: aurelian_dublin_senior_platform_engineer
+  status: draft
+  status_date: null
+  status_detail: Strong fit; waiting to tailor platform-control-plane examples before applying.
+  status_artifacts: []
+  verdict: CLEAR_FIT
+  verdict_label: Clear fit
+  rationale: Recent platform ownership, Kubernetes operations, policy-as-code, and technical leadership match the role directly.
+- role_id: ledgerly_remote_staff_backend_engineer_payments
+  status: submitted
+  status_date: '2026-05-08'
+  status_detail: Submitted through referral portal; recruiter confirmed materials were attached.
+  status_artifacts:
+  - roles/ledgerly_remote_staff_backend_engineer_payments/artifacts/resume.md
+  - roles/ledgerly_remote_staff_backend_engineer_payments/artifacts/cover_letter.md
+  verdict: FIT
+  verdict_label: Good fit
+  rationale: Payments and reconciliation evidence is strong, with some gaps around direct staff-level architecture scope.
+- role_id: northstar_dublin_engineering_manager_identity
+  status: interviewing
+  status_date: '2026-05-15'
+  status_detail: Hiring-manager screen completed; system-design and people-leadership loop scheduled for 2026-05-24.
+  status_artifacts:
+  - roles/northstar_dublin_engineering_manager_identity/artifacts/interview_prep/story_bank.md
+  - roles/northstar_dublin_engineering_manager_identity/artifacts/interview_prep/system_design_bank.md
+  verdict: OVERQUALIFIED
+  verdict_label: Overqualified fit
+  rationale: Identity-domain depth is excellent; risk is whether the candidate wants a people-management-heavy role.
+- role_id: skyforge_barcelona_sre_observability
+  status: accepted
+  status_date: '2026-05-18'
+  status_detail: Verbal offer accepted pending written contract and compensation review.
+  status_artifacts:
+  - roles/skyforge_barcelona_sre_observability/artifacts/resume.md
+  verdict: FIT
+  verdict_label: Good fit
+  rationale: Observability and reliability experience map well, while relocation preference needs confirmation.
+- role_id: civiccloud_remote_security_engineer
+  status: closed
+  status_date: '2026-05-06'
+  status_detail: Closed after salary range came in below target and on-call expectations were unclear.
+  status_artifacts: []
+  verdict: STRETCH
+  verdict_label: Stretch fit
+  rationale: Security-adjacent engineering is credible, but the role asks for deeper product-security ownership than the CV proves.
+- role_id: brightcart_london_frontend_platform_engineer
+  status: rejected
+  status_date: '2026-04-29'
+  status_detail: Rejected after technical screen; feedback was strong systems thinking but insufficient current React depth.
+  status_artifacts:
+  - roles/brightcart_london_frontend_platform_engineer/artifacts/resume.md
+  verdict: WEAK_FIT
+  verdict_label: Weak fit
+  rationale: Internal tooling and platform instincts fit, but the role is heavily frontend-framework focused.
+- role_id: oldtown_remote_java_engineer_legacy
+  status: inactive
+  status_date: '2026-04-02'
+  status_detail: Parked after discovering the role was mostly maintenance with little platform or architecture scope.
+  status_artifacts: []
+  verdict: UNFIT
+  verdict_label: Not a fit
+  rationale: Java experience is strong, but the role direction does not match current platform/backend goals.

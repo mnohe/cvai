@@ -1,0 +1,22 @@
+events:
+- id: event-44444444-4444-4444-8444-444444444444
+  role_id: skyforge_barcelona_sre_observability
+  type: submitted
+  date: '2026-05-01'
+  detail: 'Skyforge Observability `Site Reliability Engineer, Telemetry` role was submitted.'
+  artifacts:
+  - roles/skyforge_barcelona_sre_observability/artifacts/resume.md
+- id: event-55555555-5555-4555-8555-555555555555
+  role_id: skyforge_barcelona_sre_observability
+  type: interviewing
+  date: '2026-05-09'
+  detail: 'Skyforge Observability `Site Reliability Engineer, Telemetry` role is in interview stage. Technical screen passed.'
+  artifacts:
+  - roles/skyforge_barcelona_sre_observability/artifacts/interview_prep/system_design_bank.md
+- id: event-66666666-6666-4666-8666-666666666666
+  role_id: skyforge_barcelona_sre_observability
+  type: accepted
+  date: '2026-05-18'
+  detail: 'Skyforge Observability `Site Reliability Engineer, Telemetry` role was accepted. Verbal offer accepted pending written contract.'
+  artifacts:
+  - roles/skyforge_barcelona_sre_observability/artifacts/resume.md

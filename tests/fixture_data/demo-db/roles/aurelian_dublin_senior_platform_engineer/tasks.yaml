@@ -1,0 +1,5 @@
+tasks:
+- id: task_control_plane_case_study
+  status: open
+  kind: gap_evidence
+  title: Write control-plane case study

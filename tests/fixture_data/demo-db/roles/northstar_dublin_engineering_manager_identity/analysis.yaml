@@ -1,0 +1,68 @@
+version: 1
+role_id: northstar_dublin_engineering_manager_identity
+summary:
+  verdict: OVERQUALIFIED
+  verdict_label: Overqualified fit
+  recommendation:
+    value: CONTINUE_INTERVIEWING
+    reason: Domain match is strong; interview prep should focus on management motivation and current people-leadership examples.
+  rationale: Identity-domain depth is excellent; risk is whether the candidate wants a people-management-heavy role.
+  notes:
+  - INTERVIEWING
+strengths:
+- title: Identity experience
+  evidence:
+  - text: OAuth2, SAML, lifecycle APIs, PKI, audit logs, and on-call.
+    refs:
+    - cv:northstar_identity
+gaps:
+- description: Recent formal management title is absent.
+  task_refs:
+  - task_people_leadership_packet
+  feasible: true
+work_items:
+- title: Management packet
+  detail: Prepare coaching, prioritization, hiring, and conflict stories.
+timeline:
+- period: Before 2026-05-24
+  items:
+  - Finish people-leadership packet and rehearse identity architecture examples.
+requirements:
+- id: req_001
+  text: Identity platform domain knowledge
+  category: hard_requirement
+  fulfillment: met
+  evidence:
+  - text: Built authentication, authorization, lifecycle APIs, OAuth2, SAML, and PKI tooling.
+    refs:
+    - cv:northstar_identity
+  gap: ''
+  patch_plan: ''
+  task_refs: []
+  feasible: true
+- id: req_002
+  text: People management depth
+  category: hard_requirement
+  fulfillment: partial
+  evidence:
+  - text: Mentored senior engineers and led design reviews as staff engineer.
+    refs:
+    - cv:aurelian_systems
+  gap: CV does not show a recent formal manager title.
+  patch_plan: Prepare explicit coaching, prioritization, and difficult-conversation stories.
+  task_refs:
+  - task_people_leadership_packet
+  feasible: true
+gap_tasks:
+  task_people_leadership_packet:
+    title: Prepare people-leadership packet
+    estimated_days: 3
+    feasible_within_one_week: true
+    description: Prepare management stories.
+    acceptance_criteria:
+    - Five STAR stories exist.
+    evidence_refs: []
+comments:
+- Good event-timeline screenshot role.
+llm_context:
+  prompt_profile: management-identity

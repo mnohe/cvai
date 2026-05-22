@@ -1,0 +1,13 @@
+artifacts:
+- kind: resume
+  path: roles/civiccloud_remote_security_engineer/artifacts/resume.md
+- kind: cover_letter
+  path: roles/civiccloud_remote_security_engineer/artifacts/cover_letter.md
+- kind: story_bank
+  path: roles/civiccloud_remote_security_engineer/artifacts/interview_prep/story_bank.md
+- kind: system_design_bank
+  path: roles/civiccloud_remote_security_engineer/artifacts/interview_prep/system_design_bank.md
+- kind: security_bank
+  path: roles/civiccloud_remote_security_engineer/artifacts/interview_prep/security_bank.md
+- kind: coding_plan
+  path: roles/civiccloud_remote_security_engineer/artifacts/interview_prep/coding_plan.md

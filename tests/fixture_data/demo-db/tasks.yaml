@@ -1,0 +1,102 @@
+tasks:
+- id: task_control_plane_case_study
+  role_id: aurelian_dublin_senior_platform_engineer
+  status: open
+  kind: gap_evidence
+  title: Write control-plane case study
+  estimated_days: 2
+  feasible_within_one_week: true
+  description: Turn the Aurelian Systems platform work into a concise case study with architecture, constraints, rollout, and operational outcomes.
+  acceptance_criteria:
+  - Case study names the problem, architecture, rollout strategy, and measurable outcome.
+  - Claims are grounded in CV evidence and avoid confidential implementation detail.
+  - The artifact can be linked from platform and SRE role analyses.
+  evidence_refs: []
+  status_detail: ''
+- id: task_payment_failure_modes
+  role_id: ledgerly_remote_staff_backend_engineer_payments
+  status: completed
+  kind: interview_prep
+  title: Prepare payment failure-mode examples
+  estimated_days: 1
+  feasible_within_one_week: true
+  description: Prepare concrete examples for idempotency, replay, reconciliation drift, and customer-visible incident handling.
+  acceptance_criteria:
+  - At least three failure modes are written as interview prompts.
+  - Each answer includes mitigation, observability, and data-integrity trade-offs.
+  - Examples distinguish direct Ledgerly evidence from demo-project evidence.
+  evidence_refs:
+  - library/evidence.yaml#payment_reconciliation
+  status_detail: Added examples to Ledgerly story bank on 2026-05-10.
+- id: task_people_leadership_packet
+  role_id: northstar_dublin_engineering_manager_identity
+  status: open
+  kind: follow_up
+  title: Prepare people-leadership packet
+  estimated_days: 3
+  feasible_within_one_week: true
+  description: Prepare management stories covering coaching, underperformance, hiring, prioritization, and conflict resolution.
+  acceptance_criteria:
+  - Five STAR stories exist with concrete context and outcome.
+  - At least two stories cover difficult conversations.
+  - The packet includes questions for the hiring manager about management expectations.
+  evidence_refs:
+  - cv/cv.yaml#Aurelian-Systems
+  status_detail: ''
+- id: task_relocation_decision
+  role_id: skyforge_barcelona_sre_observability
+  status: open
+  kind: decision
+  title: Decide on Barcelona relocation package
+  estimated_days: 1
+  feasible_within_one_week: true
+  description: Compare written offer, relocation support, remote flexibility, and compensation against constraints.
+  acceptance_criteria:
+  - Written offer is reviewed against target compensation and location constraints.
+  - Open questions are sent before contract signing.
+  - Decision is recorded in the role event log.
+  evidence_refs: []
+  status_detail: Waiting for written offer.
+- id: task_security_threat_model
+  role_id: civiccloud_remote_security_engineer
+  status: wont_do
+  kind: gap_evidence
+  title: Build public threat-model sample
+  estimated_days: 5
+  feasible_within_one_week: true
+  description: Create a public threat model for a demo identity service.
+  acceptance_criteria:
+  - Threat model includes assets, trust boundaries, abuse cases, mitigations, and residual risks.
+  - The sample is linked from the portfolio inventory.
+  - Claims stay within software-security rather than security-operations ownership.
+  evidence_refs: []
+  status_detail: Not worth doing for a closed role; keep idea for future security roles.
+- id: task_frontend_framework_refresh
+  role_id: brightcart_london_frontend_platform_engineer
+  status: open
+  kind: gap_evidence
+  title: Refresh React platform evidence
+  estimated_days: 7
+  feasible_within_one_week: true
+  description: Build a small React component library or tooling demo if pursuing frontend-platform roles again.
+  acceptance_criteria:
+  - Project includes typed components, tests, accessibility checks, and build tooling.
+  - The README explains platform-engineering value rather than just UI implementation.
+  - Demo is realistic enough to support frontend-platform claims.
+  evidence_refs: []
+  status_detail: Low priority after rejection.
+- id: task_generic_salary_matrix
+  role_id: null
+  status: completed
+  kind: research
+  title: Build compensation comparison matrix
+  estimated_days: 1
+  feasible_within_one_week: true
+  description: Create a reusable matrix for salary, equity, relocation, on-call load, and remote flexibility.
+  acceptance_criteria:
+  - Matrix can compare at least five active roles.
+  - Each role has a go/no-go threshold.
+  - Constraints are tied back to context/context.yaml.
+  evidence_refs:
+  - context/context.yaml#constraints
+  status_detail: Stored reusable criteria in context/preferences.md.

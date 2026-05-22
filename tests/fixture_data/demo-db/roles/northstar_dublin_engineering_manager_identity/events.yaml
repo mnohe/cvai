@@ -1,0 +1,15 @@
+events:
+- id: event-22222222-2222-4222-8222-222222222222
+  role_id: northstar_dublin_engineering_manager_identity
+  type: submitted
+  date: '2026-05-11'
+  detail: 'Northstar ID `Engineering Manager, Identity Platform` role was submitted.'
+  artifacts:
+  - roles/northstar_dublin_engineering_manager_identity/artifacts/resume.md
+- id: event-33333333-3333-4333-8333-333333333333
+  role_id: northstar_dublin_engineering_manager_identity
+  type: interviewing
+  date: '2026-05-15'
+  detail: 'Northstar ID `Engineering Manager, Identity Platform` role is in interview stage. Hiring-manager screen completed; full loop scheduled.'
+  artifacts:
+  - roles/northstar_dublin_engineering_manager_identity/artifacts/interview_prep/story_bank.md

@@ -1,0 +1,57 @@
+version: 1
+role_id: civiccloud_remote_security_engineer
+summary:
+  verdict: STRETCH
+  verdict_label: Stretch fit
+  recommendation:
+    value: CLOSED
+    reason: Salary and on-call mismatch make further prep low value.
+  rationale: Security-adjacent engineering is credible, but the role asks for deeper product-security ownership than the CV proves.
+  notes:
+  - CLOSED_BY_CANDIDATE
+strengths:
+- title: Identity and secure platform foundations
+  evidence:
+  - text: OAuth2, PKI, audit logs, workload identity, and policy-as-code.
+    refs:
+    - cv:northstar_identity
+gaps:
+- description: Product-security ownership is adjacent rather than direct.
+  task_refs:
+  - task_security_threat_model
+  feasible: true
+work_items:
+- title: Deprioritized sample
+  detail: Threat-model sample was marked wont_do because the role closed.
+timeline:
+- period: Closed
+  items:
+  - No further action.
+requirements:
+- id: req_001
+  text: Secure software engineering
+  category: hard_requirement
+  fulfillment: partial
+  evidence:
+  - text: Identity and PKI work at Northstar Identity plus policy controls at Aurelian Systems.
+    refs:
+    - cv:northstar_identity
+    - cv:aurelian_systems
+  gap: Direct product-security ownership is not explicit.
+  patch_plan: Build threat-model sample if pursuing similar roles.
+  task_refs:
+  - task_security_threat_model
+  feasible: true
+gap_tasks:
+  task_security_threat_model:
+    title: Build public threat-model sample
+    estimated_days: 5
+    feasible_within_one_week: true
+    description: Create a public threat-model sample.
+    acceptance_criteria:
+    - Assets and trust boundaries are listed.
+    evidence_refs: []
+comments:
+- Closed role exercises wont_do task and closed status.
+llm_context:
+  prompt_profile: security-stretch

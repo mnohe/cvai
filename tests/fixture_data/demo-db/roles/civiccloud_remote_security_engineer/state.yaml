@@ -1,0 +1,8 @@
+role_id: civiccloud_remote_security_engineer
+status: closed
+status_date: '2026-05-06'
+status_detail: Closed after salary range came in below target and on-call expectations were unclear.
+status_artifacts: []
+verdict: STRETCH
+verdict_label: Stretch fit
+rationale: Security-adjacent engineering is credible, but the role asks for deeper product-security ownership than the CV proves.

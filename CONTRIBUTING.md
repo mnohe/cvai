@@ -47,13 +47,13 @@ Run the schema validator against a local data directory after changing schemas,
 repository code, ingestion, or reassessment logic:
 
 ```bash
-PYTHONPATH=. python3 -m cvai_core.schema /path/to/private-data
+PYTHONPATH=. python3 -m cvai_core.schema tests/fixture_data/demo-db
 ```
 
 Run a PDF smoke build after renderer or template-related changes:
 
 ```bash
-PYTHONPATH=. python3 -m cvai_core.pdf /path/to/private-data/cv/cv.yaml /tmp/cvai-smoke.pdf --templates-root /path/to/private-data/pdf/templates
+PYTHONPATH=. python3 -m cvai_core.pdf tests/fixture_data/demo-db/cv/cv.yaml /tmp/cvai-smoke.pdf --templates-root tests/fixture_data/demo-db/pdf/templates
 ```
 
 ## LLM Providers

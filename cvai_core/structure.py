@@ -252,7 +252,7 @@ def _normalize_source(value: str) -> str:
 
 
 def main(argv: list[str]) -> int:
-    root = Path(argv[1] if len(argv) > 1 else "cvai-data")
+    root = Path(argv[1] if len(argv) > 1 else "tests/fixture_data/demo-db")
     role_count = write_all_role_job_yaml(root)
     write_structured_context_and_library(root)
     print(f"Wrote {role_count} role job.yaml files")

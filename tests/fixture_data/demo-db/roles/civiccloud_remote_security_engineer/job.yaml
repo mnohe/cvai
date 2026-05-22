@@ -1,0 +1,45 @@
+version: 1
+role_id: civiccloud_remote_security_engineer
+company: CivicCloud
+title: Security Software Engineer
+location: Remote - Europe
+source_url: https://jobs.example.test/civiccloud/security-software-engineer
+captured_on: '2026-04-18T16:30:00+00:00'
+priority_rank: 5
+active: false
+posting:
+  raw_text: See job.md for the fictional posting.
+extracted:
+  responsibilities:
+  - Threat model product features.
+  - Guide secure coding and remediation.
+  - Review identity integrations.
+  hard_requirements:
+  - Product-security experience.
+  - Secure software engineering.
+  soft_requirements:
+  - Cross-team coaching.
+  inferred_requirements:
+  - Public security writing sample.
+  skills:
+  - Security
+  - Identity
+  - Threat modeling
+  interview_focus:
+  - Threat modeling.
+  - Secure SDLC.
+requirements:
+- id: req_001
+  text: Secure software engineering
+  category: hard_requirement
+  fulfillment: partial
+  evidence:
+  - text: Identity and PKI work at Northstar Identity plus policy controls at Aurelian Systems.
+    refs:
+    - cv:northstar_identity
+    - cv:aurelian_systems
+  gap: Direct product-security ownership is not explicit.
+  patch_plan: Build threat-model sample if pursuing similar roles.
+  task_refs:
+  - task_security_threat_model
+  feasible: true

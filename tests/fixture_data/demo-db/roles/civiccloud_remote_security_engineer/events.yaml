@@ -1,0 +1,7 @@
+events:
+- id: event-77777777-7777-4777-8777-777777777777
+  role_id: civiccloud_remote_security_engineer
+  type: closed
+  date: '2026-05-06'
+  detail: 'CivicCloud `Security Software Engineer` role was closed. Salary and on-call expectations were not aligned.'
+  artifacts: []

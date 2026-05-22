@@ -1,0 +1,13 @@
+artifacts:
+- kind: resume
+  path: roles/northstar_dublin_engineering_manager_identity/artifacts/resume.md
+- kind: cover_letter
+  path: roles/northstar_dublin_engineering_manager_identity/artifacts/cover_letter.md
+- kind: story_bank
+  path: roles/northstar_dublin_engineering_manager_identity/artifacts/interview_prep/story_bank.md
+- kind: system_design_bank
+  path: roles/northstar_dublin_engineering_manager_identity/artifacts/interview_prep/system_design_bank.md
+- kind: security_bank
+  path: roles/northstar_dublin_engineering_manager_identity/artifacts/interview_prep/security_bank.md
+- kind: coding_plan
+  path: roles/northstar_dublin_engineering_manager_identity/artifacts/interview_prep/coding_plan.md

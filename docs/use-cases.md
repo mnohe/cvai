@@ -58,7 +58,7 @@
 5. Add, remove, or reorder repeatable entries with the editor controls.
 6. Submit the form. The server validates the full CV structure before writing and removes the cached PDF so it can be rebuilt.
 7. Click the PDF download link in the CV section.
-8. If `cvai-data/cv/cv.pdf` already exists, the app serves it directly.
+8. If `CVAI_DATA/cv/cv.pdf` already exists, the app serves it directly.
 9. If the PDF is missing, the app triggers the Typst renderer with the configured data layout and serves the result.
 10. If Typst is not installed, the app returns a clear error rather than a 500.
 
@@ -152,14 +152,14 @@ Two paths are available:
 
 **Via the local renderer:**
 
-1. Edit the CV through `/cv/`, or update `cvai-data/cv/cv.yaml` directly if you are working outside the web UI.
+1. Edit the CV through `/cv/`, or update `CVAI_DATA/cv/cv.yaml` directly if you are working outside the web UI.
 2. Run the PDF renderer or click the CV page's PDF download link.
-3. The data-owned Typst templates render the YAML and write `cvai-data/cv/cv.pdf`.
+3. The data-owned Typst templates render the YAML and write `CVAI_DATA/cv/cv.pdf`.
 
 **Via web UI (on demand):**
 
 1. Open `/cv/`.
-2. If `cvai-data/cv/cv.pdf` is absent, `cvai` triggers the Typst renderer and serves the result.
+2. If `CVAI_DATA/cv/cv.pdf` is absent, `cvai` triggers the Typst renderer and serves the result.
 3. Subsequent downloads serve the cached PDF until `cv.yaml` changes and the file is deleted or rebuilt.
 
 **LLM:** not used.
@@ -171,8 +171,8 @@ Two paths are available:
 **Actor:** user
 
 1. Obtain a template pack directory. It must contain `template.yaml` and the Typst entry point declared by that manifest.
-2. Run `cvai templates import /path/to/template-pack /path/to/private-data`.
-3. CVAI validates the manifest and copies the pack into `cvai-data/pdf/templates/<template_id>`.
+2. Run `cvai templates import /path/to/template-pack tests/fixture_data/demo-db`.
+3. CVAI validates the manifest and copies the pack into `CVAI_DATA/pdf/templates/<template_id>`.
 4. The imported template is available to PDF rendering commands.
 
 **LLM:** not used.

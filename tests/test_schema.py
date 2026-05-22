@@ -64,7 +64,7 @@ events:
 
             self.assertTrue(created)
             self.assertTrue((root / "roles.yaml").exists())
-            self.assertTrue((root / "cv" / "cv-schema.json").exists())
+            self.assertFalse((root / "cv" / "cv-schema.json").exists())
             self.assertTrue((root / "roles").is_dir())
             self.assertEqual(validate_data_root(root), [])
 

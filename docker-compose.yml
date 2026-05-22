@@ -5,7 +5,7 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - ${CVAI_DATA:-../cvai-data}:/data
+      - ${CVAI_DATA:-./tests/fixture_data/demo-db}:/data
     environment:
       CVAI_DATA: /data
       LLM_PROVIDER: ${LLM_PROVIDER:-openai}

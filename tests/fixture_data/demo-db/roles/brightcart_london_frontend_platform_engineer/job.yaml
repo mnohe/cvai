@@ -1,0 +1,44 @@
+version: 1
+role_id: brightcart_london_frontend_platform_engineer
+company: BrightCart
+title: Frontend Platform Engineer
+location: London, UK
+source_url: https://jobs.example.test/brightcart/frontend-platform-engineer
+captured_on: '2026-04-10T10:00:00+00:00'
+priority_rank: 6
+active: false
+posting:
+  raw_text: See job.md for the fictional posting.
+extracted:
+  responsibilities:
+  - Maintain React design-system tooling.
+  - Improve frontend build and test workflows.
+  - Coach product teams on accessibility and UI quality.
+  hard_requirements:
+  - Current React and TypeScript depth.
+  - Frontend platform tooling.
+  soft_requirements:
+  - Design-system collaboration.
+  inferred_requirements:
+  - Recent public frontend evidence.
+  skills:
+  - React
+  - TypeScript
+  - Accessibility
+  interview_focus:
+  - Component API design.
+  - Build tooling.
+requirements:
+- id: req_001
+  text: Current React platform depth
+  category: hard_requirement
+  fulfillment: unmet
+  evidence:
+  - text: Early internal web tooling exists but is old and hidden by default.
+    refs:
+    - cv:harbor_finch
+  gap: No current React evidence.
+  patch_plan: Build a small React platform demo only if pursuing this track.
+  task_refs:
+  - task_frontend_framework_refresh
+  feasible: true

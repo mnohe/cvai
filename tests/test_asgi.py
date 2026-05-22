@@ -176,14 +176,14 @@ class FastAPIRouteTests(unittest.TestCase):
         client = self.client()
 
         response = client.post(
-            "/tasks/task_platform_story/status",
+            "/tasks/task_control_plane_case_study/status",
             data={"status": "completed", "detail": "pp-platform"},
             follow_redirects=False,
         )
-        task = client.app.state.service.repo.get_task("task_platform_story")
+        task = client.app.state.service.repo.get_task("task_control_plane_case_study")
 
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response.headers["location"], "/tasks/task_platform_story")
+        self.assertEqual(response.headers["location"], "/tasks/task_control_plane_case_study")
         self.assertEqual(task.status, "completed")
         self.assertEqual(task.evidence_refs, ["pp-platform"])
 
@@ -200,7 +200,7 @@ class FastAPIRouteTests(unittest.TestCase):
         client = self.client(llm=llm)
 
         response = client.post(
-            "/roles/sample_remote_platform_engineer/update-prompt",
+            "/roles/ledgerly_remote_staff_backend_engineer_payments/update-prompt",
             data={"prompt": "Rejected on 2026-05-20 with this rationale: duplicate role."},
             follow_redirects=False,
         )
@@ -212,7 +212,7 @@ class FastAPIRouteTests(unittest.TestCase):
             if "Applied rejected status dated 2026-05-20" in fragment or "failed" in fragment:
                 break
             time.sleep(0.05)
-        role = client.app.state.service.repo.get_role("sample_remote_platform_engineer")
+        role = client.app.state.service.repo.get_role("ledgerly_remote_staff_backend_engineer_payments")
 
         self.assertEqual(response.status_code, 302)
         self.assertIn("Applied rejected status dated 2026-05-20", fragment)

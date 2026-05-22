@@ -1,0 +1,13 @@
+artifacts:
+- kind: resume
+  path: roles/ledgerly_remote_staff_backend_engineer_payments/artifacts/resume.md
+- kind: cover_letter
+  path: roles/ledgerly_remote_staff_backend_engineer_payments/artifacts/cover_letter.md
+- kind: story_bank
+  path: roles/ledgerly_remote_staff_backend_engineer_payments/artifacts/interview_prep/story_bank.md
+- kind: system_design_bank
+  path: roles/ledgerly_remote_staff_backend_engineer_payments/artifacts/interview_prep/system_design_bank.md
+- kind: security_bank
+  path: roles/ledgerly_remote_staff_backend_engineer_payments/artifacts/interview_prep/security_bank.md
+- kind: coding_plan
+  path: roles/ledgerly_remote_staff_backend_engineer_payments/artifacts/interview_prep/coding_plan.md

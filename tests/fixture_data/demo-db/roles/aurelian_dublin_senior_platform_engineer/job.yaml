@@ -1,0 +1,74 @@
+version: 1
+role_id: aurelian_dublin_senior_platform_engineer
+company: Aurelian Cloud
+title: Senior Platform Engineer
+location: Dublin, Ireland
+source_url: https://jobs.example.test/aurelian/senior-platform-engineer
+captured_on: '2026-05-01T09:15:00+00:00'
+priority_rank: 1
+active: true
+posting:
+  raw_text: See job.md for the fictional posting.
+extracted:
+  responsibilities:
+  - Build platform APIs and golden paths.
+  - Operate Kubernetes fleet automation and shared services.
+  - Improve observability and incident tooling.
+  - Mentor engineers through design and operational readiness reviews.
+  hard_requirements:
+  - Go or Python backend engineering.
+  - Kubernetes production operations.
+  - Infrastructure as code and distributed systems.
+  soft_requirements:
+  - Strong written communication.
+  - Security and cost-awareness.
+  inferred_requirements:
+  - Ability to balance developer experience with governance.
+  skills:
+  - Go
+  - Python
+  - Kubernetes
+  - Terraform
+  - OpenTelemetry
+  interview_focus:
+  - Control-plane architecture.
+  - Progressive delivery and policy rollout.
+  - Incident response and operational maturity.
+requirements:
+- id: req_001
+  text: Kubernetes platform ownership
+  category: hard_requirement
+  fulfillment: met
+  evidence:
+  - text: Aurelian Systems work covered 70 production Kubernetes clusters and platform automation.
+    refs:
+    - cv:aurelian_systems
+  gap: ''
+  patch_plan: ''
+  task_refs: []
+  feasible: true
+- id: req_002
+  text: Control-plane API design
+  category: hard_requirement
+  fulfillment: met
+  evidence:
+  - text: Led multi-region control-plane design for internal developer environments.
+    refs:
+    - cv:aurelian_systems
+  gap: ''
+  patch_plan: Prepare architecture walkthrough.
+  task_refs: []
+  feasible: true
+- id: req_003
+  text: Public case-study evidence
+  category: inferred_requirement
+  fulfillment: partial
+  evidence:
+  - text: Control Plane Lab project is available as supporting public evidence.
+    refs:
+    - project:control_plane_lab
+  gap: Written case study is not yet complete.
+  patch_plan: Write a concise case study before submitting.
+  task_refs:
+  - task_control_plane_case_study
+  feasible: true

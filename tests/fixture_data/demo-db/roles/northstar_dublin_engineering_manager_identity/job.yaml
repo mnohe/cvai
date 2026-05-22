@@ -1,0 +1,57 @@
+version: 1
+role_id: northstar_dublin_engineering_manager_identity
+company: Northstar ID
+title: Engineering Manager, Identity Platform
+location: Dublin, Ireland
+source_url: https://jobs.example.test/northstar/engineering-manager-identity
+captured_on: '2026-05-03T13:20:00+00:00'
+priority_rank: 3
+active: true
+posting:
+  raw_text: See job.md for the fictional posting.
+extracted:
+  responsibilities:
+  - Manage an identity-platform engineering team.
+  - Coach engineers and coordinate roadmap delivery.
+  - Partner with security and product stakeholders.
+  hard_requirements:
+  - People leadership.
+  - Identity platform experience.
+  soft_requirements:
+  - Hiring and coaching.
+  - Conflict resolution.
+  inferred_requirements:
+  - Ability to remain technical enough for architecture reviews.
+  skills:
+  - Identity
+  - OAuth2
+  - People management
+  interview_focus:
+  - People-leadership stories.
+  - Identity platform architecture.
+requirements:
+- id: req_001
+  text: Identity platform domain knowledge
+  category: hard_requirement
+  fulfillment: met
+  evidence:
+  - text: Built authentication, authorization, lifecycle APIs, OAuth2, SAML, and PKI tooling.
+    refs:
+    - cv:northstar_identity
+  gap: ''
+  patch_plan: ''
+  task_refs: []
+  feasible: true
+- id: req_002
+  text: People management depth
+  category: hard_requirement
+  fulfillment: partial
+  evidence:
+  - text: Mentored senior engineers and led design reviews as staff engineer.
+    refs:
+    - cv:aurelian_systems
+  gap: CV does not show a recent formal manager title.
+  patch_plan: Prepare explicit coaching, prioritization, and difficult-conversation stories.
+  task_refs:
+  - task_people_leadership_packet
+  feasible: true

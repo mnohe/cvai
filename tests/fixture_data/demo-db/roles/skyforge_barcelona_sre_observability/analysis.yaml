@@ -1,0 +1,65 @@
+version: 1
+role_id: skyforge_barcelona_sre_observability
+summary:
+  verdict: FIT
+  verdict_label: Good fit
+  recommendation:
+    value: ACCEPT_PENDING_CONTRACT
+    reason: Technical fit is good; final decision depends on written offer and relocation details.
+  rationale: Observability and reliability experience map well, while relocation preference needs confirmation.
+  notes:
+  - ACCEPTED_VERBAL_OFFER
+strengths:
+- title: Reliability and telemetry evidence
+  evidence:
+  - text: Aurelian Systems platform work includes OpenTelemetry, SLOs, incident playbooks, and production operations.
+    refs:
+    - cv:aurelian_systems
+gaps:
+- description: Written relocation package is pending.
+  task_refs:
+  - task_relocation_decision
+  feasible: true
+work_items:
+- title: Offer review
+  detail: Compare compensation, relocation, hybrid schedule, and on-call load.
+timeline:
+- period: Offer stage
+  items:
+  - Review written contract before signing.
+requirements:
+- id: req_001
+  text: Observability and reliability experience
+  category: hard_requirement
+  fulfillment: met
+  evidence:
+  - text: Aurelian Systems includes OpenTelemetry, SLOs, incident playbooks, and platform operations.
+    refs:
+    - cv:aurelian_systems
+  gap: ''
+  patch_plan: ''
+  task_refs: []
+  feasible: true
+- id: req_002
+  text: Barcelona relocation decision
+  category: inferred_requirement
+  fulfillment: partial
+  evidence: []
+  gap: Need written offer details before final decision.
+  patch_plan: Compare offer against constraints.
+  task_refs:
+  - task_relocation_decision
+  feasible: true
+gap_tasks:
+  task_relocation_decision:
+    title: Decide on Barcelona relocation package
+    estimated_days: 1
+    feasible_within_one_week: true
+    description: Review offer against constraints.
+    acceptance_criteria:
+    - Written offer reviewed.
+    evidence_refs: []
+comments:
+- Accepted role exercises terminal dashboard filtering.
+llm_context:
+  prompt_profile: sre

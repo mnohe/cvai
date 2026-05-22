@@ -1,0 +1,5 @@
+tasks:
+- id: task_relocation_decision
+  status: open
+  kind: decision
+  title: Decide on Barcelona relocation package

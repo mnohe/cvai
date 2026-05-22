@@ -3,7 +3,6 @@ from __future__ import annotations
 import argparse
 from dataclasses import dataclass
 from datetime import date, datetime
-import shutil
 from pathlib import Path
 from typing import Any
 from uuid import UUID
@@ -55,18 +54,6 @@ PROJECTION_FILES = {
         "cover_letter_blocks": [],
     },
 }
-PUBLIC_SCHEMA_FILES = {
-    # Keep a copy under the repository-level `schemas/` directory for direct
-    # publication, and under `cvai_core/schemas/` for installed packages. The
-    # initializer prefers the public file during source checkouts and falls back
-    # to the package resource in wheel/container installs.
-    "cv/cv-schema.json": (
-        Path(__file__).resolve().parents[1] / "schemas" / "cv.schema.json",
-        Path(__file__).resolve().parent / "schemas" / "cv.schema.json",
-    ),
-}
-
-
 @dataclass(frozen=True)
 class ValidationIssue:
     # A validation issue points at the closest YAML path we can name. Tests assert
@@ -88,8 +75,8 @@ def initialize_data_root(root: Path) -> list[Path]:
     """Create the minimal writable data directory expected by CVAI.
 
     Deployment mounts a private, initially empty location as `CVAI_DATA`. The web
-    package owns the schema, so initialization lives here and writes only missing
-    files. Existing user data is never overwritten.
+    package owns the schema and validator, so initialization writes only the
+    datastore files and directories. Existing user data is never overwritten.
     """
     root.mkdir(parents=True, exist_ok=True)
     created: list[Path] = []
@@ -103,13 +90,6 @@ def initialize_data_root(root: Path) -> list[Path]:
         if not path.exists():
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(dump_yaml(payload), encoding="utf-8")
-            created.append(path)
-    for relative_path, sources in PUBLIC_SCHEMA_FILES.items():
-        path = root / relative_path
-        source = next((candidate for candidate in sources if candidate.exists()), None)
-        if not path.exists() and source is not None:
-            path.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(source, path)
             created.append(path)
     return created
 

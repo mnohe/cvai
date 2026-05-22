@@ -1,0 +1,57 @@
+roles:
+- id: aurelian_dublin_senior_platform_engineer
+  company: Aurelian Cloud
+  title: Senior Platform Engineer
+  location: Dublin, Ireland
+  source_url: https://jobs.example.test/aurelian/senior-platform-engineer
+  captured_on: '2026-05-01T09:15:00+00:00'
+  priority_rank: 1
+  active: true
+- id: ledgerly_remote_staff_backend_engineer_payments
+  company: Ledgerly
+  title: Staff Backend Engineer, Payments
+  location: Remote - EU
+  source_url: https://jobs.example.test/ledgerly/staff-backend-payments
+  captured_on: '2026-05-02T11:40:00+00:00'
+  priority_rank: 2
+  active: true
+- id: northstar_dublin_engineering_manager_identity
+  company: Northstar ID
+  title: Engineering Manager, Identity Platform
+  location: Dublin, Ireland
+  source_url: https://jobs.example.test/northstar/engineering-manager-identity
+  captured_on: '2026-05-03T13:20:00+00:00'
+  priority_rank: 3
+  active: true
+- id: skyforge_barcelona_sre_observability
+  company: Skyforge Observability
+  title: Site Reliability Engineer, Telemetry
+  location: Barcelona, Spain
+  source_url: https://jobs.example.test/skyforge/sre-telemetry
+  captured_on: '2026-04-26T08:05:00+00:00'
+  priority_rank: 4
+  active: true
+- id: civiccloud_remote_security_engineer
+  company: CivicCloud
+  title: Security Software Engineer
+  location: Remote - Europe
+  source_url: https://jobs.example.test/civiccloud/security-software-engineer
+  captured_on: '2026-04-18T16:30:00+00:00'
+  priority_rank: 5
+  active: false
+- id: brightcart_london_frontend_platform_engineer
+  company: BrightCart
+  title: Frontend Platform Engineer
+  location: London, UK
+  source_url: https://jobs.example.test/brightcart/frontend-platform-engineer
+  captured_on: '2026-04-10T10:00:00+00:00'
+  priority_rank: 6
+  active: false
+- id: oldtown_remote_java_engineer_legacy
+  company: OldTown Software
+  title: Senior Java Engineer, Legacy Modernization
+  location: Remote - Europe
+  source_url: https://jobs.example.test/oldtown/java-modernization
+  captured_on: '2026-03-20T12:00:00+00:00'
+  priority_rank: 7
+  active: false

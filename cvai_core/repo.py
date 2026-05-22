@@ -740,4 +740,4 @@ def default_repo_root() -> Path:
     configured = os.environ.get("CVAI_DATA")
     if configured:
         return Path(configured).resolve()
-    return (Path(__file__).resolve().parents[2] / "cvai-data").resolve()
+    return (Path(__file__).resolve().parents[1] / "tests" / "fixture_data" / "demo-db").resolve()

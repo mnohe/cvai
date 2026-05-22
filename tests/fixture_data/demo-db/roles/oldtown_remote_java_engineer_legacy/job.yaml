@@ -1,0 +1,40 @@
+version: 1
+role_id: oldtown_remote_java_engineer_legacy
+company: OldTown Software
+title: Senior Java Engineer, Legacy Modernization
+location: Remote - Europe
+source_url: https://jobs.example.test/oldtown/java-modernization
+captured_on: '2026-03-20T12:00:00+00:00'
+priority_rank: 7
+active: false
+posting:
+  raw_text: See job.md for the fictional posting.
+extracted:
+  responsibilities:
+  - Maintain legacy Java services.
+  - Support incremental modernization.
+  hard_requirements:
+  - Java backend experience.
+  soft_requirements:
+  - Patience with maintenance-heavy work.
+  inferred_requirements:
+  - Low appetite for platform architecture.
+  skills:
+  - Java
+  - Legacy modernization
+  interview_focus:
+  - Maintenance trade-offs.
+requirements:
+- id: req_001
+  text: Java backend experience
+  category: hard_requirement
+  fulfillment: met
+  evidence:
+  - text: Multiple prior roles include Java backend work.
+    refs:
+    - cv:ledgerly
+    - cv:northstar_identity
+  gap: ''
+  patch_plan: ''
+  task_refs: []
+  feasible: true

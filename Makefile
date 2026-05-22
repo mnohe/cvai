@@ -10,7 +10,7 @@ include .env
 export
 endif
 
-.PHONY: test e2e coverage run dev validate cv cv-mr
+.PHONY: test e2e coverage run dev validate cv
 
 test:
 	PYTHONPATH=. $(PYTHON) -m unittest discover -s tests -v
@@ -33,7 +33,4 @@ validate:
 	PYTHONPATH=. $(PYTHON) -m cvai_core.schema $(CVAI_DATA)
 
 cv:
-	PYTHONPATH=. $(PYTHON) -m cvai_core.pdf $(CVAI_DATA)/cv/cv.yaml $(CVAI_DATA)/cv/cv.pdf --template portrait --templates-root $(CVAI_DATA)/pdf/templates
-
-cv-mr:
-	PYTHONPATH=. $(PYTHON) -m cvai_core.pdf $(CVAI_DATA)/cv/cv.yaml $(CVAI_DATA)/cv/mnoe-cv-mr.pdf --template machine-readable --templates-root $(CVAI_DATA)/pdf/templates
+	PYTHONPATH=. $(PYTHON) -m cvai_core.pdf $(CVAI_DATA)/cv/cv.yaml $(CVAI_DATA)/cv/cv.pdf --template demo --templates-root $(CVAI_DATA)/pdf/templates

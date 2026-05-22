@@ -1,0 +1,56 @@
+version: 1
+role_id: brightcart_london_frontend_platform_engineer
+summary:
+  verdict: WEAK_FIT
+  verdict_label: Weak fit
+  recommendation:
+    value: DO_NOT_PRIORITIZE
+    reason: Rejection feedback confirms the known gap in current frontend-framework depth.
+  rationale: Internal tooling and platform instincts fit, but the role is heavily frontend-framework focused.
+  notes:
+  - REJECTED
+strengths:
+- title: Platform instincts
+  evidence:
+  - text: Developer-platform and tooling work transfers partially.
+    refs:
+    - cv:aurelian_systems
+gaps:
+- description: No current React platform evidence.
+  task_refs:
+  - task_frontend_framework_refresh
+  feasible: true
+work_items:
+- title: Optional frontend refresh
+  detail: Only invest if frontend-platform roles become a target again.
+timeline:
+- period: After rejection
+  items:
+  - Keep task low priority.
+requirements:
+- id: req_001
+  text: Current React platform depth
+  category: hard_requirement
+  fulfillment: unmet
+  evidence:
+  - text: Early internal web tooling exists but is old and hidden by default.
+    refs:
+    - cv:harbor_finch
+  gap: No current React evidence.
+  patch_plan: Build a small React platform demo only if pursuing this track.
+  task_refs:
+  - task_frontend_framework_refresh
+  feasible: true
+gap_tasks:
+  task_frontend_framework_refresh:
+    title: Refresh React platform evidence
+    estimated_days: 7
+    feasible_within_one_week: true
+    description: Build a small React platform demo.
+    acceptance_criteria:
+    - Typed components, tests, accessibility checks, and build tooling exist.
+    evidence_refs: []
+comments:
+- Useful for showing weak fit and rejection handling.
+llm_context:
+  prompt_profile: frontend-gap

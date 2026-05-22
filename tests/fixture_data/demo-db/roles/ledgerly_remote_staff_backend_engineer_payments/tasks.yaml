@@ -1,0 +1,5 @@
+tasks:
+- id: task_payment_failure_modes
+  status: completed
+  kind: interview_prep
+  title: Prepare payment failure-mode examples

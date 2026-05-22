@@ -1,0 +1,10 @@
+role_id: northstar_dublin_engineering_manager_identity
+status: interviewing
+status_date: '2026-05-15'
+status_detail: Hiring-manager screen completed; system-design and people-leadership loop scheduled for 2026-05-24.
+status_artifacts:
+- roles/northstar_dublin_engineering_manager_identity/artifacts/interview_prep/story_bank.md
+- roles/northstar_dublin_engineering_manager_identity/artifacts/interview_prep/system_design_bank.md
+verdict: OVERQUALIFIED
+verdict_label: Overqualified fit
+rationale: Identity-domain depth is excellent; risk is whether the candidate wants a people-management-heavy role.

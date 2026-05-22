@@ -1,0 +1,45 @@
+version: 1
+role_id: oldtown_remote_java_engineer_legacy
+summary:
+  verdict: UNFIT
+  verdict_label: Not a fit
+  recommendation:
+    value: KEEP_INACTIVE
+    reason: Role scope is below current target direction.
+  rationale: Java experience is strong, but the role direction does not match current platform/backend goals.
+  notes:
+  - INACTIVE_ARCHIVE_EXAMPLE
+strengths:
+- title: Java background
+  evidence:
+  - text: Multiple roles include Java backend delivery.
+    refs:
+    - cv:northstar_identity
+gaps:
+- description: Role motivation is weak.
+  task_refs: []
+  feasible: false
+work_items: []
+timeline:
+- period: Archived
+  items:
+  - No further action.
+requirements:
+- id: req_001
+  text: Java backend experience
+  category: hard_requirement
+  fulfillment: met
+  evidence:
+  - text: Multiple prior roles include Java backend work.
+    refs:
+    - cv:ledgerly
+    - cv:northstar_identity
+  gap: ''
+  patch_plan: ''
+  task_refs: []
+  feasible: true
+gap_tasks: {}
+comments:
+- Exercises inactive status.
+llm_context:
+  prompt_profile: inactive-archive

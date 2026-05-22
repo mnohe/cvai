@@ -1,0 +1,5 @@
+tasks:
+- id: task_security_threat_model
+  status: wont_do
+  kind: gap_evidence
+  title: Build public threat-model sample

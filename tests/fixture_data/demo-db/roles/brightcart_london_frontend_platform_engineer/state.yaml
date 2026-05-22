@@ -1,0 +1,9 @@
+role_id: brightcart_london_frontend_platform_engineer
+status: rejected
+status_date: '2026-04-29'
+status_detail: Rejected after technical screen; feedback was strong systems thinking but insufficient current React depth.
+status_artifacts:
+- roles/brightcart_london_frontend_platform_engineer/artifacts/resume.md
+verdict: WEAK_FIT
+verdict_label: Weak fit
+rationale: Internal tooling and platform instincts fit, but the role is heavily frontend-framework focused.

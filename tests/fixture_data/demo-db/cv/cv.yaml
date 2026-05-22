@@ -1,0 +1,172 @@
+summary: |
+  Staff-level backend and platform engineer with 13+ years of experience building secure distributed systems, developer platforms, identity products, and production automation. Strongest in Python, Go, Java, Kubernetes, reliability engineering, and pragmatic technical leadership across product, security, and operations teams.
+contact:
+  name: Lena
+  surname: Hart
+  phone:
+    prefix: '+353'
+    number: 87 555 0142
+  email: lena.hart@example.test
+  linkedin: lena-hart-demo
+  github: lenahart-demo
+  www: https://lena-hart.example.test
+languages:
+- name: English
+  level: Native
+- name: German
+  level: Professional working proficiency
+- name: Spanish
+  level: Conversational
+certifications:
+- name: Certified Kubernetes Administrator
+  id: CKA-DEMO-20491
+  issuer: Cloud Native Computing Foundation
+  year: 2022
+- name: AWS Certified Solutions Architect - Professional
+  id: AWS-DEMO-88Q2
+  issuer: Amazon Web Services
+  year: 2021
+- name: Professional Scrum Master I
+  id: PSM-DEMO-1138
+  issuer: Scrum.org
+  year: 2018
+education:
+- name: MSc Distributed Software Systems
+  type: Master's degree
+  issuer: University College Dublin
+  year: 2013
+- name: BSc Computer Science
+  type: Bachelor's degree
+  issuer: Trinity College Dublin
+  year: 2011
+experience:
+- company: Aurelian Systems
+  positions:
+  - roles:
+    - Staff Platform Engineer
+    - Tech Lead
+    start: 2022-02
+    end: null
+    location: Dublin, Ireland (hybrid)
+    tasks:
+    - Led the design of a multi-region control plane for provisioning internal developer environments, reducing environment lead time from days to under one hour.
+    - Introduced progressive delivery, workload identity, and policy-as-code controls across 70 production Kubernetes clusters.
+    - Partnered with security and finance teams to add cost guardrails, audit trails, and incident playbooks for platform services.
+    - Mentored six senior engineers through design reviews, operational readiness reviews, and post-incident learning sessions.
+    keywords:
+    - Go
+    - Python
+    - Kubernetes
+    - Argo CD
+    - Terraform
+    - OpenTelemetry
+    - AWS
+    - GCP
+    - Platform engineering
+    - Technical leadership
+  - roles:
+    - Senior Backend Engineer
+    start: 2019-08
+    end: 2022-02
+    location: Dublin, Ireland
+    tasks:
+    - Built tenant-aware APIs for customer onboarding, entitlement checks, and usage reporting.
+    - Reworked a message-driven billing workflow to use idempotent consumers, bounded retries, and event replay tooling.
+    - Added contract tests and service-level indicators for critical backend workflows.
+    keywords:
+    - Java
+    - Spring Boot
+    - Kafka
+    - PostgreSQL
+    - Redis
+    - REST
+    - SLOs
+- company: Ledgerly
+  positions:
+  - roles:
+    - Senior Software Engineer
+    start: 2016-04
+    end: 2019-07
+    location: Berlin, Germany
+    tasks:
+    - Built payment reconciliation services processing card, SEPA, and wallet transactions for a B2B finance product.
+    - Designed audit-friendly data flows for ledger adjustments, operational overrides, and customer support tooling.
+    - Led a migration from batch reconciliation jobs to event-driven settlement pipelines.
+    keywords:
+    - Python
+    - Django
+    - PostgreSQL
+    - Celery
+    - RabbitMQ
+    - Payments
+    - Reconciliation
+- company: Northstar Identity
+  positions:
+  - roles:
+    - Backend Engineer
+    start: 2013-09
+    end: 2016-03
+    location: Galway, Ireland
+    tasks:
+    - Implemented authentication, authorization, and user lifecycle APIs for an enterprise identity product.
+    - Added OAuth2 integrations, certificate rotation tooling, and admin audit logs.
+    - Joined on-call for identity services and wrote recovery runbooks for high-priority incidents.
+    keywords:
+    - Java
+    - OAuth2
+    - SAML
+    - PKI
+    - MySQL
+    - Linux
+    - Security
+- company: Harbor & Finch
+  visible: false
+  positions:
+  - roles:
+    - Junior Web Developer
+    start: 2011-07
+    end: 2013-08
+    location: Cork, Ireland
+    tasks:
+    - Built internal reporting screens and customer-support tools for a logistics company.
+    keywords:
+    - PHP
+    - JavaScript
+    - MySQL
+projects:
+  url: https://lena-hart.example.test/projects
+  items:
+  - name: Control Plane Lab
+    summary: Reference implementation of a small developer-platform control plane.
+    url: https://github.com/lenahart-demo/control-plane-lab
+    description: Demonstrates environment provisioning, policy checks, audit events, and reconciliation loops with a compact Go service and local Kubernetes fixtures.
+    links:
+    - label: Architecture notes
+      url: https://lena-hart.example.test/projects/control-plane-lab
+    - label: Demo recording
+      url: https://lena-hart.example.test/talks/control-plane-lab
+    keywords:
+    - Go
+    - Kubernetes
+    - Controllers
+    - Platform engineering
+  - name: ReconcileKit
+    summary: Toy payment reconciliation service with replayable event streams.
+    url: https://github.com/lenahart-demo/reconcilekit
+    description: A Python service showing idempotent settlement processing, manual adjustment review, and audit-friendly operational workflows.
+    links:
+    - label: Design write-up
+      url: https://lena-hart.example.test/projects/reconcilekit
+    keywords:
+    - Python
+    - FastAPI
+    - PostgreSQL
+    - Payments
+  - name: Incident Notebook
+    visible: false
+    summary: Private notes template for post-incident reviews.
+    url: https://lena-hart.example.test/private/incident-notebook
+    description: Hidden demo project used to exercise visibility toggles and project editing without appearing in public CV output.
+    keywords:
+    - Reliability
+    - Postmortems

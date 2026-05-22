@@ -10,14 +10,13 @@ FIXTURE_ROOT = Path(__file__).resolve().parent / "fixture_data"
 
 
 def create_sample_data_root(root: Path) -> Path:
-    """Create a sample CVAI data directory for tests.
+    """Create a demo CVAI data directory for tests.
 
-    The public `cvai` repository must not depend on a private sibling
-    `cvai-data` checkout. Tests therefore copy a small file-based data fixture
-    into a temporary directory that looks like a real `CVAI_DATA` root.
+    Tests copy the public demo datastore into a temporary directory that looks
+    like a real `CVAI_DATA` root.
     """
     initialize_data_root(root)
-    copy_fixture_tree("sample-data", root)
+    copy_fixture_tree("demo-db", root)
     return root
 
 

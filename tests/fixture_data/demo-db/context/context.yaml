@@ -1,0 +1,49 @@
+version: 1
+constraints:
+  salary_target_range: EUR 135K-165K total compensation for Dublin or remote EU roles; EUR 120K minimum for high-learning roles with strong flexibility.
+  location_constraints: Dublin preferred; remote EU acceptable; relocation only for unusually strong offers.
+  visa_work_authorization: EU citizen; no sponsorship required for Ireland, Germany, or Spain.
+  notice_period: 6 weeks.
+  remote_hybrid_onsite_preference: Hybrid up to two days per week or remote-first.
+  other_constraints: Avoid high-travel roles and permanent weekend on-call.
+preferences:
+  preferred_tone: Senior, plain-spoken, metrics-aware, and specific without sounding inflated.
+  avoid_these_claims_phrases: Deep React specialization, security-operations ownership, ML model training, or direct HSM operations unless a role artifact explains the limitation.
+  preferred_framing: Staff-level backend/platform engineer who combines distributed systems delivery, secure identity/payment experience, and operational ownership.
+  topics_to_de_emphasize: Early junior web work and hidden private incident notes unless needed to explain career continuity.
+metrics:
+- id: platform_clusters_supported
+  metric: Production Kubernetes clusters supported
+  value: 70
+  context: Aurelian Systems platform-control-plane work
+  source: cv/cv.yaml -> Aurelian Systems
+  status: SAFE
+- id: environment_lead_time
+  metric: Developer environment lead time
+  value: Days to under one hour
+  context: Internal platform provisioning at Aurelian Systems
+  source: cv/cv.yaml -> Aurelian Systems
+  status: SAFE
+- id: commercial_experience
+  metric: Commercial software engineering experience
+  value: 13+ years
+  context: Career timeline from 2011 through 2026
+  source: cv/cv.yaml experience timeline
+  status: SAFE
+portfolio:
+  public_surfaces:
+  - 'Homepage: https://lena-hart.example.test'
+  - 'Project index: https://lena-hart.example.test/projects'
+  projects:
+  - id: control_plane_lab
+    name: Control Plane Lab
+    public_link: https://github.com/lenahart-demo/control-plane-lab
+    proves: Kubernetes controller patterns, platform automation, auditability, and policy-aware provisioning.
+    relevance: Strongest public supplement for platform, SRE, and infrastructure roles.
+    notes: Fictional public repo for demos.
+  - id: reconcilekit
+    name: ReconcileKit
+    public_link: https://github.com/lenahart-demo/reconcilekit
+    proves: Payment reconciliation, idempotent consumers, replay tooling, and operational review flows.
+    relevance: Useful for payments, risk, ledger, and backend roles.
+    notes: Fictional public repo for demos.

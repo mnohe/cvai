@@ -25,9 +25,9 @@ class RepoTests(unittest.TestCase):
     def test_list_roles_loads_known_role(self) -> None:
         repo = Repository(self.data_root())
         roles = repo.list_roles()
-        known = [role for role in roles if role.canonical_slug == "example_dublin_backend_engineer"]
+        known = [role for role in roles if role.canonical_slug == "ledgerly_remote_staff_backend_engineer_payments"]
         self.assertTrue(known)
-        self.assertEqual(known[0].company, "Example")
+        self.assertEqual(known[0].company, "Ledgerly")
         self.assertEqual(known[0].verdict, "FIT")
 
     def test_not_submitted_status_is_draft(self) -> None:
@@ -69,13 +69,13 @@ class RepoTests(unittest.TestCase):
         slugs = [role.role.canonical_slug for role in roles]
 
         self.assertLess(
-            slugs.index("example_dublin_backend_engineer"),
-            slugs.index("sample_remote_platform_engineer"),
+            slugs.index("aurelian_dublin_senior_platform_engineer"),
+            slugs.index("ledgerly_remote_staff_backend_engineer_payments"),
         )
         network_role = [
             role
             for role in roles
-            if role.role.canonical_slug == "sample_remote_platform_engineer"
+            if role.role.canonical_slug == "aurelian_dublin_senior_platform_engineer"
         ][0]
         self.assertEqual(network_role.open_task_count, 1)
 

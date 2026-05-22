@@ -1,0 +1,9 @@
+role_id: skyforge_barcelona_sre_observability
+status: accepted
+status_date: '2026-05-18'
+status_detail: Verbal offer accepted pending written contract and compensation review.
+status_artifacts:
+- roles/skyforge_barcelona_sre_observability/artifacts/resume.md
+verdict: FIT
+verdict_label: Good fit
+rationale: Observability and reliability experience map well, while relocation preference needs confirmation.

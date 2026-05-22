@@ -1,0 +1,9 @@
+events:
+- id: event-11111111-1111-4111-8111-111111111111
+  role_id: ledgerly_remote_staff_backend_engineer_payments
+  type: submitted
+  date: '2026-05-08'
+  detail: 'Ledgerly `Staff Backend Engineer, Payments` role was submitted.'
+  artifacts:
+  - roles/ledgerly_remote_staff_backend_engineer_payments/artifacts/resume.md
+  - roles/ledgerly_remote_staff_backend_engineer_payments/artifacts/cover_letter.md

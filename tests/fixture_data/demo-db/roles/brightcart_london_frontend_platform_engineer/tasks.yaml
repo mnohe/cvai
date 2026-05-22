@@ -1,0 +1,5 @@
+tasks:
+- id: task_frontend_framework_refresh
+  status: open
+  kind: gap_evidence
+  title: Refresh React platform evidence

@@ -2,7 +2,7 @@
 
 ## Overview
 
-CVAI is a personal job-application management system. It serves a browser UI for tracking roles, application statuses, and AI-generated artifacts. It reads from and writes to `cvai-data`, a private structured data store the user keeps in a separate private repository. Typst templates stored in the data directory render the candidate CV from YAML source.
+CVAI is a personal job-application management system. It serves a browser UI for tracking roles, application statuses, and AI-generated artifacts. It reads from and writes to the configured `CVAI_DATA` directory. The public demo datastore lives at `tests/fixture_data/demo-db`. Typst templates stored in the data directory render the candidate CV from YAML source.
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
@@ -32,8 +32,8 @@ CVAI is a personal job-application management system. It serves a browser UI for
 └─────────────┼────────────────────────────────────────────────┘
               │ filesystem  (CVAI_DATA env var)
 ┌─────────────▼────────────────────────────────────────────────┐
-│                        cvai-data                             │
-│             (private; mounted at CVAI_DATA)                  │
+│             tests/fixture_data/demo-db                       │
+│             (or another directory mounted at CVAI_DATA)      │
 │                                                              │
 │  roles.yaml          applications.yaml                      │
 │  tasks.yaml          events.yaml                             │
@@ -56,7 +56,7 @@ The public-safe web application. The only component users interact with directly
 
 - LLMs are permitted only to interpret free-form user input or unstructured source material into structured data. They must never be used for dashboard ordering, task counts, status display, artifact discovery, or any deterministic read operation.
 - The `cvai` package must not contain private data, candidate secrets, or any file specific to a particular user's job search.
-- All state that must survive a process restart lives in `cvai-data`, not in memory.
+- All state that must survive a process restart lives in the configured data directory, not in memory.
 
 **Stack:**
 
@@ -69,15 +69,15 @@ The public-safe web application. The only component users interact with directly
 | LLM HTTP | `urllib` (stdlib; no SDK dependency) |
 | Data serialisation | PyYAML |
 
-### `cvai-data`
+### Data Directory
 
-Private structured data store. Canonical source of truth for all runtime state. Should live in a separate private repository and is mounted into `cvai` at runtime via `CVAI_DATA`. Users who publish `cvai` keep their `cvai-data` entirely private; the two repositories are intentionally decoupled.
+Structured data store and canonical source of truth for all runtime state. Local development uses the checked-in demo datastore at `tests/fixture_data/demo-db`; deployments mount a writable directory via `CVAI_DATA`.
 
-`cvai-data` is an instance directory, not a public template repository. `cvai` owns the schema, validator, and initializer. If `CVAI_DATA` points at a missing writable directory, startup creates the empty root layout before validating it.
+The data directory is an instance directory, not a template repository. `cvai` owns the schema, validator, and initializer. If `CVAI_DATA` points at a missing writable directory, startup creates the empty root layout before validating it.
 
 ### PDF templates
 
-Typst templates and their fonts are data assets under `cvai-data/pdf/templates/<template>/`. `cvai_core.pdf` reads `cvai-data/cv/cv.yaml`, calls Typst with the selected template's `cv.typ`, and writes PDFs. CVAI invokes it for the generic CV download endpoint when the cached PDF is missing. The runtime needs the `typst` binary for builds; the Docker image installs it.
+Typst templates and their fonts are data assets under `CVAI_DATA/pdf/templates/<template>/`. `cvai_core.pdf` reads `CVAI_DATA/cv/cv.yaml`, calls Typst with the selected template's `cv.typ`, and writes PDFs. CVAI invokes it for the generic CV download endpoint when the cached PDF is missing. The runtime needs the `typst` binary for builds; the Docker image installs it.
 
 ---
 
@@ -85,7 +85,7 @@ Typst templates and their fonts are data assets under `cvai-data/pdf/templates/<
 
 All role process state is stored as structured YAML. Fields are machine-readable; the web app reads them directly and never parses status, verdict, or rationale out of prose text.
 
-### Global indexes (`cvai-data/*.yaml`)
+### Global indexes (`CVAI_DATA/*.yaml`)
 
 | File | Purpose |
 |---|---|
@@ -140,7 +140,7 @@ All role process state is stored as structured YAML. Fields are machine-readable
 | `detail` | string | Event body. |
 | `artifacts` | list[string] | Artifact paths mentioned by the event. |
 
-### Per-role directory (`cvai-data/roles/<role_id>/`)
+### Per-role directory (`CVAI_DATA/roles/<role_id>/`)
 
 | Path | Purpose |
 |---|---|
@@ -161,8 +161,8 @@ Requirement rows in `analysis.yaml` distinguish hard requirements, soft requirem
 
 | Path | Purpose |
 |---|---|
-| `cv/cv.yaml` | YAML source of truth for the candidate CV. Schema at `cv/cv-schema.json`. |
-| `cv/cv.pdf` | Rendered generic CV (portrait template). |
+| `cv/cv.yaml` | YAML source of truth for the candidate CV. Schema is owned by `cvai_core/schemas/cv.schema.json`. |
+| `cv/cv.pdf` | Rendered generic CV (demo template by default). |
 | `pdf/templates/<template>/cv.typ` | Typst entry point for a CV template. |
 | `pdf/templates/<template>/fonts/` | Optional fonts owned by the template. |
 | `context/context.yaml` | Structured constraints, preferences, safe metrics, and portfolio inventory. |
@@ -288,7 +288,7 @@ No LLM call.
 
 ## Security Model
 
-- **Data separation.** `cvai` contains no private data. Secrets and candidate artifacts live in `cvai-data`, mounted at runtime and never committed to the public repository.
+- **Data separation.** Secrets and real candidate artifacts should live in the configured runtime data directory, not in the public demo fixture.
 - **Authentication.** The initial release is intended for local, single-user deployment and does not implement application-layer authentication. Do not expose CVAI directly to the public internet without a trusted authentication layer in front of it.
 - **SSRF protection.** The URL intake endpoint validates that the scheme is `https` and that the resolved IP address is not in an RFC 1918, loopback, or link-local range before fetching.
 - **Template escaping.** Jinja2 auto-escaping is enabled on all templates. User-supplied strings are never interpolated raw into HTML.
@@ -302,7 +302,7 @@ All configuration uses environment variables. A `.env` file at the root of `CVAI
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `CVAI_DATA` | yes | — | Absolute path to the `cvai-data` directory. |
+| `CVAI_DATA` | yes | `tests/fixture_data/demo-db` in source checkouts | Path to the data directory. |
 | `PORT` | no | `8080` | HTTP listen port. |
 | `LLM_API_KEY` | when using LLM workflows | — | API key for the selected provider. |
 | `LLM_MODEL` | no | `gpt-5` | Model name for the selected provider. |

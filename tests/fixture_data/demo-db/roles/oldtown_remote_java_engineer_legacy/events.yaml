@@ -1,0 +1,7 @@
+events:
+- id: event-99999999-9999-4999-8999-999999999999
+  role_id: oldtown_remote_java_engineer_legacy
+  type: note
+  date: '2026-04-02'
+  detail: 'OldTown Software `Senior Java Engineer, Legacy Modernization` role was marked inactive after scope review.'
+  artifacts: []

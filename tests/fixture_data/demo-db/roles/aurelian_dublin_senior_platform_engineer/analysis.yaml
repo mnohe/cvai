@@ -1,0 +1,86 @@
+version: 1
+role_id: aurelian_dublin_senior_platform_engineer
+summary:
+  verdict: CLEAR_FIT
+  verdict_label: Clear fit
+  recommendation:
+    value: APPLY_AFTER_TAILORING
+    reason: The role matches recent platform evidence directly; a short case study would make the application stronger.
+  rationale: Recent platform ownership, Kubernetes operations, policy-as-code, and technical leadership match the role directly.
+  notes:
+  - BEST_DEMO_DRAFT_ROLE
+strengths:
+- title: Recent platform-control-plane ownership
+  evidence:
+  - text: Led developer-environment control-plane design and rollout.
+    refs:
+    - cv:aurelian_systems
+- title: Production Kubernetes operations
+  evidence:
+  - text: Worked across 70 production clusters with policy and progressive delivery.
+    refs:
+    - cv:aurelian_systems
+gaps:
+- description: Written public case study is not finished.
+  task_refs:
+  - task_control_plane_case_study
+  feasible: true
+work_items:
+- title: Tailor CV
+  detail: Emphasize platform API, fleet operations, policy-as-code, and mentoring.
+timeline:
+- period: Before applying
+  items:
+  - Finish one-page case study and application materials.
+requirements:
+- id: req_001
+  text: Kubernetes platform ownership
+  category: hard_requirement
+  fulfillment: met
+  evidence:
+  - text: Aurelian Systems work covered 70 production Kubernetes clusters and platform automation.
+    refs:
+    - cv:aurelian_systems
+  gap: ''
+  patch_plan: ''
+  task_refs: []
+  feasible: true
+- id: req_002
+  text: Control-plane API design
+  category: hard_requirement
+  fulfillment: met
+  evidence:
+  - text: Led multi-region control-plane design for internal developer environments.
+    refs:
+    - cv:aurelian_systems
+  gap: ''
+  patch_plan: Prepare architecture walkthrough.
+  task_refs: []
+  feasible: true
+- id: req_003
+  text: Public case-study evidence
+  category: inferred_requirement
+  fulfillment: partial
+  evidence:
+  - text: Control Plane Lab project is available as supporting public evidence.
+    refs:
+    - project:control_plane_lab
+  gap: Written case study is not yet complete.
+  patch_plan: Write a concise case study before submitting.
+  task_refs:
+  - task_control_plane_case_study
+  feasible: true
+gap_tasks:
+  task_control_plane_case_study:
+    title: Write control-plane case study
+    estimated_days: 2
+    feasible_within_one_week: true
+    description: Turn platform work into a concise case study.
+    acceptance_criteria:
+    - Architecture and rollout are described.
+    - Metrics and constraints are included.
+    evidence_refs: []
+comments:
+- Strongest match in the demo dataset.
+llm_context:
+  prompt_profile: platform-first

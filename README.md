@@ -16,13 +16,12 @@ Build and run the app locally:
 
 ```bash
 cd /path/to/cvai
-mkdir -p /path/to/private-data
 docker build -t cvai:local .
 docker run --rm \
   -p 8080:8080 \
   -e CVAI_DATA=/data \
   -e LLM_API_KEY="${LLM_API_KEY}" \
-  -v /path/to/private-data:/data \
+  -v "$PWD/tests/fixture_data/demo-db:/data" \
   cvai:local
 ```
 
@@ -31,9 +30,8 @@ Then open `http://localhost:8080`.
 If you prefer running from a source checkout without Docker:
 
 ```bash
-PYTHONPATH=. python3 -m cvai_web init /path/to/private-data
-PYTHONPATH=. python3 -m cvai_web validate /path/to/private-data
-PYTHONPATH=. CVAI_DATA=/path/to/private-data python3 -m cvai_web serve
+PYTHONPATH=. python3 -m cvai_web validate tests/fixture_data/demo-db
+PYTHONPATH=. CVAI_DATA=tests/fixture_data/demo-db python3 -m cvai_web serve
 ```
 
 For local development, the Makefile defaults `CVAI_DATA` to
@@ -44,10 +42,10 @@ content. This lets `make dev` start a live-reloading server immediately:
 make dev
 ```
 
-Use a separate private datastore for real applications:
+Use a separate writable datastore for real applications:
 
 ```bash
-make dev CVAI_DATA=/path/to/private-data
+make dev CVAI_DATA=/path/to/your-data
 ```
 
 `LLM_API_KEY` is only needed for role ingestion, free-form status updates, and
@@ -87,18 +85,16 @@ reassessment. You can browse and edit existing structured data without an LLM.
 ## PDF Templates
 
 Templates are separate template packs so they can be versioned and shared
-independently from the application and your private data.
+independently from the application and your configured data directory.
 
-- [CVAI Portrait Template](https://github.com/mnohe/cvai-template-portrait): a
-  polished portrait DIN A4 template for normal applications.
-- [CVAI Machine-Readable Template](https://github.com/mnohe/cvai-template-machine-readable):
-  a plain, predictable template intended for ATS and document-processing systems.
+The demo fixture includes a minimal `demo` template. Custom template packs can be
+imported into your configured data directory when you want a different CV
+presentation.
 
 Import a local template checkout with:
 
 ```bash
-cvai templates import /path/to/cvai-template-portrait /path/to/private-data
-cvai templates import /path/to/cvai-template-machine-readable /path/to/private-data
+cvai templates import /path/to/template-pack tests/fixture_data/demo-db
 ```
 
 Template-pack requirements are documented in [docs/TEMPLATES.adoc](docs/TEMPLATES.adoc).
@@ -121,12 +117,13 @@ other Makefile targets also load a repo-root `.env` file when one is present.
 
 ```bash
 docker build -t cvai .
-docker run --rm -p 8080:8080 -e CVAI_DATA=/data -e LLM_API_KEY -v /path/to/private-data:/data cvai
+docker run --rm -p 8080:8080 -e CVAI_DATA=/data -e LLM_API_KEY -v "$PWD/tests/fixture_data/demo-db:/data" cvai
 ```
 
 ## Docker Compose
 
-Create a `docker-compose.yml` next to your private data directory:
+Use the checked-in compose file from the source checkout, or create an equivalent
+file with the demo datastore mounted:
 
 ```yaml
 services:
@@ -136,7 +133,7 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - /path/to/private-data:/data
+      - ./tests/fixture_data/demo-db:/data
     environment:
       CVAI_DATA: /data
       LLM_API_KEY: "${LLM_API_KEY}"
@@ -211,12 +208,12 @@ spec:
       volumes:
         - name: data
           persistentVolumeClaim:
-            claimName: cvai-data
+            claimName: cvai-storage
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: cvai-data
+  name: cvai-storage
 spec:
   accessModes:
     - ReadWriteOnce   # sufficient for a single pod; use ReadWriteMany only if your storage class supports it

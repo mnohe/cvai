@@ -198,19 +198,19 @@ class EndToEndTests(unittest.TestCase):
             cv_page = client.get("/cv/")
             cv_save = client.post("/cv/", data=self.cv_form_data(summary="E2E updated summary."))
             task_update = client.post(
-                "/tasks/task_platform_story/status",
+                "/tasks/task_control_plane_case_study/status",
                 data={"status": "completed", "detail": "pp-e2e-platform"},
             )
             status_update = client.post(
-                "/roles/sample_remote_platform_engineer/update-prompt",
+                "/roles/ledgerly_remote_staff_backend_engineer_payments/update-prompt",
                 data={"prompt": "Rejected on 2026-05-20 with this rationale: E2E duplicate."},
             )
             status_fragment = self._poll_job_fragment(client, status_update.headers["location"])
             restricted_download = client.get("/download/file", params={"path": "roles.yaml"})
 
             updated_cv = client.get("/cv/")
-            updated_task = client.get("/tasks/task_platform_story")
-            updated_role = client.get("/roles/sample_remote_platform_engineer")
+            updated_task = client.get("/tasks/task_control_plane_case_study")
+            updated_role = client.get("/roles/ledgerly_remote_staff_backend_engineer_payments")
 
         self.assertEqual(health.json(), {"status": "ok"})
         self.assertIn("Active roles", dashboard.text)
@@ -219,7 +219,7 @@ class EndToEndTests(unittest.TestCase):
         self.assertEqual(cv_save.status_code, 302)
         self.assertEqual(cv_save.headers["location"], "/cv/")
         self.assertIn("E2E updated summary.", updated_cv.text)
-        self.assertEqual(task_update.headers["location"], "/tasks/task_platform_story")
+        self.assertEqual(task_update.headers["location"], "/tasks/task_control_plane_case_study")
         self.assertIn("Completed", updated_task.text)
         self.assertIn("pp-e2e-platform", updated_task.text)
         self.assertTrue(status_update.headers["location"].startswith("/jobs/"))

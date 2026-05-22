@@ -1,0 +1,70 @@
+version: 1
+role_id: ledgerly_remote_staff_backend_engineer_payments
+summary:
+  verdict: FIT
+  verdict_label: Good fit
+  recommendation:
+    value: SUBMITTED_MONITOR
+    reason: Application is already submitted; prepare for architecture and consistency questions.
+  rationale: Payments and reconciliation evidence is strong, with some gaps around direct staff-level architecture scope.
+  notes:
+  - SUBMITTED_WITH_ARTIFACTS
+strengths:
+- title: Direct payments evidence
+  evidence:
+  - text: Built reconciliation services for card, SEPA, and wallet transactions.
+    refs:
+    - cv:ledgerly
+gaps:
+- description: Staff-level title is not from the payments role.
+  task_refs: []
+  feasible: true
+work_items:
+- title: Rehearse consistency trade-offs
+  detail: Prepare examples covering idempotency, replay, operational overrides, and auditability.
+timeline:
+- period: This week
+  items:
+  - Follow up if no recruiter response by 2026-05-22.
+requirements:
+- id: req_001
+  text: Payment reconciliation systems
+  category: hard_requirement
+  fulfillment: met
+  evidence:
+  - text: Ledgerly experience built card, SEPA, and wallet reconciliation services.
+    refs:
+    - cv:ledgerly
+  gap: ''
+  patch_plan: ''
+  task_refs: []
+  feasible: true
+- id: req_002
+  text: Staff-level architecture influence
+  category: soft_requirement
+  fulfillment: partial
+  evidence:
+  - text: Aurelian Systems staff-level leadership and design reviews support level calibration.
+    refs:
+    - cv:aurelian_systems
+  gap: Staff title is recent and not in payments domain.
+  patch_plan: Use staff examples from Aurelian and domain examples from Ledgerly.
+  task_refs: []
+  feasible: true
+- id: req_003
+  text: Payment failure-mode preparation
+  category: inferred_requirement
+  fulfillment: met
+  evidence:
+  - text: Failure-mode examples were added to the interview story bank.
+    refs:
+    - task_payment_failure_modes
+  gap: ''
+  patch_plan: ''
+  task_refs: []
+  feasible: true
+gap_tasks: {}
+comments:
+- Good submitted-role screenshot candidate.
+llm_context:
+  prompt_profile: payments
