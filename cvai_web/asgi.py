@@ -210,7 +210,7 @@ def create_fastapi_app(repo: Repository | None = None, llm: OpenAIClient | None 
         return FileResponse(Path(__file__).resolve().parent / "static" / "cvai-v.svg", media_type="image/svg+xml")
 
     @app.post("/ingestions/url")
-    def ingest_url(request: Request, source_url: str = Form("")) -> Response:
+    def ingest_url(request: Request, source_url: str = Form(""), quick_analysis: str = Form("")) -> Response:
         # URL ingestion can be slow or fail on remote sites, so it runs as a
         # background job and the browser follows the job-status page.
         source_url = source_url.strip()
@@ -220,7 +220,13 @@ def create_fastapi_app(repo: Repository | None = None, llm: OpenAIClient | None 
             validate_public_https_url(source_url)
         except ValueError as exc:
             return _error(app, request, "Blocked URL", str(exc), 400)
-        job = service.jobs.create("url", lambda current_job: service._run_url_ingestion(current_job, source_url))
+        if quick_analysis:
+            job = service.jobs.create(
+                "quick analysis",
+                lambda current_job: service._run_url_quick_analysis(current_job, source_url),
+            )
+        else:
+            job = service.jobs.create("url", lambda current_job: service._run_url_ingestion(current_job, source_url))
         return _redirect(f"/jobs/{job.id}")
 
     @app.post("/ingestions/text")
@@ -231,6 +237,7 @@ def create_fastapi_app(repo: Repository | None = None, llm: OpenAIClient | None 
         company: str = Form(""),
         location: str = Form(""),
         role: str = Form(""),
+        quick_analysis: str = Form(""),
     ) -> Response:
         source_text = source_text.strip()
         if not source_text:
@@ -240,10 +247,16 @@ def create_fastapi_app(repo: Repository | None = None, llm: OpenAIClient | None 
             for key, value in {"company": company, "location": location, "role": role}.items()
             if value.strip()
         }
-        job = service.jobs.create(
-            "text",
-            lambda current_job: service._run_text_ingestion(current_job, source_text, source_url.strip(), overrides),
-        )
+        if quick_analysis:
+            job = service.jobs.create(
+                "quick analysis",
+                lambda current_job: service._run_text_quick_analysis(current_job, source_text, source_url.strip(), overrides),
+            )
+        else:
+            job = service.jobs.create(
+                "text",
+                lambda current_job: service._run_text_ingestion(current_job, source_text, source_url.strip(), overrides),
+            )
         return _redirect(f"/jobs/{job.id}")
 
     @app.get("/jobs/{job_id}", response_class=HTMLResponse)
@@ -269,6 +282,27 @@ def create_fastapi_app(repo: Repository | None = None, llm: OpenAIClient | None 
             name="job_fragment.html.j2",
             context=_job_context(request, job.as_dict(), fragment=True),
         )
+
+    @app.post("/jobs/{job_id}/continue-ingestion")
+    def continue_ingestion(request: Request, job_id: str) -> Response:
+        preview_job = service.jobs.get(job_id)
+        if preview_job is None or not preview_job.result or not preview_job.result.get("intake"):
+            return _error(app, request, "Job not found", "That quick analysis job cannot be continued.", 404)
+        intake = dict(preview_job.result["intake"])
+        job = service.jobs.create(
+            "full ingestion",
+            lambda current_job: service._run_full_ingestion_from_preview(current_job, intake),
+        )
+        return _redirect(f"/jobs/{job.id}")
+
+    @app.post("/jobs/{job_id}/abandon")
+    def abandon_ingestion(request: Request, job_id: str) -> Response:
+        preview_job = service.jobs.get(job_id)
+        if preview_job is None or not preview_job.result or not preview_job.result.get("quick_analysis"):
+            return _error(app, request, "Job not found", "That quick analysis job cannot be abandoned.", 404)
+        preview_job.result["abandoned"] = True
+        preview_job.log("Quick analysis abandoned. No role files were written.")
+        return _redirect(f"/jobs/{job_id}")
 
     @app.get("/roles/{canonical_slug}", response_class=HTMLResponse)
     def role_detail(request: Request, canonical_slug: str) -> Response:

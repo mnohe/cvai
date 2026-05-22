@@ -5,6 +5,10 @@
   <article class="card">
     <h3>From URL</h3>
     <form method="post" action="/ingestions/url">
+      <label class="checkbox-row">
+        <input type="checkbox" name="quick_analysis" value="1" checked>
+        Quick analysis before full ingestion
+      </label>
       <label>Role URL
         <input type="url" name="source_url" required placeholder="https://company.example/jobs/role">
       </label>
@@ -14,6 +18,10 @@
   <article class="card">
     <h3>From pasted text</h3>
     <form method="post" action="/ingestions/text">
+      <label class="checkbox-row">
+        <input type="checkbox" name="quick_analysis" value="1" checked>
+        Quick analysis before full ingestion
+      </label>
       <label>Source URL
         <input type="url" name="source_url" placeholder="Optional but helpful">
       </label>

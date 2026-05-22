@@ -125,6 +125,53 @@ class FastAPIRouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("Missing text", response.text)
 
+    def test_intake_page_enables_quick_analysis_by_default(self) -> None:
+        response = self.client().get("/intake")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('name="quick_analysis"', response.text)
+        self.assertIn("checked", response.text)
+
+    def test_text_ingestion_quick_analysis_stops_before_role_write(self) -> None:
+        llm = mock.Mock()
+        llm.is_configured.return_value = True
+        llm.quick_analyze_role.return_value = {
+            "clear": True,
+            "summary": "Promising fit.",
+            "fit_level": "good",
+            "key_matching_abilities": ["Python platform work"],
+            "important_gaps": [],
+            "recommendation": "continue",
+            "rationale": "Enough overlap to inspect fully.",
+        }
+        client = self.client(llm=llm)
+
+        response = client.post(
+            "/ingestions/text",
+            data={
+                "quick_analysis": "1",
+                "source_text": "Example needs a platform engineer for Python APIs.",
+                "source_url": "https://example.test/job",
+            },
+            follow_redirects=False,
+        )
+        job_path = response.headers["location"]
+        fragment = ""
+        deadline = time.time() + 5
+        while time.time() < deadline:
+            fragment = client.get(f"{job_path}/fragment").text
+            if "Quick analysis completed" in fragment or "failed" in fragment:
+                break
+            time.sleep(0.05)
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("Quick analysis", fragment)
+        self.assertIn("Continue full ingestion", fragment)
+        self.assertIn("Promising fit.", fragment)
+        self.assertFalse((client.app.state.service.repo.root / "roles" / "example_remote_platform_engineer").exists())
+        llm.quick_analyze_role.assert_called_once()
+        llm.generate_bundle.assert_not_called()
+
     def test_task_status_post_updates_task(self) -> None:
         client = self.client()
 

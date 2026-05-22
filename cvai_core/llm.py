@@ -212,6 +212,63 @@ class OpenAIClient:
         }
         return self._json_chat(system, user, max_tokens=12000)
 
+    def quick_analyze_role(
+        self,
+        *,
+        source_kind: str,
+        source_url: str,
+        source_text: str,
+        cv_yaml: str,
+        context: dict,
+        evidence_library: dict,
+        tasks: list[dict],
+    ) -> dict:
+        # Quick analysis is intentionally pre-ingestion: it helps the user decide
+        # whether a posting deserves a full durable role bundle.
+        system = (
+            "You perform a quick pre-ingestion role fit analysis for CVAI. "
+            "Use only the provided job posting text and structured candidate data. "
+            "Do not invent experience. Return concise structured JSON."
+        )
+        user = {
+            "source_kind": source_kind,
+            "source_url": source_url,
+            "source_text": source_text[:24000],
+            "cv_yaml": cv_yaml,
+            "context": context,
+            "evidence_library": evidence_library,
+            "open_gap_tasks": tasks,
+            "allowed_requirement_categories": ["hard_requirement", "soft_requirement", "inferred_requirement"],
+            "allowed_fulfillment": ["met", "partial", "unmet", "unknown"],
+            "allowed_fit_levels": ["strong", "good", "targeted_prep", "stretch", "weak", "poor", "unknown"],
+            "allowed_recommendations": ["continue", "stop", "review"],
+            "output_schema": {
+                "clear": True,
+                "summary": "two or three sentence suitability summary",
+                "fit_level": "strong | good | targeted_prep | stretch | weak | poor | unknown",
+                "key_matching_abilities": ["specific matching ability backed by candidate data"],
+                "important_gaps": [
+                    {
+                        "requirement": "gap requirement text",
+                        "category": "hard_requirement | soft_requirement | inferred_requirement",
+                        "fulfillment": "partial | unmet | unknown",
+                        "estimated_effort": "concise effort estimate, or unknown",
+                    }
+                ],
+                "recommendation": "continue | stop | review",
+                "rationale": "concise rationale for the recommendation",
+                "reason": "string when clear is false",
+            },
+            "rules": [
+                "Prefer continue only when the candidate data shows enough relevant evidence or gaps are realistically closeable.",
+                "Prefer review for ambiguous postings or when fit depends on user preference.",
+                "Prefer stop for clear poor fit or non-closeable must-have gaps.",
+                "Use existing gap-task vocabulary when naming categories and fulfillment.",
+                "Keep output short enough to read before deciding whether to run full ingestion.",
+            ],
+        }
+        return self._json_chat(system, user, max_tokens=2400)
+
     def interpret_status_update(self, *, role: dict[str, str], prompt: str, today: str) -> dict:
         # Free-form role updates are LLM interpreted because even terse user input
         # may imply coordinated changes across role state, notes, tasks, and events.

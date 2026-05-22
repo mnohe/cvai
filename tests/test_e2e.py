@@ -28,6 +28,7 @@ class FakeLLM:
     # the same methods used by WebApp's intake workflow.
     def __init__(self) -> None:
         self.generated_bundles: list[dict] = []
+        self.quick_analyses: list[dict] = []
 
     def is_configured(self) -> bool:
         return True
@@ -104,6 +105,25 @@ class FakeLLM:
         }
         self.generated_bundles.append(bundle)
         return bundle
+
+    def quick_analyze_role(self, **kwargs) -> dict:
+        self.quick_analyses.append(kwargs)
+        return {
+            "clear": True,
+            "summary": "FakeCorp is a good platform fit for the current CV.",
+            "fit_level": "good",
+            "key_matching_abilities": ["Python platform services", "Distributed systems ownership"],
+            "important_gaps": [
+                {
+                    "requirement": "Production Go services",
+                    "category": "soft_requirement",
+                    "fulfillment": "partial",
+                    "estimated_effort": "2 days",
+                }
+            ],
+            "recommendation": "continue",
+            "rationale": "The important gaps are closeable before applying.",
+        }
 
     def interpret_status_update(self, **kwargs) -> dict:
         return {
@@ -237,16 +257,91 @@ class EndToEndTests(unittest.TestCase):
         self.assertIn("Python backend services", role_page.text)
         self.assertTrue((root / "roles" / "fakecorp_remote_staff_engineer" / "analysis.yaml").exists())
 
-    def _poll_job_fragment(self, client: httpx.Client, job_path: str) -> str:
+    def test_quick_text_ingestion_can_be_abandoned_without_creating_role(self) -> None:
+        root = self.data_root()
+        fake_llm = FakeLLM()
+        with LiveServer(Repository(root), llm=fake_llm) as server, httpx.Client(
+            base_url=server.base_url,
+            follow_redirects=False,
+            timeout=10,
+        ) as client:
+            response = client.post(
+                "/ingestions/text",
+                data={
+                    "quick_analysis": "1",
+                    "source_text": "FakeCorp needs a Staff Engineer to build Python platform services.",
+                    "source_url": "https://example.test/fakecorp-staff-engineer",
+                },
+            )
+            self.assertEqual(response.status_code, 302)
+            job_path = response.headers["location"]
+
+            fragment = self._poll_job_fragment(client, job_path, markers=("Quick analysis completed", "failed"))
+            abandon = client.post(f"{job_path}/abandon")
+            abandoned_fragment = self._poll_job_fragment(
+                client,
+                job_path,
+                markers=("Quick analysis abandoned", "failed"),
+            )
+
+        self.assertEqual(len(fake_llm.quick_analyses), 1)
+        self.assertEqual(len(fake_llm.generated_bundles), 0)
+        self.assertIn("Quick analysis", fragment)
+        self.assertIn("Continue full ingestion", fragment)
+        self.assertEqual(abandon.status_code, 302)
+        self.assertIn("Quick analysis abandoned", abandoned_fragment)
+        self.assertFalse((root / "roles" / "fakecorp_remote_staff_engineer").exists())
+
+    def test_quick_text_ingestion_can_continue_to_full_ingestion(self) -> None:
+        root = self.data_root()
+        fake_llm = FakeLLM()
+        with LiveServer(Repository(root), llm=fake_llm) as server, httpx.Client(
+            base_url=server.base_url,
+            follow_redirects=False,
+            timeout=10,
+        ) as client:
+            response = client.post(
+                "/ingestions/text",
+                data={
+                    "quick_analysis": "1",
+                    "source_text": "FakeCorp needs a Staff Engineer to build Python platform services.",
+                    "source_url": "https://example.test/fakecorp-staff-engineer",
+                },
+            )
+            self.assertEqual(response.status_code, 302)
+            preview_job_path = response.headers["location"]
+
+            preview_fragment = self._poll_job_fragment(
+                client,
+                preview_job_path,
+                markers=("Quick analysis completed", "failed"),
+            )
+            continue_response = client.post(f"{preview_job_path}/continue-ingestion")
+            self.assertEqual(continue_response.status_code, 302)
+            full_job_path = continue_response.headers["location"]
+            full_fragment = self._poll_job_fragment(client, full_job_path)
+            role_page = client.get("/roles/fakecorp_remote_staff_engineer")
+
+        self.assertEqual(len(fake_llm.quick_analyses), 1)
+        self.assertEqual(len(fake_llm.generated_bundles), 1)
+        self.assertIn("FakeCorp is a good platform fit", preview_fragment)
+        self.assertIn("Ingestion completed", full_fragment)
+        self.assertIn("Open role", full_fragment)
+        self.assertEqual(role_page.status_code, 200)
+        self.assertIn("FakeCorp", role_page.text)
+        self.assertTrue((root / "roles" / "fakecorp_remote_staff_engineer" / "analysis.yaml").exists())
+
+    def _poll_job_fragment(self, client: httpx.Client, job_path: str, markers: tuple[str, ...] | None = None) -> str:
         # Background jobs complete quickly with FakeLLM, but polling keeps the test
         # faithful to the browser flow and catches regressions in the fragment URL.
+        markers = markers or ("Ingestion completed", "Applied ", "failed")
         deadline = time.time() + 10
         fragment_path = f"{job_path}/fragment"
         latest = ""
         while time.time() < deadline:
             response = client.get(fragment_path)
             latest = response.text
-            if "Ingestion completed" in latest or "Applied " in latest or "failed" in latest:
+            if any(marker in latest for marker in markers):
                 return latest
             time.sleep(0.1)
         self.fail(f"Background job did not finish. Last fragment: {latest}")

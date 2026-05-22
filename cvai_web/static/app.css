@@ -301,6 +301,14 @@ label {
   gap: 6px;
   font-weight: 600;
 }
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.checkbox-row input {
+  width: auto;
+}
 input, textarea, select {
   width: 100%;
   border: 1px solid var(--border);

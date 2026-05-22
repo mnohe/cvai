@@ -154,6 +154,112 @@ class ServerUtilityTests(unittest.TestCase):
         llm.generate_bundle.assert_called_once()
         repo.write_bundle.assert_called_once()
 
+    def test_quick_analysis_uses_structured_candidate_context_without_writing_bundle(self) -> None:
+        repo = mock.Mock()
+        repo.exists.side_effect = lambda path: path == "cv/cv.yaml"
+        repo.read_text.return_value = "summary: Platform engineer"
+        repo.load_data.side_effect = lambda path, default=None: {
+            "context/context.yaml": {"preferences": {"locations": ["Remote"]}},
+            "library/evidence.yaml": {"evidence": [{"id": "je-platform"}]},
+        }.get(path, default or {})
+        repo.list_tasks.return_value = [
+            SimpleNamespace(
+                id="task-go",
+                title="Go services",
+                description="Close Go gap",
+                status="open",
+                estimated_days=3,
+                acceptance_criteria=["Build a small service"],
+                evidence_refs=[],
+            )
+        ]
+        llm = mock.Mock()
+        llm.is_configured.return_value = True
+        llm.quick_analyze_role.return_value = {
+            "clear": True,
+            "summary": "Promising platform fit.",
+            "fit_level": "good",
+            "key_matching_abilities": ["Python platform ownership"],
+            "important_gaps": [
+                {
+                    "requirement": "Go services",
+                    "category": "hard_requirement",
+                    "fulfillment": "partial",
+                    "estimated_effort": "3 days",
+                }
+            ],
+            "recommendation": "continue",
+            "rationale": "Most gaps are closeable.",
+        }
+        app = WebApp(repo, llm)
+
+        job = IntakeJob(id="job-quick", kind="quick analysis")
+        app._run_text_quick_analysis(job, "Build distributed systems in Go.", "https://example.test/job", {"company": "Example"})
+
+        self.assertEqual(job.result["quick_analysis"]["recommendation"], "continue")
+        self.assertEqual(job.result["intake"]["kind"], "text")
+        self.assertEqual(job.result["intake"]["overrides"], {"company": "Example"})
+        llm.quick_analyze_role.assert_called_once()
+        self.assertEqual(llm.quick_analyze_role.call_args.kwargs["cv_yaml"], "summary: Platform engineer")
+        self.assertEqual(llm.quick_analyze_role.call_args.kwargs["tasks"][0]["id"], "task-go")
+        repo.write_bundle.assert_not_called()
+
+    def test_continue_from_quick_analysis_runs_full_ingestion(self) -> None:
+        repo = mock.Mock()
+        repo.create_job_markdown.return_value = "# Job\n"
+        repo.read_text.side_effect = lambda path: f"content for {path}"
+        repo.exists.return_value = False
+        repo.write_bundle.return_value = {"analysis": "roles/example/analysis.yaml"}
+        llm = mock.Mock()
+        llm.is_configured.return_value = True
+        llm.extract_role.return_value = {
+            "clear": True,
+            "company": "Example",
+            "location": "Remote",
+            "role": "Staff Engineer",
+        }
+        llm.generate_bundle.return_value = {
+            "metadata": {
+                "company": "Example",
+                "location": "Remote",
+                "role": "Staff Engineer",
+                "source_url": "https://example.test/job",
+                "captured_on": "2026-05-22",
+                "company_slug": "example",
+                "location_slug": "remote",
+                "role_slug": "staff_engineer",
+                "canonical_slug": "example_remote_staff_engineer",
+            },
+            "mirror_summary": {"verdict": "FIT", "bullets": ["Good fit."]},
+            "job": {"requirements": [{"text": "Python", "category": "hard_requirement", "fulfillment": "met"}]},
+            "analysis": {"requirements": [{"text": "Python", "category": "hard_requirement", "fulfillment": "met"}]},
+            "suitability_report": "# Report",
+            "role_matrix": "# Matrix",
+            "interview_prep": {
+                "story_bank_md": "# Stories",
+                "system_design_bank_md": "# Systems",
+                "security_bank_md": "# Security",
+                "coding_plan_md": "# Coding",
+            },
+        }
+        app = WebApp(repo, llm)
+        job = IntakeJob(id="job-full", kind="full ingestion")
+
+        app._run_full_ingestion_from_preview(
+            job,
+            {
+                "kind": "url",
+                "source_url": "https://example.test/job",
+                "source_text": "Example needs Python.",
+                "overrides": {},
+            },
+        )
+
+        llm.extract_role.assert_called_once()
+        llm.generate_bundle.assert_called_once()
+        repo.write_bundle.assert_called_once()
+        self.assertEqual(job.result["canonical_slug"], "example_remote_staff_engineer")
+
     def test_prompt_and_task_reassessment_use_llm_when_needed(self) -> None:
         # Ambiguous status updates and task reassessment still use the LLM, but
         # the durable writes remain structured repository operations.

@@ -257,6 +257,24 @@ class WebApp:
             raise RuntimeError(reason + " Please use pasted-text intake instead.")
         self._complete_ingestion(job, source_text, source_url, extracted)
 
+    def _run_url_quick_analysis(self, job: IntakeJob, source_url: str) -> None:
+        if not self.llm.is_configured():
+            raise RuntimeError("LLM_API_KEY is required before quick analysis can run.")
+        job.log(f"Fetching role page: {source_url}")
+        source_text = self._fetch_url_text(source_url)
+        job.log(f"Fetched {len(source_text)} characters of visible page text.")
+        analysis = self._quick_analyze_source(source_kind="url", source_url=source_url, source_text=source_text)
+        job.result = {
+            "quick_analysis": analysis,
+            "intake": {
+                "kind": "url",
+                "source_url": source_url,
+                "source_text": source_text,
+                "overrides": {},
+            },
+        }
+        job.log("Quick analysis completed. Continue or abandon this role from the job page.")
+
     def _run_text_ingestion(
         self,
         job: IntakeJob,
@@ -278,6 +296,85 @@ class WebApp:
             reason = extracted.get("reason") or "The pasted text still did not provide a clear company, role, and location."
             raise RuntimeError(reason)
         self._complete_ingestion(job, source_text, source_url, extracted)
+
+    def _run_text_quick_analysis(
+        self,
+        job: IntakeJob,
+        source_text: str,
+        source_url: str,
+        overrides: dict[str, str],
+    ) -> None:
+        if not self.llm.is_configured():
+            raise RuntimeError("LLM_API_KEY is required before quick analysis can run.")
+        job.log("Running quick fit analysis for pasted text.")
+        analysis = self._quick_analyze_source(source_kind="text", source_url=source_url, source_text=source_text)
+        job.result = {
+            "quick_analysis": analysis,
+            "intake": {
+                "kind": "text",
+                "source_url": source_url,
+                "source_text": source_text,
+                "overrides": overrides,
+            },
+        }
+        job.log("Quick analysis completed. Continue or abandon this role from the job page.")
+
+    def _quick_analyze_source(self, *, source_kind: str, source_url: str, source_text: str) -> dict:
+        analysis = self.llm.quick_analyze_role(
+            source_kind=source_kind,
+            source_url=source_url,
+            source_text=source_text,
+            cv_yaml=self.repo.read_text("cv/cv.yaml") if self.repo.exists("cv/cv.yaml") else "",
+            context=self.repo.load_data("context/context.yaml", {}),
+            evidence_library=self.repo.load_data("library/evidence.yaml", {}),
+            tasks=[
+                {
+                    "id": task.id,
+                    "title": task.title,
+                    "description": task.description,
+                    "status": task.status,
+                    "estimated_days": task.estimated_days,
+                    "acceptance_criteria": task.acceptance_criteria,
+                    "evidence_refs": task.evidence_refs,
+                }
+                for task in self.repo.list_tasks()
+                if task.status == "open"
+            ],
+        )
+        if not isinstance(analysis, dict):
+            raise RuntimeError("Quick analysis did not return structured data.")
+        if not analysis.get("clear", True):
+            raise RuntimeError(analysis.get("reason") or "The quick analysis was not clear enough to show.")
+        return {
+            "summary": normalize_visible_text(str(analysis.get("summary", ""))),
+            "fit_level": str(analysis.get("fit_level", "unknown")),
+            "key_matching_abilities": list(analysis.get("key_matching_abilities") or []),
+            "important_gaps": list(analysis.get("important_gaps") or []),
+            "recommendation": str(analysis.get("recommendation", "review")),
+            "rationale": normalize_visible_text(str(analysis.get("rationale", ""))),
+        }
+
+    def _run_full_ingestion_from_preview(self, job: IntakeJob, intake: dict) -> None:
+        source_kind = intake.get("kind", "text")
+        source_url = intake.get("source_url", "")
+        source_text = intake.get("source_text", "")
+        overrides = intake.get("overrides") or {}
+        if source_kind == "url":
+            job.log("Continuing full ingestion from quick URL analysis.")
+            extracted = self.llm.extract_role(
+                source_kind="url",
+                source_url=source_url,
+                source_text=source_text,
+                strict=True,
+            )
+            if not extracted.get("clear"):
+                reason = extracted.get("reason") or "The role metadata was not fully clear from the page."
+                raise RuntimeError(reason + " Please use pasted-text intake instead.")
+            self._complete_ingestion(job, source_text, source_url, extracted)
+            return
+
+        job.log("Continuing full ingestion from quick pasted-text analysis.")
+        self._run_text_ingestion(job, source_text, source_url, overrides)
 
     def _complete_ingestion(self, job: IntakeJob, source_text: str, source_url: str, extracted: dict) -> None:
         # The slug is the durable role identity. It is computed once from extracted
