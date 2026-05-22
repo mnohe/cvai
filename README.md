@@ -36,6 +36,20 @@ PYTHONPATH=. python3 -m cvai_web validate /path/to/private-data
 PYTHONPATH=. CVAI_DATA=/path/to/private-data python3 -m cvai_web serve
 ```
 
+For local development, the Makefile defaults `CVAI_DATA` to
+`tests/fixture_data/demo-db`, a public demo datastore with realistic sample
+content. This lets `make dev` start a live-reloading server immediately:
+
+```bash
+make dev
+```
+
+Use a separate private datastore for real applications:
+
+```bash
+make dev CVAI_DATA=/path/to/private-data
+```
+
 `LLM_API_KEY` is only needed for role ingestion, free-form status updates, and
 reassessment. You can browse and edit existing structured data without an LLM.
 
@@ -45,7 +59,7 @@ reassessment. You can browse and edit existing structured data without an LLM.
 2. Go to **CV**. On a fresh data directory, CVAI creates the surrounding data
    structure and shows where the structured CV file belongs. Once `cv/cv.yaml`
    exists, the page lets you edit the CV with form controls instead of raw YAML.
-3. Import a PDF layout pack, then use **Download current PDF** from the CV page
+3. Import a PDF template pack, then use **Download current PDF** from the CV page
    to render the CV.
 4. Go to **Ingest Role** and paste a job URL or job-description text. CVAI asks
    the configured LLM to turn the posting into structured YAML and creates a role
@@ -60,8 +74,8 @@ reassessment. You can browse and edit existing structured data without an LLM.
   deterministic reads from those files.
 - **CV editor.** Edit contact details, summary, languages, certifications,
   education, experience, and projects using browser forms and modal subforms.
-- **PDF rendering.** Render `cv/cv.yaml` through Typst layout packs installed in
-  `CVAI_DATA/pdf/layouts/<layout>`.
+- **PDF rendering.** Render `cv/cv.yaml` through Typst template packs installed in
+  `CVAI_DATA/pdf/templates/<template>`.
 - **Role ingestion.** Use an LLM to turn a job posting URL or pasted description
   into structured `job.yaml`, `analysis.yaml`, tasks, and human-readable
   artifacts.
@@ -70,24 +84,24 @@ reassessment. You can browse and edit existing structured data without an LLM.
 - **Status updates.** Record structured application events, or use an LLM to
   interpret a free-form update prompt.
 
-## PDF Layouts
+## PDF Templates
 
-Layouts are separate layout packs so they can be versioned and shared
+Templates are separate template packs so they can be versioned and shared
 independently from the application and your private data.
 
-- [CVAI Portrait Layout](https://github.com/mnohe/cvai-layout-portrait): a
-  polished portrait DIN A4 layout for normal applications.
-- [CVAI Machine-Readable Layout](https://github.com/mnohe/cvai-layout-machine-readable):
-  a plain, predictable layout intended for ATS and document-processing systems.
+- [CVAI Portrait Template](https://github.com/mnohe/cvai-template-portrait): a
+  polished portrait DIN A4 template for normal applications.
+- [CVAI Machine-Readable Template](https://github.com/mnohe/cvai-template-machine-readable):
+  a plain, predictable template intended for ATS and document-processing systems.
 
-Import a local layout checkout with:
+Import a local template checkout with:
 
 ```bash
-cvai layouts import /path/to/cvai-layout-portrait /path/to/private-data
-cvai layouts import /path/to/cvai-layout-machine-readable /path/to/private-data
+cvai templates import /path/to/cvai-template-portrait /path/to/private-data
+cvai templates import /path/to/cvai-template-machine-readable /path/to/private-data
 ```
 
-Layout-pack requirements are documented in [docs/LAYOUTS.adoc](docs/LAYOUTS.adoc).
+Template-pack requirements are documented in [docs/TEMPLATES.adoc](docs/TEMPLATES.adoc).
 
 ## Configuration
 
@@ -97,6 +111,11 @@ Set these values in the environment or in a `.env` file inside `CVAI_DATA`:
 - `LLM_API_KEY`: API token for LLM-backed workflows.
 - `LLM_MODEL`: model name.
 - `LLM_BASE_URL`: OpenAI-compatible API base URL.
+
+When using the Makefile from a source checkout, `CVAI_DATA` defaults to the
+checked-in demo datastore at `tests/fixture_data/demo-db`; Docker examples use
+`/data` because they expect a mounted private data directory. `make run` and
+other Makefile targets also load a repo-root `.env` file when one is present.
 
 ## Docker
 

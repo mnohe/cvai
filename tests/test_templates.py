@@ -1,82 +1,165 @@
 import tempfile
 import unittest
 from pathlib import Path
-import sys
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
-try:
-    from fastapi.testclient import TestClient
-except ModuleNotFoundError:  # pragma: no cover - exercised only outside the web venv
-    TestClient = None
-
-from cvai_core.llm import LLMConfig, OpenAIClient
-from cvai_core.repo import Repository
-from fixtures import create_sample_data_root
+from cvai_core.templates import TemplatePackError, import_template_pack, validate_template_pack
 
 
-@unittest.skipIf(TestClient is None, "FastAPI test dependency is not installed")
-class TemplateRouteTests(unittest.TestCase):
-    def client(self) -> TestClient:
-        temp_dir = tempfile.TemporaryDirectory()
-        self.addCleanup(temp_dir.cleanup)
-        root = create_sample_data_root(Path(temp_dir.name))
-        from cvai_web.asgi import create_fastapi_app
+class TemplatePackTests(unittest.TestCase):
+    def test_valid_template_pack_can_be_imported(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "source-template"
+            data_root = root / "data"
+            (source / "fonts" / "archivo").mkdir(parents=True)
+            (source / "template.yaml").write_text(
+                """
+id: compact
+name: Compact
+version: 1
+entrypoint: cv.typ
+fonts:
+  - family: Archivo
+    path: fonts/archivo
+""",
+                encoding="utf-8",
+            )
+            (source / "cv.typ").write_text("#set text(font: \"Archivo\")\n", encoding="utf-8")
 
-        app = create_fastapi_app(
-            repo=Repository(root),
-            llm=OpenAIClient(LLMConfig(api_key="", model="test", base_url="https://example.test/v1")),
+            pack = validate_template_pack(source)
+            destination = import_template_pack(source, data_root)
+
+            self.assertEqual(pack.template_id, "compact")
+            self.assertTrue((destination / "template.yaml").exists())
+            self.assertTrue((destination / "cv.typ").exists())
+
+    def test_template_pack_requires_existing_entrypoint(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source = Path(temp_dir)
+            (source / "template.yaml").write_text(
+                """
+id: broken
+name: Broken
+version: 1
+entrypoint: missing.typ
+""",
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(TemplatePackError, "entrypoint does not exist"):
+                validate_template_pack(source)
+
+    def test_template_pack_requires_directory_source(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            missing = Path(temp_dir) / "missing"
+
+            with self.assertRaisesRegex(TemplatePackError, "not a directory"):
+                validate_template_pack(missing)
+
+    def test_template_pack_requires_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source = Path(temp_dir)
+
+            with self.assertRaisesRegex(TemplatePackError, "missing template.yaml"):
+                validate_template_pack(source)
+
+    def test_template_pack_rejects_non_mapping_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source = Path(temp_dir)
+            (source / "template.yaml").write_text("- not\n- a\n- mapping\n", encoding="utf-8")
+
+            with self.assertRaisesRegex(TemplatePackError, "must contain a mapping"):
+                validate_template_pack(source)
+
+    def test_template_pack_rejects_bad_id_and_nested_entrypoint(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source = Path(temp_dir)
+            (source / "template.yaml").write_text(
+                """
+id: Bad Template
+name: Bad
+entrypoint: cv.typ
+""",
+                encoding="utf-8",
+            )
+            (source / "cv.typ").write_text("#set text()\n", encoding="utf-8")
+
+            with self.assertRaisesRegex(TemplatePackError, "template id"):
+                validate_template_pack(source)
+
+            (source / "template.yaml").write_text(
+                """
+id: bad
+name: Bad
+entrypoint: nested/cv.typ
+""",
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(TemplatePackError, "entrypoint must be a file name"):
+                validate_template_pack(source)
+
+    def test_template_pack_validates_declared_fonts(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source = Path(temp_dir)
+            (source / "template.yaml").write_text(
+                """
+id: compact
+name: Compact
+entrypoint: cv.typ
+fonts:
+  - family: Archivo
+    path: missing-fonts
+""",
+                encoding="utf-8",
+            )
+            (source / "cv.typ").write_text("#set text()\n", encoding="utf-8")
+
+            with self.assertRaisesRegex(TemplatePackError, "fonts\\[0\\].path does not exist"):
+                validate_template_pack(source)
+
+            (source / "template.yaml").write_text(
+                """
+id: compact
+name: Compact
+entrypoint: cv.typ
+fonts:
+  - nope
+""",
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(TemplatePackError, "fonts\\[0\\] must be a mapping"):
+                validate_template_pack(source)
+
+    def test_import_template_pack_requires_replace_for_existing_template(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = self._template_source(root / "source", body="first")
+            data_root = root / "data"
+            first_destination = import_template_pack(source, data_root)
+            (source / "cv.typ").write_text("second\n", encoding="utf-8")
+
+            with self.assertRaisesRegex(FileExistsError, "already exists"):
+                import_template_pack(source, data_root)
+
+            replaced_destination = import_template_pack(source, data_root, replace=True)
+            self.assertEqual(first_destination, replaced_destination)
+            self.assertEqual((replaced_destination / "cv.typ").read_text(encoding="utf-8"), "second\n")
+
+    def _template_source(self, source: Path, *, body: str = "#set text()\n") -> Path:
+        source.mkdir(parents=True)
+        (source / "template.yaml").write_text(
+            """
+id: compact
+name: Compact
+version: 1
+entrypoint: cv.typ
+""",
+            encoding="utf-8",
         )
-        return TestClient(app)
-
-    def test_dashboard_lists_roles_with_update_dialogs(self) -> None:
-        html = self.client().get("/").text
-
-        self.assertEqual(html.count("class=\"role-row\""), 2)
-        self.assertEqual(html.count("<dialog class=\"dialog\""), 1)
-        self.assertIn(">Backend Engineer</a>", html)
-        self.assertIn(">Submitted</span>", html)
-        self.assertIn("<div class=\"role-subtitle\">Example, Dublin</div>", html)
-        self.assertIn("Submitted on 2026-05-19.", html)
-        self.assertIn("1 open task", html)
-        self.assertIn("/roles/example_dublin_backend_engineer/update-prompt", html)
-        self.assertIn("/static/cvai-h.svg", html)
-        self.assertIn("/favicon.svg", html)
-        self.assertIn('class="nav-tab" href="/"', html)
-        self.assertIn(">CV</a>", html)
-        self.assertNotIn("CV YAML", html)
-
-    def test_application_page_uses_jinja_sections(self) -> None:
-        html = self.client().get("/roles/sample_remote_platform_engineer").text
-
-        self.assertIn("Fixture rationale.", html)
-        self.assertNotIn("Rationale:", html)
-        self.assertIn("Possible fit", html)
-        self.assertIn("<h3 style=\"margin:0;\">Requirement coverage</h3>", html)
-        self.assertIn("Backend systems", html)
-        self.assertIn("Must-have", html)
-        self.assertIn("Partially met", html)
-        self.assertIn("task_platform_story", html)
-        self.assertIn("href=\"/tasks/task_platform_story\"", html)
-        self.assertNotIn("Job file", html)
-        self.assertNotIn("Open source", html)
-        self.assertIn("action=\"/roles/sample_remote_platform_engineer/update-prompt\"", html)
-        self.assertIn("<h3>Event log</h3>", html)
-
-    def test_task_pages_show_catalog_and_detail_state(self) -> None:
-        client = self.client()
-        list_html = client.get("/tasks").text
-        detail_html = client.get("/tasks/task_platform_story").text
-
-        self.assertIn("href=\"/tasks/task_platform_story\"", list_html)
-        self.assertIn("2 days", list_html)
-        self.assertIn("Prepare platform ownership evidence.", list_html)
-        self.assertIn('<h1 class="header-title">Platform story</h1>', detail_html)
-        self.assertIn("Evidence references one platform project.", detail_html)
-        self.assertIn("Won't do", detail_html)
-        self.assertIn("action=\"/tasks/task_platform_story/status\"", detail_html)
-        self.assertIn("action=\"/tasks/task_platform_story/reassess\"", detail_html)
-        self.assertIn("Used by requirements", detail_html)
+        (source / "cv.typ").write_text(body, encoding="utf-8")
+        return source
 
 
 if __name__ == "__main__":

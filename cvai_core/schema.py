@@ -39,7 +39,7 @@ ROOT_FILES = {
     "tasks.yaml": {"tasks": []},
     "events.yaml": {"events": []},
 }
-ROOT_DIRECTORIES = ("roles", "cv", "context", "library", "pdf", "pdf/layouts")
+ROOT_DIRECTORIES = ("roles", "cv", "context", "library", "pdf", "pdf/templates")
 PROJECTION_FILES = {
     "context/context.yaml": {
         "version": 1,

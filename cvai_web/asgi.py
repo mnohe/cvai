@@ -365,7 +365,7 @@ def create_fastapi_app(repo: Repository | None = None, llm: OpenAIClient | None 
         except FileNotFoundError as exc:
             return _error(app, request, "CV PDF unavailable", str(exc), 404)
         except subprocess.CalledProcessError:
-            return _error(app, request, "CV PDF unavailable", "Typst could not build the CV PDF. Check the selected layout and CV YAML.", 500)
+            return _error(app, request, "CV PDF unavailable", "Typst could not build the CV PDF. Check the selected template and CV YAML.", 500)
 
     @app.get("/download/file")
     def download_file(request: Request, path: str = Query("")) -> Response:

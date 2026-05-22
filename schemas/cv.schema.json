@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://mnohe.github.io/cvai/schemas/cv.schema.json",
   "title": "CVAI CV Format",
-  "description": "Public JSON Schema for CVAI CV source data. CVAI stores candidate CVs as structured YAML or JSON matching this schema, then renders them through CVAI layouts.",
+  "description": "Public JSON Schema for CVAI CV source data. CVAI stores candidate CVs as structured YAML or JSON matching this schema, then renders them through CVAI templates.",
   "$comment": "CVAI repository: https://github.com/mnohe/cvai",
   "type": "object",
   "additionalProperties": false,

@@ -13,8 +13,8 @@ Other versions may work but are not tested.
 - This repository contains public-safe web code, templates, schema validation,
   documentation, and tests.
 - Private data and secrets live in the directory configured through `CVAI_DATA`.
-- PDF rendering code lives in `cvai_core.pdf`; layouts and fonts live in
-  `CVAI_DATA/pdf/layouts/<layout>/`.
+- PDF rendering code lives in `cvai_core.pdf`; templates and fonts live in
+  `CVAI_DATA/pdf/templates/<template>/`.
 
 ## Data Rules
 
@@ -31,6 +31,9 @@ Other versions may work but are not tested.
 - The app receives its data location through `CVAI_DATA`.
 - Do not commit private data, `.env`, or generated candidate artifacts.
 - Authentication is planned but not implemented.
+- The Makefile defaults `CVAI_DATA` to `tests/fixture_data/demo-db` so
+  contributors can run `make dev` against realistic public demo data. Override
+  `CVAI_DATA` when testing against a private datastore.
 
 ## Checks
 
@@ -47,10 +50,10 @@ repository code, ingestion, or reassessment logic:
 PYTHONPATH=. python3 -m cvai_core.schema /path/to/private-data
 ```
 
-Run a PDF smoke build after renderer or layout-related changes:
+Run a PDF smoke build after renderer or template-related changes:
 
 ```bash
-PYTHONPATH=. python3 -m cvai_core.pdf /path/to/private-data/cv/cv.yaml /tmp/cvai-smoke.pdf --layouts-root /path/to/private-data/pdf/layouts
+PYTHONPATH=. python3 -m cvai_core.pdf /path/to/private-data/cv/cv.yaml /tmp/cvai-smoke.pdf --templates-root /path/to/private-data/pdf/templates
 ```
 
 ## LLM Providers

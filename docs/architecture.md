@@ -2,7 +2,7 @@
 
 ## Overview
 
-CVAI is a personal job-application management system. It serves a browser UI for tracking roles, application statuses, and AI-generated artifacts. It reads from and writes to `cvai-data`, a private structured data store the user keeps in a separate private repository. Typst layouts stored in the data directory render the candidate CV from YAML source.
+CVAI is a personal job-application management system. It serves a browser UI for tracking roles, application statuses, and AI-generated artifacts. It reads from and writes to `cvai-data`, a private structured data store the user keeps in a separate private repository. Typst templates stored in the data directory render the candidate CV from YAML source.
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
@@ -41,7 +41,7 @@ CVAI is a personal job-application management system. It serves a browser UI for
 └──────────────────────────────┬───────────────────────────────┘
                                │ typst subprocess when PDF is missing
                                ▼
-                    CVAI_DATA/pdf/layouts
+                    CVAI_DATA/pdf/templates
 ```
 
 ---
@@ -75,9 +75,9 @@ Private structured data store. Canonical source of truth for all runtime state. 
 
 `cvai-data` is an instance directory, not a public template repository. `cvai` owns the schema, validator, and initializer. If `CVAI_DATA` points at a missing writable directory, startup creates the empty root layout before validating it.
 
-### PDF layouts
+### PDF templates
 
-Typst layouts and their fonts are data assets under `cvai-data/pdf/layouts/<layout>/`. `cvai_core.pdf` reads `cvai-data/cv/cv.yaml`, calls Typst with the selected layout's `cv.typ`, and writes PDFs. CVAI invokes it for the generic CV download endpoint when the cached PDF is missing. The runtime needs the `typst` binary for builds; the Docker image installs it.
+Typst templates and their fonts are data assets under `cvai-data/pdf/templates/<template>/`. `cvai_core.pdf` reads `cvai-data/cv/cv.yaml`, calls Typst with the selected template's `cv.typ`, and writes PDFs. CVAI invokes it for the generic CV download endpoint when the cached PDF is missing. The runtime needs the `typst` binary for builds; the Docker image installs it.
 
 ---
 
@@ -162,9 +162,9 @@ Requirement rows in `analysis.yaml` distinguish hard requirements, soft requirem
 | Path | Purpose |
 |---|---|
 | `cv/cv.yaml` | YAML source of truth for the candidate CV. Schema at `cv/cv-schema.json`. |
-| `cv/cv.pdf` | Rendered generic CV (portrait layout). |
-| `pdf/layouts/<layout>/cv.typ` | Typst entry point for a CV layout. |
-| `pdf/layouts/<layout>/fonts/` | Optional fonts owned by the layout. |
+| `cv/cv.pdf` | Rendered generic CV (portrait template). |
+| `pdf/templates/<template>/cv.typ` | Typst entry point for a CV template. |
+| `pdf/templates/<template>/fonts/` | Optional fonts owned by the template. |
 | `context/context.yaml` | Structured constraints, preferences, safe metrics, and portfolio inventory. |
 | `library/evidence.yaml` | Structured skill evidence pointers, story snippets, and reusable prose blocks. |
 | `context/*.md`, `library/*.md` | Human-readable source artifacts for candidate context and prose blocks. |

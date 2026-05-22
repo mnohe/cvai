@@ -41,13 +41,13 @@ class CLITests(unittest.TestCase):
         self.assertEqual(exit_code, 1)
         self.assertIn("roles.yaml", output)
 
-    def test_layout_import_command_copies_a_layout_pack(self) -> None:
+    def test_template_import_command_copies_a_template_pack(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             data_root = root / "data"
-            source = root / "layout"
+            source = root / "template"
             source.mkdir()
-            (source / "layout.yaml").write_text(
+            (source / "template.yaml").write_text(
                 """
 id: compact
 name: Compact
@@ -58,15 +58,15 @@ entrypoint: cv.typ
             (source / "cv.typ").write_text("#set text()\n", encoding="utf-8")
             self.run_cli("init", str(data_root))
 
-            exit_code, output = self.run_cli("layouts", "import", str(source), str(data_root))
+            exit_code, output = self.run_cli("templates", "import", str(source), str(data_root))
 
         self.assertEqual(exit_code, 0)
-        self.assertIn("Imported layout", output)
+        self.assertIn("Imported template", output)
 
-    def test_layouts_command_requires_a_subcommand(self) -> None:
+    def test_templates_command_requires_a_subcommand(self) -> None:
         # argparse reports usage errors by raising SystemExit, which is exactly
         # what a shell user would see as a non-zero process exit.
-        with mock.patch.object(sys, "argv", ["cvai", "layouts"]), contextlib.redirect_stderr(io.StringIO()):
+        with mock.patch.object(sys, "argv", ["cvai", "templates"]), contextlib.redirect_stderr(io.StringIO()):
             with self.assertRaises(SystemExit) as error:
                 main()
 

@@ -154,7 +154,7 @@ Two paths are available:
 
 1. Edit the CV through `/cv/`, or update `cvai-data/cv/cv.yaml` directly if you are working outside the web UI.
 2. Run the PDF renderer or click the CV page's PDF download link.
-3. The data-owned Typst layouts render the YAML and write `cvai-data/cv/cv.pdf`.
+3. The data-owned Typst templates render the YAML and write `cvai-data/cv/cv.pdf`.
 
 **Via web UI (on demand):**
 
@@ -166,14 +166,14 @@ Two paths are available:
 
 ---
 
-## Import a PDF Layout
+## Import a PDF Template
 
 **Actor:** user
 
-1. Obtain a layout pack directory. It must contain `layout.yaml` and the Typst entry point declared by that manifest.
-2. Run `cvai layouts import /path/to/layout-pack /path/to/private-data`.
-3. CVAI validates the manifest and copies the pack into `cvai-data/pdf/layouts/<layout_id>`.
-4. The imported layout is available to PDF rendering commands.
+1. Obtain a template pack directory. It must contain `template.yaml` and the Typst entry point declared by that manifest.
+2. Run `cvai templates import /path/to/template-pack /path/to/private-data`.
+3. CVAI validates the manifest and copies the pack into `cvai-data/pdf/templates/<template_id>`.
+4. The imported template is available to PDF rendering commands.
 
 **LLM:** not used.
 

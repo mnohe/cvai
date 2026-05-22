@@ -666,7 +666,7 @@ class Repository:
         output_path = self.resolve("cv/cv.pdf")
         if output_path.exists():
             return output_path
-        return PDFRenderer(self.resolve("pdf/layouts")).build_cv(source=self.resolve("cv/cv.yaml"), output=output_path)
+        return PDFRenderer(self.resolve("pdf/templates")).build_cv(source=self.resolve("cv/cv.yaml"), output=output_path)
 
     def _upsert_global_row(self, relative_path: str, key: str, row: dict, id_field: str) -> None:
         # Mirrors are keyed by their natural ID. Upsert keeps writes idempotent when

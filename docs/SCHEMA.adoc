@@ -416,30 +416,30 @@ The canonical CV format is JSON Schema `schemas/cv.schema.json` in the public `c
 Initialization copies that schema into `cv/cv-schema.json` for each private data directory so local editors and validators can use it without network access.
 The schema has a stable public `$id` suitable for publishing on a CVAI website: `https://mnohe.github.io/cvai/schemas/cv.schema.json`.
 
-== PDF Layouts
+== PDF Templates
 
-PDF layouts live under `pdf/layouts/<layout_id>/` in the configured data directory.
-They are data assets rather than Python package files so installations can keep custom layouts and licensed fonts outside the public application repository.
+PDF templates live under `pdf/templates/<template_id>/` in the configured data directory.
+They are data assets rather than Python package files so installations can keep custom templates and licensed fonts outside the public application repository.
 
 [cols="1,1,3"]
 |===
 | Path | Type | Notes
 
-| `pdf/layouts/<layout_id>/cv.typ`
+| `pdf/templates/<template_id>/cv.typ`
 | file
 | Required Typst entry point. CVAI passes the selected `cv/cv.yaml` path as the Typst input named `cv`.
 
-| `pdf/layouts/<layout_id>/fonts/`
+| `pdf/templates/<template_id>/fonts/`
 | directory
-| Optional layout-owned fonts. Each first-level subdirectory is passed to Typst as a font path.
+| Optional template-owned fonts. Each first-level subdirectory is passed to Typst as a font path.
 
-| `pdf/layouts/<layout_id>/README.md`
+| `pdf/templates/<template_id>/README.md`
 | file
-| Optional human documentation for the layout.
+| Optional human documentation for the template.
 
-| `pdf/layouts/<layout_id>/layout.yaml`
+| `pdf/templates/<template_id>/template.yaml`
 | file
-| Reserved manifest for importable layout packs.
+| Reserved manifest for importable template packs.
 |===
 
 == Validator

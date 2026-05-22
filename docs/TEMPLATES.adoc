@@ -1,0 +1,74 @@
+= CVAI Template Packs
+:toc:
+:toclevels: 2
+
+CVAI renders PDFs from Typst template packs stored under `CVAI_DATA/pdf/templates`.
+Templates are data assets, so private installations can
+install or replace them without modifying the application container.
+
+== Directory Structure
+
+A template pack is a directory with this minimum structure:
+
+[source,text]
+----
+template-pack/
+  template.yaml
+  cv.typ
+  fonts/          # optional
+----
+
+`template.yaml` is the manifest:
+
+[source,yaml]
+----
+id: compact
+name: Compact
+version: 1
+entrypoint: cv.typ
+fonts:
+  - family: Archivo
+    path: fonts/archivo
+----
+
+Rules:
+
+* `id` must use lowercase letters, numbers, `_`, or `-`.
+* `entrypoint` must name a file in the template root, not a nested path.
+* Declared font paths must exist inside the template pack.
+* Fonts should live inside the template directory so the pack is portable.
+
+== Importing
+
+Import a local template pack:
+
+[source,sh]
+----
+cvai templates import /path/to/template-pack /path/to/private-data
+----
+
+Use `--replace` to overwrite an installed template with the same ID:
+
+[source,sh]
+----
+cvai templates import --replace /path/to/template-pack /path/to/private-data
+----
+
+The command copies the pack into:
+
+[source,text]
+----
+CVAI_DATA/pdf/templates/<template_id>/
+----
+
+== Updating
+
+For the current release, updates are performed by re-running the import command
+with `--replace`.
+
+The web template manager will add source-aware updates:
+
+* GitHub or GitLab templates update with `git pull`.
+* Regular URL templates update by downloading the URL again.
+* ZIP-uploaded templates have no update action unless they are uploaded again.
+* ZIP uploads that would overwrite an existing template require confirmation.

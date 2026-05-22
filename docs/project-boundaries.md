@@ -5,8 +5,8 @@ templates, the YAML schema, validation, and data-directory initialization.
 
 Private application data belongs outside this repository and is supplied at
 runtime through `CVAI_DATA`. PDF rendering code is called through
-`cvai_core.pdf`; layouts and fonts are data assets under
-`CVAI_DATA/pdf/layouts/<layout>/`.
+`cvai_core.pdf`; templates and fonts are data assets under
+`CVAI_DATA/pdf/templates/<template>/`.
 
 ## Data Contract
 
