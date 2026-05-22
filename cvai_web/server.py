@@ -438,6 +438,7 @@ class WebApp:
         # can change and how those changes are shaped.
         interpreted = self.llm.interpret_status_update(
             role={
+                "canonical_slug": canonical_slug,
                 "company": role.company,
                 "role": role.role,
                 "location": role.location,
@@ -489,7 +490,7 @@ class WebApp:
         if not isinstance(operation, dict):
             return False
         op = operation.get("op")
-        role_id = operation.get("role_id") or canonical_slug
+        role_id = self._operation_role_id(canonical_slug, operation.get("role_id"))
         # Dispatch only through repository methods so path/layout details stay in
         # one place even though the LLM chooses which data operation is needed.
         if op == "record_status":
@@ -515,6 +516,15 @@ class WebApp:
             )
             return True
         return False
+
+    @staticmethod
+    def _operation_role_id(canonical_slug: str, role_id: object) -> str:
+        if not isinstance(role_id, str):
+            return canonical_slug
+        normalized = role_id.strip()
+        if not normalized or normalized.lower() in {"current", "current role", "this role"}:
+            return canonical_slug
+        return normalized
 
     def _run_role_reassessment(self, job: IntakeJob, canonical_slug: str) -> None:
         if not self.llm.is_configured():

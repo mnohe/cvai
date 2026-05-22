@@ -295,7 +295,7 @@ class OpenAIClient:
                 "operations": [
                     {
                         "op": "record_status | append_analysis_notes | update_task_status",
-                        "role_id": "role id, normally the current role",
+                        "role_id": f"role id; use {role.get('canonical_slug', '')!r} for the current role or omit it",
                         "event_type": "for record_status",
                         "exact_date": "for record_status",
                         "note": "for record_status",

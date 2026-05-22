@@ -381,6 +381,47 @@ class ServerUtilityTests(unittest.TestCase):
         repo.write_text.assert_not_called()
         self.assertEqual(job.result["paths"], {"operations": ["record_status", "append_analysis_notes"]})
 
+    def test_prompt_update_treats_current_operation_role_id_as_route_role(self) -> None:
+        role = SimpleNamespace(
+            company="Example",
+            role="Engineer",
+            location="Remote",
+            role_status="Submitted.",
+            artifacts=[],
+        )
+        repo = mock.Mock()
+        repo.get_role.return_value = role
+        llm = mock.Mock()
+        llm.is_configured.return_value = True
+        llm.interpret_status_update.return_value = {
+            "clear": True,
+            "event_type": "interviewing",
+            "exact_date": "2026-05-22",
+            "note": "Ignored because operations are authoritative.",
+            "operations": [
+                {
+                    "op": "record_status",
+                    "role_id": "current",
+                    "event_type": "interviewing",
+                    "exact_date": "2026-05-22",
+                    "note": "Hiring manager screen booked.",
+                }
+            ],
+        }
+        app = WebApp(repo, llm)
+        job = IntakeJob(id="job-update", kind="update")
+
+        app._run_prompt_update(job, "example_remote_engineer", "Hiring manager screen booked.")
+
+        repo.record_status.assert_called_once_with(
+            "example_remote_engineer",
+            "interviewing",
+            "2026-05-22",
+            "Hiring manager screen booked.",
+            artifacts=[],
+        )
+        self.assertEqual(job.result["paths"], {"operations": ["record_status"]})
+
 
 if __name__ == "__main__":
     unittest.main()

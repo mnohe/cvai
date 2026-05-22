@@ -32,5 +32,5 @@
       }
     }
   },
-  "postCreateCommand": "python3 --version && typst --version && python3 -m unittest discover -s tests -v"
+  "postCreateCommand": "python3 --version && typst --version"
 }
