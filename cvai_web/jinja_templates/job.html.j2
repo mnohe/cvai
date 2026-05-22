@@ -3,7 +3,8 @@
 {% block body %}
 <section class="hero">
   <div>
-    <h1>Ingestion job {{ job.id }}</h1>
+    <h1>Ingestion job</h1>
+    <p class="job-id"><code>{{ job.id }}</code></p>
     <p>{{ job.kind.upper() }} intake is running in the background. This page updates while the job is active.</p>
   </div>
 </section>

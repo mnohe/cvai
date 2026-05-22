@@ -13,7 +13,7 @@
     <div class="topbar-inner">
       <div class="header-left">
         <a class="brand" href="/"><img class="brand-logo" src="/static/cvai-h.svg" alt=""><span class="brand-text">CVAI</span></a>
-        <h1 class="header-title">{{ title }}</h1>
+        <h1 class="header-title">{{ section_title|default(title) }}</h1>
       </div>
       <nav class="nav-tabs" aria-label="Primary">
         <a class="nav-tab" href="/" title="Active roles ordered by the repository backlog, with status and follow-up work visible at a glance.">Dashboard</a>
@@ -21,7 +21,10 @@
         <a class="nav-tab" href="/tasks" title="Open evidence and follow-up tasks ordered by ETA, shortest first.">Tasks</a>
       </nav>
       <details class="nav-menu">
-        <summary>Menu</summary>
+        <summary aria-label="Menu">
+          <span class="menu-icon" aria-hidden="true"><span></span><span></span><span></span></span>
+          <span class="visually-hidden">Menu</span>
+        </summary>
         <div class="nav-menu-list">
           <a href="/" title="Active roles ordered by the repository backlog, with status and follow-up work visible at a glance.">Dashboard</a>
           <a href="/cv/" title="Edit the structured CV data used by layouts, role matching, and PDF generation.">CV</a>

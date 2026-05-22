@@ -310,7 +310,17 @@ def create_fastapi_app(repo: Repository | None = None, llm: OpenAIClient | None 
         if role is None:
             return _error(app, request, "Role not found", "No canonical role matched that ID.", 404)
         task_titles = {task.id: task.title for task in service.repo.list_tasks()}
-        return _template(app, request, "role.html.j2", {"title": f"{role.company} · {role.role}", "role": role, "task_titles": task_titles})
+        return _template(
+            app,
+            request,
+            "role.html.j2",
+            {
+                "title": f"{role.company} · {role.role}",
+                "section_title": "Roles",
+                "role": role,
+                "task_titles": task_titles,
+            },
+        )
 
     @app.post("/roles/{canonical_slug}/status")
     async def update_role_status(
@@ -628,7 +638,8 @@ def _job_context(request: Request, job: dict, *, fragment: bool = False) -> dict
     # replacing #job-status does not duplicate page-level messages.
     return {
         "request": request,
-        "title": f"Job {job['id']}",
+        "title": "Ingestion job",
+        "section_title": "Jobs",
         "job": job,
         "finished": job["status"] in {"completed", "failed"},
         "flash": ("error", job["error"]) if not fragment and job.get("error") else None,
