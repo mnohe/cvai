@@ -64,13 +64,13 @@ def create_fastapi_app(repo: Repository | None = None, llm: OpenAIClient | None 
     _register_template_helpers(app.state.templates)
 
     @app.get("/healthz")
-    def healthz() -> dict[str, str]:
+    async def healthz() -> dict[str, str]:
         # Container platforms and CI smoke tests need a cheap endpoint that does
         # not touch LLMs or render templates.
         return {"status": "ok"}
 
     @app.get("/", response_class=HTMLResponse)
-    def dashboard(request: Request) -> Response:
+    async def dashboard(request: Request) -> Response:
         # The dashboard is a pure read: data comes from YAML, never from an LLM.
         roles = service.repo.list_dashboard_roles()
         jobs = [job_summary(job.as_dict()) for job in service.jobs.list()]
@@ -88,7 +88,7 @@ def create_fastapi_app(repo: Repository | None = None, llm: OpenAIClient | None 
         )
 
     @app.get("/intake", response_class=HTMLResponse)
-    def intake(request: Request) -> Response:
+    async def intake(request: Request) -> Response:
         return app.state.templates.TemplateResponse(
             request=request,
             name="intake.html.j2",
@@ -96,24 +96,24 @@ def create_fastapi_app(repo: Repository | None = None, llm: OpenAIClient | None 
         )
 
     @app.get("/tasks", response_class=HTMLResponse)
-    def tasks(request: Request) -> Response:
+    async def tasks(request: Request) -> Response:
         return _template(app, request, "tasks.html.j2", {"title": "Tasks", "tasks": [task for task in service.repo.list_tasks() if task.status == "open"]})
 
     @app.get("/tasks/{task_id}", response_class=HTMLResponse)
-    def task_detail(request: Request, task_id: str) -> Response:
+    async def task_detail(request: Request, task_id: str) -> Response:
         task = service.repo.get_task(task_id)
         if task is None:
             return _error(app, request, "Task not found", "No task matched that ID.", 404)
         return _template(app, request, "task.html.j2", {"title": task.title, "task": task, "role_states": service.repo.task_usage(task_id)})
 
     @app.get("/cv", response_class=HTMLResponse)
-    def cv_redirect() -> Response:
+    async def cv_redirect() -> Response:
         # The canonical CV editor URL keeps the trailing slash so relative form
         # actions resolve consistently in browsers and tests.
         return _redirect("/cv/")
 
     @app.get("/cv/", response_class=HTMLResponse)
-    def cv_editor(request: Request) -> Response:
+    async def cv_editor(request: Request) -> Response:
         # CV data is read directly from structured YAML. The LLM is not needed to
         # display or edit a valid CV.
         return _cv_response(app, request)
@@ -139,7 +139,7 @@ def create_fastapi_app(repo: Repository | None = None, llm: OpenAIClient | None 
         return _redirect("/cv/")
 
     @app.get("/cv/contact/edit", response_class=HTMLResponse)
-    def edit_cv_contact(request: Request) -> Response:
+    async def edit_cv_contact(request: Request) -> Response:
         return _cv_contact_modal(app, request)
 
     @app.post("/cv/contact")
@@ -159,11 +159,11 @@ def create_fastapi_app(repo: Repository | None = None, llm: OpenAIClient | None 
         return _redirect("/cv/")
 
     @app.get("/cv/{section}/new", response_class=HTMLResponse)
-    def new_cv_item(request: Request, section: str) -> Response:
+    async def new_cv_item(request: Request, section: str) -> Response:
         return _cv_item_modal(app, request, section, None)
 
     @app.get("/cv/{section}/{index}/edit", response_class=HTMLResponse)
-    def edit_cv_item(request: Request, section: str, index: int) -> Response:
+    async def edit_cv_item(request: Request, section: str, index: int) -> Response:
         return _cv_item_modal(app, request, section, index)
 
     @app.post("/cv/{section}/{index}")
@@ -177,14 +177,14 @@ def create_fastapi_app(repo: Repository | None = None, llm: OpenAIClient | None 
         return _hx_redirect_or_normal(request, "/cv/")
 
     @app.post("/cv/{section}/{index}/delete")
-    def delete_cv_item(request: Request, section: str, index: int) -> Response:
+    async def delete_cv_item(request: Request, section: str, index: int) -> Response:
         issues = delete_cv_list_item(service.repo.root, section, index)
         if issues:
             return _cv_response(app, request, issues=issues, status_code=400)
         return _hx_redirect_or_normal(request, "/cv/")
 
     @app.post("/cv/{section}/{index}/move")
-    def move_cv_item(request: Request, section: str, index: int, direction: str = Form("")) -> Response:
+    async def move_cv_item(request: Request, section: str, index: int, direction: str = Form("")) -> Response:
         issues = move_cv_list_item(service.repo.root, section, index, direction)
         if issues:
             return _cv_response(app, request, issues=issues, status_code=400)
@@ -193,12 +193,12 @@ def create_fastapi_app(repo: Repository | None = None, llm: OpenAIClient | None 
         return _hx_redirect_or_normal(request, "/cv/")
 
     @app.post("/tasks/{task_id}/status")
-    def update_task_status(task_id: str, status: str = Form("open"), detail: str = Form("")) -> Response:
+    async def update_task_status(task_id: str, status: str = Form("open"), detail: str = Form("")) -> Response:
         service.repo.update_task_status(task_id, status, detail)
         return _redirect(f"/tasks/{task_id}")
 
     @app.post("/tasks/{task_id}/reassess")
-    def reassess_task(request: Request, task_id: str) -> Response:
+    async def reassess_task(request: Request, task_id: str) -> Response:
         task = service.repo.get_task(task_id)
         if task is None:
             return _error(app, request, "Task not found", "No task matched that ID.", 404)
@@ -206,11 +206,11 @@ def create_fastapi_app(repo: Repository | None = None, llm: OpenAIClient | None 
         return _redirect(f"/jobs/{job.id}")
 
     @app.get("/favicon.svg")
-    def favicon() -> Response:
+    async def favicon() -> Response:
         return FileResponse(Path(__file__).resolve().parent / "static" / "cvai-v.svg", media_type="image/svg+xml")
 
     @app.post("/ingestions/url")
-    def ingest_url(request: Request, source_url: str = Form(""), quick_analysis: str = Form("")) -> Response:
+    async def ingest_url(request: Request, source_url: str = Form(""), quick_analysis: str = Form("")) -> Response:
         # URL ingestion can be slow or fail on remote sites, so it runs as a
         # background job and the browser follows the job-status page.
         source_url = source_url.strip()
@@ -230,7 +230,7 @@ def create_fastapi_app(repo: Repository | None = None, llm: OpenAIClient | None 
         return _redirect(f"/jobs/{job.id}")
 
     @app.post("/ingestions/text")
-    def ingest_text(
+    async def ingest_text(
         request: Request,
         source_text: str = Form(""),
         source_url: str = Form(""),
@@ -260,7 +260,7 @@ def create_fastapi_app(repo: Repository | None = None, llm: OpenAIClient | None 
         return _redirect(f"/jobs/{job.id}")
 
     @app.get("/jobs/{job_id}", response_class=HTMLResponse)
-    def job_status(request: Request, job_id: str) -> Response:
+    async def job_status(request: Request, job_id: str) -> Response:
         job = service.jobs.get(job_id)
         if job is None:
             return _error(app, request, "Job not found", "That intake job does not exist.", 404)
@@ -271,7 +271,7 @@ def create_fastapi_app(repo: Repository | None = None, llm: OpenAIClient | None 
         )
 
     @app.get("/jobs/{job_id}/fragment", response_class=HTMLResponse)
-    def job_status_fragment(request: Request, job_id: str) -> Response:
+    async def job_status_fragment(request: Request, job_id: str) -> Response:
         # HTMX polls this small fragment while a background job runs. Returning only
         # the changing section avoids refreshing the whole page.
         job = service.jobs.get(job_id)
@@ -284,7 +284,7 @@ def create_fastapi_app(repo: Repository | None = None, llm: OpenAIClient | None 
         )
 
     @app.post("/jobs/{job_id}/continue-ingestion")
-    def continue_ingestion(request: Request, job_id: str) -> Response:
+    async def continue_ingestion(request: Request, job_id: str) -> Response:
         preview_job = service.jobs.get(job_id)
         if preview_job is None or not preview_job.result or not preview_job.result.get("intake"):
             return _error(app, request, "Job not found", "That quick analysis job cannot be continued.", 404)
@@ -296,7 +296,7 @@ def create_fastapi_app(repo: Repository | None = None, llm: OpenAIClient | None 
         return _redirect(f"/jobs/{job.id}")
 
     @app.post("/jobs/{job_id}/abandon")
-    def abandon_ingestion(request: Request, job_id: str) -> Response:
+    async def abandon_ingestion(request: Request, job_id: str) -> Response:
         preview_job = service.jobs.get(job_id)
         if preview_job is None or not preview_job.result or not preview_job.result.get("quick_analysis"):
             return _error(app, request, "Job not found", "That quick analysis job cannot be abandoned.", 404)
@@ -305,7 +305,7 @@ def create_fastapi_app(repo: Repository | None = None, llm: OpenAIClient | None 
         return _redirect(f"/jobs/{job_id}")
 
     @app.get("/roles/{canonical_slug}", response_class=HTMLResponse)
-    def role_detail(request: Request, canonical_slug: str) -> Response:
+    async def role_detail(request: Request, canonical_slug: str) -> Response:
         role = service.repo.get_role(canonical_slug)
         if role is None:
             return _error(app, request, "Role not found", "No canonical role matched that ID.", 404)
@@ -313,7 +313,7 @@ def create_fastapi_app(repo: Repository | None = None, llm: OpenAIClient | None 
         return _template(app, request, "role.html.j2", {"title": f"{role.company} · {role.role}", "role": role, "task_titles": task_titles})
 
     @app.post("/roles/{canonical_slug}/status")
-    def update_role_status(
+    async def update_role_status(
         request: Request,
         canonical_slug: str,
         event_type: str = Form(""),
@@ -332,7 +332,7 @@ def create_fastapi_app(repo: Repository | None = None, llm: OpenAIClient | None 
         return _redirect(f"/roles/{canonical_slug}")
 
     @app.post("/roles/{canonical_slug}/update-prompt")
-    def update_role_from_prompt(request: Request, canonical_slug: str, prompt: str = Form("")) -> Response:
+    async def update_role_from_prompt(request: Request, canonical_slug: str, prompt: str = Form("")) -> Response:
         # Free-text updates always go through the LLM. Even short prompts can imply
         # multiple durable changes across role notes, tasks, events, or status.
         prompt = prompt.strip()
@@ -348,7 +348,7 @@ def create_fastapi_app(repo: Repository | None = None, llm: OpenAIClient | None 
         return _redirect(f"/jobs/{job.id}")
 
     @app.post("/roles/{canonical_slug}/reassess")
-    def reassess_role(request: Request, canonical_slug: str) -> Response:
+    async def reassess_role(request: Request, canonical_slug: str) -> Response:
         role = service.repo.get_role(canonical_slug)
         if role is None:
             return _error(app, request, "Role not found", "No canonical role matched that ID.", 404)
@@ -359,7 +359,7 @@ def create_fastapi_app(repo: Repository | None = None, llm: OpenAIClient | None 
         return _redirect(f"/jobs/{job.id}")
 
     @app.get("/download/generic-cv")
-    def download_generic_cv(request: Request) -> Response:
+    async def download_generic_cv(request: Request) -> Response:
         try:
             return FileResponse(service.repo.ensure_generic_cv(), media_type="application/pdf", filename="cv.pdf")
         except FileNotFoundError as exc:
@@ -368,7 +368,7 @@ def create_fastapi_app(repo: Repository | None = None, llm: OpenAIClient | None 
             return _error(app, request, "CV PDF unavailable", "Typst could not build the CV PDF. Check the selected template and CV YAML.", 500)
 
     @app.get("/download/file")
-    def download_file(request: Request, path: str = Query("")) -> Response:
+    async def download_file(request: Request, path: str = Query("")) -> Response:
         # Repository.file_info validates that the requested path stays inside
         # CVAI_DATA before FastAPI streams it back to the browser.
         if not path:
@@ -381,7 +381,7 @@ def create_fastapi_app(repo: Repository | None = None, llm: OpenAIClient | None 
         return FileResponse(file_path, media_type=mime, filename=file_path.name)
 
     @app.get("/preview/file", response_class=HTMLResponse)
-    def preview_file(request: Request, path: str = Query("")) -> Response:
+    async def preview_file(request: Request, path: str = Query("")) -> Response:
         if not path:
             return HTMLResponse("No repository file path was provided.", status_code=400)
         if not _is_downloadable_artifact(path) or not path.endswith(".md"):
