@@ -1,19 +1,6 @@
 {% extends "base.html.j2" %}
 
 {% block body %}
-<section class="grid cards" style="margin-bottom:24px;">
-  <article class="card">
-    <h3>Active roles</h3>
-    <div style="font-size:34px;font-weight:700;">{{ roles|length }}</div>
-    <div class="muted">Ordered by roles.yaml</div>
-  </article>
-  <article class="card">
-    <h3>Session operations</h3>
-    <div style="font-size:34px;font-weight:700;">{{ operations|length }}</div>
-    <div class="muted">Background actions launched since this app started</div>
-  </article>
-</section>
-
 <section class="role-list" style="margin-bottom:24px;">
   {% for role in roles %}
     {% set role_record = role.role %}
@@ -73,24 +60,4 @@
   }
 </script>
 
-<section class="grid" style="margin-top:18px;">
-  <article class="card">
-    <h3>Recent operations</h3>
-    <div class="list">
-      {% for operation in operations[:6] %}
-        <div class="list-item">
-          <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;">
-            <div>
-              <strong>{{ operation.kind|replace("_", " ")|title }}</strong><br>
-              <span class="muted">{{ operation.status }}</span>
-            </div>
-            <a href="/operations/{{ operation.id }}">Open</a>
-          </div>
-        </div>
-      {% else %}
-        <div class="list-item muted">No operations yet in this session.</div>
-      {% endfor %}
-    </div>
-  </article>
-</section>
 {% endblock %}

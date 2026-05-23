@@ -33,7 +33,6 @@ from .view_helpers import (
     dashboard_status_badge,
     fulfillment_class,
     fulfillment_label,
-    operation_summary,
     status_sentence,
     task_eta_class,
     task_eta_label,
@@ -71,24 +70,22 @@ def create_fastapi_app(repo: Repository | None = None, llm: OpenAIClient | None 
 
     @app.get("/", response_class=HTMLResponse)
     async def dashboard(request: Request) -> Response:
-        # The dashboard is a pure read: data comes from YAML, never from an LLM.
+        # The roles page is a pure read: data comes from YAML, never from an LLM.
         roles = service.repo.list_dashboard_roles()
-        operations = [operation_summary(operation.as_dict()) for operation in service.operations.list()]
         return _template(
             app,
             request,
             "dashboard.html.j2",
             {
-                "title": "Dashboard",
+                "title": "Roles",
                 "roles": roles,
-                "operations": operations,
                 "dashboard_status_badge": dashboard_status_badge,
             },
         )
 
     @app.get("/intake", response_class=HTMLResponse)
     async def intake(request: Request) -> Response:
-        return _template(app, request, "intake.html.j2", {"title": "Roles"})
+        return _template(app, request, "intake.html.j2", {"title": "Ingest Role"})
 
     @app.get("/tasks", response_class=HTMLResponse)
     async def tasks(request: Request) -> Response:

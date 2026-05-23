@@ -214,7 +214,7 @@ class EndToEndTests(unittest.TestCase):
             updated_role = client.get("/roles/ledgerly_remote_staff_backend_engineer_payments")
 
         self.assertEqual(health.json(), {"status": "ok"})
-        self.assertIn("Active roles", dashboard.text)
+        self.assertIn("/roles/", dashboard.text)
         self.assertIn(">CV</a>", dashboard.text)
         self.assertIn("Ada Lovelace", cv_page.text)
         self.assertEqual(cv_save.status_code, 302)
