@@ -9,8 +9,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from cvai_core.llm import OpenAIAPIError
 from cvai_web.server import (
-    IntakeJob,
-    JobManager,
+    Operation,
+    OperationManager,
     JobPostingExtractor,
     TextExtractor,
     WebApp,
@@ -104,11 +104,11 @@ class ServerUtilityTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "Could not resolve"):
                 validate_public_https_url("https://example.invalid/job")
 
-    def test_job_manager_records_success_and_failure_states(self) -> None:
-        manager = JobManager()
-        success = IntakeJob(id="job-success", kind="unit")
-        failure = IntakeJob(id="job-failure", kind="unit")
-        api_failure = IntakeJob(id="job-api", kind="unit")
+    def test_operation_manager_records_success_and_failure_states(self) -> None:
+        manager = OperationManager()
+        success = Operation(id="job-success", kind="unit")
+        failure = Operation(id="job-failure", kind="unit")
+        api_failure = Operation(id="job-api", kind="unit")
 
         manager._run(success, lambda job: setattr(job, "result", {"ok": True}))
         manager._run(failure, lambda job: (_ for _ in ()).throw(RuntimeError("boom")))
@@ -139,7 +139,7 @@ class ServerUtilityTests(unittest.TestCase):
             "application": {"status": "draft"},
         }
         app = WebApp(repo, llm)
-        job = IntakeJob(id="job-1", kind="text")
+        job = Operation(id="job-1", kind="text")
 
         app._complete_ingestion(
             job,
@@ -193,7 +193,7 @@ class ServerUtilityTests(unittest.TestCase):
         }
         app = WebApp(repo, llm)
 
-        job = IntakeJob(id="job-quick", kind="quick analysis")
+        job = Operation(id="job-quick", kind="quick analysis")
         app._run_text_quick_analysis(job, "Build distributed systems in Go.", "https://example.test/job", {"company": "Example"})
 
         self.assertEqual(job.result["quick_analysis"]["recommendation"], "continue")
@@ -243,7 +243,7 @@ class ServerUtilityTests(unittest.TestCase):
             },
         }
         app = WebApp(repo, llm)
-        job = IntakeJob(id="job-full", kind="full ingestion")
+        job = Operation(id="job-full", kind="full ingestion")
 
         app._run_full_ingestion_from_preview(
             job,
@@ -308,9 +308,9 @@ class ServerUtilityTests(unittest.TestCase):
         }
         app = WebApp(repo, llm)
 
-        update_job = IntakeJob(id="job-update", kind="update")
+        update_job = Operation(id="job-update", kind="update")
         app._run_prompt_update(update_job, "example_remote_engineer", "They wrote back")
-        task_job = IntakeJob(id="job-task", kind="task")
+        task_job = Operation(id="job-task", kind="task")
         app._run_task_reassessment(task_job, "task-python")
 
         repo.record_status.assert_called_once_with(
@@ -324,6 +324,7 @@ class ServerUtilityTests(unittest.TestCase):
             "example_remote_engineer",
             ["Prepare a recent technical project story."],
         )
+        repo.record_note_event.assert_called_once_with("example_remote_engineer", "2026-05-23", "Update prompt: They wrote back")
         repo.update_task_status.assert_called_once_with("task-python", "completed", "Evidence now exists. Evidence: pp-api")
         self.assertEqual(update_job.result["canonical_slug"], "example_remote_engineer")
         self.assertEqual(task_job.result["paths"], {"task": "tasks.yaml"})
@@ -363,7 +364,7 @@ class ServerUtilityTests(unittest.TestCase):
             ],
         }
         app = WebApp(repo, llm)
-        job = IntakeJob(id="job-update", kind="update")
+        job = Operation(id="job-update", kind="update")
 
         app._run_prompt_update(job, "example_remote_engineer", "Update the role and notes.")
 
@@ -378,6 +379,7 @@ class ServerUtilityTests(unittest.TestCase):
             "example_remote_engineer",
             ["Prepare a recent project story."],
         )
+        repo.record_note_event.assert_called_once_with("example_remote_engineer", "2026-05-23", "Update prompt: Update the role and notes.")
         repo.write_text.assert_not_called()
         self.assertEqual(job.result["paths"], {"operations": ["record_status", "append_analysis_notes"]})
 
@@ -409,7 +411,7 @@ class ServerUtilityTests(unittest.TestCase):
             ],
         }
         app = WebApp(repo, llm)
-        job = IntakeJob(id="job-update", kind="update")
+        job = Operation(id="job-update", kind="update")
 
         app._run_prompt_update(job, "example_remote_engineer", "Hiring manager screen booked.")
 
@@ -420,6 +422,7 @@ class ServerUtilityTests(unittest.TestCase):
             "Hiring manager screen booked.",
             artifacts=[],
         )
+        repo.record_note_event.assert_called_once_with("example_remote_engineer", "2026-05-23", "Update prompt: Hiring manager screen booked.")
         self.assertEqual(job.result["paths"], {"operations": ["record_status"]})
 
 

@@ -94,7 +94,7 @@ class ViewHelperTests(unittest.TestCase):
         self.assertEqual(view_helpers.task_eta_class(self._task(estimated_days=3, feasible=True)), "submitted")
         self.assertEqual(view_helpers.task_eta_class(self._task(estimated_days=9, feasible=False)), "rejected")
         self.assertEqual(
-            view_helpers.job_summary({"id": "role", "kind": "url", "status": "draft", "secret": "ignored"}),
+            view_helpers.operation_summary({"id": "role", "kind": "url", "status": "draft", "secret": "ignored"}),
             {"id": "role", "kind": "url", "status": "draft"},
         )
 

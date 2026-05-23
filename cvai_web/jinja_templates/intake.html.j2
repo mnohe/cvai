@@ -4,7 +4,7 @@
 <section class="split">
   <article class="card">
     <h3>From URL</h3>
-    <form method="post" action="/ingestions/url">
+    <form method="post" action="/ingestions/url" hx-post="/ingestions/url" hx-target="#operation-modal-root" hx-swap="outerHTML">
       <label class="checkbox-row">
         <input type="checkbox" name="quick_analysis" value="1" checked>
         Quick analysis before full ingestion
@@ -17,7 +17,7 @@
   </article>
   <article class="card">
     <h3>From pasted text</h3>
-    <form method="post" action="/ingestions/text">
+    <form method="post" action="/ingestions/text" hx-post="/ingestions/text" hx-target="#operation-modal-root" hx-swap="outerHTML">
       <label class="checkbox-row">
         <input type="checkbox" name="quick_analysis" value="1" checked>
         Quick analysis before full ingestion

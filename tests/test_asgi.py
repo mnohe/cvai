@@ -4,6 +4,7 @@ import sys
 import tempfile
 import subprocess
 import time
+import re
 from unittest import mock
 
 import anyio
@@ -21,7 +22,7 @@ else:
 from cvai_core.llm import LLMConfig, OpenAIClient
 from cvai_core.repo import Repository
 from cvai_core.yaml_format import dump_yaml
-from cvai_web.server import IntakeJob
+from cvai_web.server import Operation
 from fixtures import create_sample_data_root
 from test_cv import valid_cv
 
@@ -100,17 +101,17 @@ class FastAPIRouteTests(unittest.TestCase):
         self.assertIn("<svg", (static_root / "cvai-h.svg").read_text(encoding="utf-8"))
         self.assertIn("<svg", (static_root / "cvai-v.svg").read_text(encoding="utf-8"))
 
-    def test_job_page_uses_htmx_status_fragment(self) -> None:
+    def test_operation_page_uses_htmx_status_fragment(self) -> None:
         client = self.client()
-        job = IntakeJob(id="testjob", kind="url", status="running")
-        job.log_lines.append("[00:00:00] Started")
-        client.app.state.service.jobs._jobs[job.id] = job
+        operation = Operation(id="operation-test", kind="url", status="running")
+        operation.log_lines.append("[00:00:00] Started")
+        client.app.state.service.operations._operations[operation.id] = operation
 
-        page = client.get("/jobs/testjob")
-        fragment = client.get("/jobs/testjob/fragment")
+        page = client.get("/operations/operation-test")
+        fragment = client.get("/operations/operation-test/fragment")
 
         self.assertEqual(page.status_code, 200)
-        self.assertIn('hx-get="/jobs/testjob/fragment"', page.text)
+        self.assertIn('hx-get="/operations/operation-test/fragment"', page.text)
         self.assertIn("Started", fragment.text)
 
     def test_missing_typst_returns_clean_pdf_error_page(self) -> None:
@@ -181,22 +182,86 @@ class FastAPIRouteTests(unittest.TestCase):
             },
             follow_redirects=False,
         )
-        job_path = response.headers["location"]
+        operation_path = response.headers["location"]
         fragment = ""
         deadline = time.time() + 5
         while time.time() < deadline:
-            fragment = client.get(f"{job_path}/fragment").text
+            fragment = client.get(f"{operation_path}/fragment").text
             if "Quick analysis completed" in fragment or "failed" in fragment:
                 break
             time.sleep(0.05)
 
         self.assertEqual(response.status_code, 302)
         self.assertIn("Quick analysis", fragment)
-        self.assertIn("Continue full ingestion", fragment)
-        self.assertIn("Promising fit.", fragment)
+        self.assertIn("Return to the intake page", fragment)
         self.assertFalse((client.app.state.service.repo.root / "roles" / "example_remote_platform_engineer").exists())
         llm.quick_analyze_role.assert_called_once()
         llm.generate_bundle.assert_not_called()
+
+    def test_hx_quick_analysis_launches_modal_without_redirect(self) -> None:
+        llm = mock.Mock()
+        llm.is_configured.return_value = True
+        llm.quick_analyze_role.return_value = {
+            "clear": True,
+            "summary": "Promising fit.",
+            "fit_level": "good",
+            "key_matching_abilities": [],
+            "important_gaps": [],
+            "recommendation": "continue",
+            "rationale": "Enough overlap to inspect fully.",
+        }
+        client = self.client(llm=llm)
+
+        response = client.post(
+            "/ingestions/text",
+            data={
+                "quick_analysis": "1",
+                "source_text": "Example needs a platform engineer for Python APIs.",
+                "source_url": "https://example.test/job",
+            },
+            headers={"HX-Request": "true"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("location", response.headers)
+        self.assertIn('id="operation-modal-root"', response.text)
+        self.assertIn("<dialog", response.text)
+        self.assertIn("Quick analysis", response.text)
+        self.assertNotIn("operation-page-status", response.text)
+        self.assertNotIn("<code>operation-", response.text)
+        self.assertIn("/operations/operation-", response.text)
+        operation_match = re.search(r"/operations/(operation-[^\"]+)/modal", response.text)
+        self.assertIsNotNone(operation_match)
+        operation_path = f"/operations/{operation_match.group(1)}"
+        modal = ""
+        deadline = time.time() + 5
+        while time.time() < deadline:
+            modal = client.get(f"{operation_path}/modal").text
+            if "Quick analysis" in modal or "failed" in modal:
+                break
+            time.sleep(0.05)
+
+        self.assertIn("Quick analysis", modal)
+        self.assertIn("Continue full ingestion", modal)
+        self.assertIn("Promising fit.", modal)
+
+    def test_hx_operation_cancel_closes_modal_and_marks_cancelled(self) -> None:
+        client = self.client()
+        operation = Operation(id="operation-cancel", kind="quick analysis", status="running")
+        client.app.state.service.operations._operations[operation.id] = operation
+
+        response = client.post("/operations/operation-cancel/cancel", headers={"HX-Request": "true"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('<div id="operation-modal-root"></div>', response.text)
+        self.assertIn('id="active-operation-count"', response.text)
+        self.assertEqual(operation.status, "cancelled")
+
+    def test_missing_operation_modal_poll_closes_without_console_error(self) -> None:
+        response = self.client().get("/operations/operation-missing/modal")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('<div id="operation-modal-root"></div>', response.text)
 
     def test_task_status_post_updates_task(self) -> None:
         client = self.client()
@@ -213,7 +278,7 @@ class FastAPIRouteTests(unittest.TestCase):
         self.assertEqual(task.status, "completed")
         self.assertEqual(task.evidence_refs, ["pp-platform"])
 
-    def test_role_update_prompt_uses_llm_job_to_record_status(self) -> None:
+    def test_role_update_prompt_uses_llm_operation_to_record_status(self) -> None:
         llm = mock.Mock()
         llm.is_configured.return_value = True
         llm.interpret_status_update.return_value = {
@@ -230,11 +295,11 @@ class FastAPIRouteTests(unittest.TestCase):
             data={"prompt": "Rejected on 2026-05-20 with this rationale: duplicate role."},
             follow_redirects=False,
         )
-        job_path = response.headers["location"]
+        operation_path = response.headers["location"]
         fragment = ""
         deadline = time.time() + 5
         while time.time() < deadline:
-            fragment = client.get(f"{job_path}/fragment").text
+            fragment = client.get(f"{operation_path}/fragment").text
             if "Applied rejected status dated 2026-05-20" in fragment or "failed" in fragment:
                 break
             time.sleep(0.05)

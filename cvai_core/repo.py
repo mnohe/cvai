@@ -660,6 +660,26 @@ class Repository:
         role_events.setdefault("events", []).append(event)
         self.write_data(f"roles/{canonical_slug}/events.yaml", role_events)
 
+    def record_note_event(self, canonical_slug: str, exact_date: str, detail: str) -> None:
+        role = self.get_role(canonical_slug)
+        if role is None:
+            raise FileNotFoundError(f"Unknown role: {canonical_slug}")
+        detail = normalize_whitespace(detail)
+        if not detail:
+            return
+        event = {
+            "id": f"event-{uuid.uuid4()}",
+            "role_id": canonical_slug,
+            "type": "note",
+            "date": exact_date,
+            "detail": detail,
+            "artifacts": [],
+        }
+        self._append_global_row("events.yaml", "events", event)
+        role_events = self.load_data(f"roles/{canonical_slug}/events.yaml", {"events": []})
+        role_events.setdefault("events", []).append(event)
+        self.write_data(f"roles/{canonical_slug}/events.yaml", role_events)
+
     def ensure_generic_cv(self) -> Path:
         # The web app serves the PDF from CVAI_DATA. If it is missing, the bundled
         # Typst renderer builds it on demand from the structured CV YAML.

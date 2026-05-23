@@ -1,0 +1,16 @@
+{% extends "base.html.j2" %}
+
+{% block body %}
+<section class="hero">
+  <div>
+    <div class="hero-title-row">
+      <h1>Operation</h1>
+      {% include "operation_status_badge.html.j2" %}
+    </div>
+    <p class="operation-id"><code>{{ operation.id }}</code></p>
+    {% include "operation_summary_text.html.j2" %}
+  </div>
+</section>
+
+{% include "operation_fragment.html.j2" %}
+{% endblock %}

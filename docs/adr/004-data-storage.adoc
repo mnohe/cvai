@@ -113,7 +113,7 @@ The directory layout uses:
 
 * global catalogue files at the root, covering the role index, application status tracking, the task list, and the cross-role decision log
 * per-role subdirectories, each containing posting metadata, requirement assessment, artefact references, and a role-specific decision log
-* a separate area for background job state, so that job status survives process restarts and is readable by any process sharing the directory
+* a separate area for background operation state, so that operation status survives process restarts and is readable by any process sharing the directory
 
 == Consequences
 

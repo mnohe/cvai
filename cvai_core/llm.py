@@ -18,7 +18,7 @@ class LLMConfig:
 
 @dataclass
 class OpenAIAPIError(RuntimeError):
-    # The UI shows user_message. Logs and job pages can include detail when the
+    # The UI shows user_message. Logs and operation pages can include detail when the
     # caller needs a more technical explanation of what the API returned.
     status_code: int | None
     error_code: str | None
@@ -503,7 +503,7 @@ class OpenAIClient:
     def _build_api_error(self, status_code: int, details: str) -> OpenAIAPIError:
         # OpenAI-compatible providers vary in their error bodies. Extract the
         # common fields when present, then map them to messages that make sense in
-        # a background job log rather than exposing raw provider JSON to the page.
+        # a background operation log rather than exposing raw provider JSON to the page.
         error_code = None
         error_type = None
         error_message = ""
@@ -524,9 +524,9 @@ class OpenAIClient:
         if status_code == 401:
             user_message = "The LLM API key was rejected. Check LLM_API_KEY and confirm the key is still valid."
         elif status_code == 429 and error_code == "insufficient_quota":
-            user_message = "LLM project quota is exhausted. Add billing or available credits for this API project, then retry the intake job."
+            user_message = "LLM project quota is exhausted. Add billing or available credits for this API project, then retry the intake operation."
         elif status_code == 429:
-            user_message = "The LLM API rate-limited this request. Wait a moment and retry the intake job."
+            user_message = "The LLM API rate-limited this request. Wait a moment and retry the intake operation."
         else:
             user_message = f"LLM API request failed with HTTP {status_code}."
             if error_message:

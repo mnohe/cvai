@@ -169,10 +169,10 @@ def normalize_visible_text(text: str) -> str:
 
 
 @dataclass
-class IntakeJob:
-    # Intake jobs are in-memory background runs. They are intentionally session
+class Operation:
+    # Operations are in-memory background actions. They are intentionally session
     # scoped: if the web process restarts, durable role data remains in CVAI_DATA
-    # while transient job logs disappear.
+    # while transient operation logs disappear.
     id: str
     kind: str
     status: str = "queued"
@@ -183,6 +183,10 @@ class IntakeJob:
     def log(self, message: str) -> None:
         timestamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
         self.log_lines.append(f"[{timestamp}] {message}")
+
+    @property
+    def cancelled(self) -> bool:
+        return self.status == "cancelled"
 
     def as_dict(self) -> dict:
         return {
@@ -195,57 +199,77 @@ class IntakeJob:
         }
 
 
-class JobManager:
-    # JobManager isolates thread handling from HTTP routes. Routes create jobs and
-    # then poll their status; worker methods write durable data through Repository.
+class OperationManager:
+    # OperationManager isolates thread handling from HTTP routes. Routes create
+    # operations and then poll their status; worker methods write durable data
+    # through Repository.
     def __init__(self) -> None:
-        self._jobs: dict[str, IntakeJob] = {}
+        self._operations: dict[str, Operation] = {}
         self._lock = threading.Lock()
 
-    def create(self, kind: str, worker: Callable[[IntakeJob], None]) -> IntakeJob:
-        job_id = f"job-{uuid.uuid4()}"
-        job = IntakeJob(id=job_id, kind=kind)
+    def create(self, kind: str, worker: Callable[[Operation], None]) -> Operation:
+        operation_id = f"operation-{uuid.uuid4()}"
+        operation = Operation(id=operation_id, kind=kind)
         with self._lock:
-            self._jobs[job_id] = job
-        thread = threading.Thread(target=self._run, args=(job, worker), daemon=True)
+            self._operations[operation_id] = operation
+        thread = threading.Thread(target=self._run, args=(operation, worker), daemon=True)
         thread.start()
-        return job
+        return operation
 
-    def _run(self, job: IntakeJob, worker: Callable[[IntakeJob], None]) -> None:
-        job.status = "running"
+    def _run(self, operation: Operation, worker: Callable[[Operation], None]) -> None:
+        operation.status = "running"
         try:
-            worker(job)
-            job.status = "completed"
+            worker(operation)
+            if operation.status != "cancelled":
+                operation.status = "completed"
         except OpenAIAPIError as exc:
-            job.status = "failed"
-            job.error = str(exc)
-            job.log(exc.detail)
+            if operation.status == "cancelled":
+                return
+            operation.status = "failed"
+            operation.error = str(exc)
+            operation.log(exc.detail)
         except Exception as exc:  # noqa: BLE001
-            job.status = "failed"
-            job.error = str(exc)
-            job.log(traceback.format_exc())
+            if operation.status == "cancelled":
+                return
+            operation.status = "failed"
+            operation.error = str(exc)
+            operation.log(traceback.format_exc())
 
-    def get(self, job_id: str) -> IntakeJob | None:
-        return self._jobs.get(job_id)
+    def get(self, operation_id: str) -> Operation | None:
+        return self._operations.get(operation_id)
 
-    def list(self) -> list[IntakeJob]:
-        return sorted(self._jobs.values(), key=lambda job: job.id, reverse=True)
+    def cancel(self, operation_id: str) -> Operation | None:
+        operation = self.get(operation_id)
+        if operation is None:
+            return None
+        if operation.status in {"queued", "running"}:
+            operation.status = "cancelled"
+            operation.log("Operation cancelled by user.")
+        return operation
+
+    def list(self) -> list[Operation]:
+        return sorted(self._operations.values(), key=lambda operation: operation.id, reverse=True)
+
+    def active_count(self) -> int:
+        return sum(1 for operation in self._operations.values() if operation.status in {"queued", "running"})
 
 
 class WebApp:
     # WebApp is the service object behind the FastAPI routes. It owns workflow
-    # methods and the in-memory job manager; HTTP rendering lives in Jinja routes.
+    # methods and the in-memory operation manager; HTTP rendering lives in Jinja routes.
     def __init__(self, repo: Repository, llm: OpenAIClient) -> None:
         self.repo = repo
         self.llm = llm
-        self.jobs = JobManager()
+        self.operations = OperationManager()
 
-    def _run_url_ingestion(self, job: IntakeJob, source_url: str) -> None:
+    def _run_url_ingestion(self, operation: Operation, source_url: str) -> None:
         if not self.llm.is_configured():
-            raise RuntimeError("LLM_API_KEY is required before intake jobs can run.")
-        job.log(f"Fetching role page: {source_url}")
+            raise RuntimeError("LLM_API_KEY is required before intake operations can run.")
+        operation.log(f"Fetching role page: {source_url}")
         source_text = self._fetch_url_text(source_url)
-        job.log(f"Fetched {len(source_text)} characters of visible page text.")
+        if operation.cancelled:
+            return
+        operation.log(f"Fetched {len(source_text)} characters of visible page text.")
         extracted = self.llm.extract_role(
             source_kind="url",
             source_url=source_url,
@@ -255,16 +279,20 @@ class WebApp:
         if not extracted.get("clear"):
             reason = extracted.get("reason") or "The role metadata was not fully clear from the page."
             raise RuntimeError(reason + " Please use pasted-text intake instead.")
-        self._complete_ingestion(job, source_text, source_url, extracted)
+        self._complete_ingestion(operation, source_text, source_url, extracted)
 
-    def _run_url_quick_analysis(self, job: IntakeJob, source_url: str) -> None:
+    def _run_url_quick_analysis(self, operation: Operation, source_url: str) -> None:
         if not self.llm.is_configured():
             raise RuntimeError("LLM_API_KEY is required before quick analysis can run.")
-        job.log(f"Fetching role page: {source_url}")
+        operation.log(f"Fetching role page: {source_url}")
         source_text = self._fetch_url_text(source_url)
-        job.log(f"Fetched {len(source_text)} characters of visible page text.")
+        if operation.cancelled:
+            return
+        operation.log(f"Fetched {len(source_text)} characters of visible page text.")
         analysis = self._quick_analyze_source(source_kind="url", source_url=source_url, source_text=source_text)
-        job.result = {
+        if operation.cancelled:
+            return
+        operation.result = {
             "quick_analysis": analysis,
             "intake": {
                 "kind": "url",
@@ -273,18 +301,18 @@ class WebApp:
                 "overrides": {},
             },
         }
-        job.log("Quick analysis completed. Continue or abandon this role from the job page.")
+        operation.log("Quick analysis completed. Continue or abandon this role from the operation page.")
 
     def _run_text_ingestion(
         self,
-        job: IntakeJob,
+        operation: Operation,
         source_text: str,
         source_url: str,
         overrides: dict[str, str],
     ) -> None:
         if not self.llm.is_configured():
-            raise RuntimeError("LLM_API_KEY is required before intake jobs can run.")
-        job.log("Extracting metadata from pasted text.")
+            raise RuntimeError("LLM_API_KEY is required before intake operations can run.")
+        operation.log("Extracting metadata from pasted text.")
         extracted = self.llm.extract_role(
             source_kind="text",
             source_url=source_url,
@@ -295,20 +323,24 @@ class WebApp:
         if not extracted.get("clear"):
             reason = extracted.get("reason") or "The pasted text still did not provide a clear company, role, and location."
             raise RuntimeError(reason)
-        self._complete_ingestion(job, source_text, source_url, extracted)
+        if operation.cancelled:
+            return
+        self._complete_ingestion(operation, source_text, source_url, extracted)
 
     def _run_text_quick_analysis(
         self,
-        job: IntakeJob,
+        operation: Operation,
         source_text: str,
         source_url: str,
         overrides: dict[str, str],
     ) -> None:
         if not self.llm.is_configured():
             raise RuntimeError("LLM_API_KEY is required before quick analysis can run.")
-        job.log("Running quick fit analysis for pasted text.")
+        operation.log("Running quick fit analysis for pasted text.")
         analysis = self._quick_analyze_source(source_kind="text", source_url=source_url, source_text=source_text)
-        job.result = {
+        if operation.cancelled:
+            return
+        operation.result = {
             "quick_analysis": analysis,
             "intake": {
                 "kind": "text",
@@ -317,7 +349,7 @@ class WebApp:
                 "overrides": overrides,
             },
         }
-        job.log("Quick analysis completed. Continue or abandon this role from the job page.")
+        operation.log("Quick analysis completed. Continue or abandon this role from the operation page.")
 
     def _quick_analyze_source(self, *, source_kind: str, source_url: str, source_text: str) -> dict:
         analysis = self.llm.quick_analyze_role(
@@ -354,13 +386,13 @@ class WebApp:
             "rationale": normalize_visible_text(str(analysis.get("rationale", ""))),
         }
 
-    def _run_full_ingestion_from_preview(self, job: IntakeJob, intake: dict) -> None:
+    def _run_full_ingestion_from_preview(self, operation: Operation, intake: dict) -> None:
         source_kind = intake.get("kind", "text")
         source_url = intake.get("source_url", "")
         source_text = intake.get("source_text", "")
         overrides = intake.get("overrides") or {}
         if source_kind == "url":
-            job.log("Continuing full ingestion from quick URL analysis.")
+            operation.log("Continuing full ingestion from quick URL analysis.")
             extracted = self.llm.extract_role(
                 source_kind="url",
                 source_url=source_url,
@@ -370,13 +402,15 @@ class WebApp:
             if not extracted.get("clear"):
                 reason = extracted.get("reason") or "The role metadata was not fully clear from the page."
                 raise RuntimeError(reason + " Please use pasted-text intake instead.")
-            self._complete_ingestion(job, source_text, source_url, extracted)
+            if operation.cancelled:
+                return
+            self._complete_ingestion(operation, source_text, source_url, extracted)
             return
 
-        job.log("Continuing full ingestion from quick pasted-text analysis.")
-        self._run_text_ingestion(job, source_text, source_url, overrides)
+        operation.log("Continuing full ingestion from quick pasted-text analysis.")
+        self._run_text_ingestion(operation, source_text, source_url, overrides)
 
-    def _complete_ingestion(self, job: IntakeJob, source_text: str, source_url: str, extracted: dict) -> None:
+    def _complete_ingestion(self, operation: Operation, source_text: str, source_url: str, extracted: dict) -> None:
         # The slug is the durable role identity. It is computed once from extracted
         # metadata and then used consistently across indexes and role-local files.
         metadata = {
@@ -392,7 +426,7 @@ class WebApp:
         metadata["canonical_slug"] = (
             f"{metadata['company_slug']}_{metadata['location_slug']}_{metadata['role_slug']}"
         )
-        job.log(f"Resolved role: {metadata['company']} / {metadata['location']} / {metadata['role']}")
+        operation.log(f"Resolved role: {metadata['company']} / {metadata['location']} / {metadata['role']}")
         job_markdown = self.repo.create_job_markdown(
             company=metadata["company"],
             role=metadata["role"],
@@ -401,7 +435,7 @@ class WebApp:
             source_text=source_text,
             captured_on=metadata["captured_on"],
         )
-        job.log("Generating repository bundle with the configured LLM API.")
+        operation.log("Generating repository bundle with the configured LLM API.")
         generated = self.llm.generate_bundle(
             metadata=metadata,
             workflow_text=self.repo.read_text("README.md"),
@@ -413,7 +447,9 @@ class WebApp:
                 "role_matrix": "",
             },
         )
-        job.log("Writing generated files into the repository.")
+        if operation.cancelled:
+            return
+        operation.log("Writing generated files into the repository.")
         paths = self.repo.write_bundle(
             canonical_slug=metadata["canonical_slug"],
             company_slug=metadata["company_slug"],
@@ -422,14 +458,14 @@ class WebApp:
             job_markdown=job_markdown,
             generated=generated,
         )
-        job.result = {"canonical_slug": metadata["canonical_slug"], "paths": paths}
-        job.log("Ingestion completed.")
+        operation.result = {"canonical_slug": metadata["canonical_slug"], "paths": paths}
+        operation.log("Ingestion completed.")
 
-    def _run_prompt_update(self, job: IntakeJob, canonical_slug: str, prompt: str) -> None:
+    def _run_prompt_update(self, operation: Operation, canonical_slug: str, prompt: str) -> None:
         role = self.repo.get_role(canonical_slug)
         if role is None:
             raise FileNotFoundError(f"Unknown role: {canonical_slug}")
-        job.log(f"Interpreting update prompt for {role.company} / {role.role}.")
+        operation.log(f"Interpreting update prompt for {role.company} / {role.role}.")
         today = date.today().isoformat()
         if not self.llm.is_configured():
             raise RuntimeError("LLM_API_KEY is required before update prompts can run.")
@@ -451,11 +487,12 @@ class WebApp:
             reason = interpreted.get("reason") or "The prompt was not clear enough to apply as a tracked status update."
             raise RuntimeError(reason)
         paths = self._apply_interpreted_update(canonical_slug, role, interpreted)
-        job.result = {"canonical_slug": canonical_slug, "paths": paths}
+        self.repo.record_note_event(canonical_slug, today, f"Update prompt: {prompt}")
+        operation.result = {"canonical_slug": canonical_slug, "paths": paths}
         if paths.get("operations"):
-            job.log(f"Applied {len(paths['operations'])} LLM-returned operation(s).")
+            operation.log(f"Applied {len(paths['operations'])} LLM-returned operation(s).")
         else:
-            job.log(f"Applied {interpreted['event_type']} status dated {interpreted['exact_date']}.")
+            operation.log(f"Applied {interpreted['event_type']} status dated {interpreted['exact_date']}.")
 
     def _apply_interpreted_update(self, canonical_slug: str, role, interpreted: dict) -> dict:
         operations = interpreted.get("operations") or []
@@ -526,10 +563,10 @@ class WebApp:
             return canonical_slug
         return normalized
 
-    def _run_role_reassessment(self, job: IntakeJob, canonical_slug: str) -> None:
+    def _run_role_reassessment(self, operation: Operation, canonical_slug: str) -> None:
         if not self.llm.is_configured():
             raise RuntimeError("LLM_API_KEY is required before role reassessment can run.")
-        job.log(f"Reassessing role {canonical_slug} from structured YAML.")
+        operation.log(f"Reassessing role {canonical_slug} from structured YAML.")
         context = self.repo.role_reassessment_context(canonical_slug)
         result = self.llm.reassess_role_analysis(**context)
         if not result.get("clear"):
@@ -538,16 +575,16 @@ class WebApp:
         if not isinstance(analysis, dict):
             raise RuntimeError("Role reassessment did not return structured analysis.")
         self.repo.write_reassessed_analysis(canonical_slug, analysis)
-        job.result = {"canonical_slug": canonical_slug, "paths": {"analysis": f"roles/{canonical_slug}/analysis.yaml"}}
-        job.log("Updated structured role analysis.")
+        operation.result = {"canonical_slug": canonical_slug, "paths": {"analysis": f"roles/{canonical_slug}/analysis.yaml"}}
+        operation.log("Updated structured role analysis.")
 
-    def _run_task_reassessment(self, job: IntakeJob, task_id: str) -> None:
+    def _run_task_reassessment(self, operation: Operation, task_id: str) -> None:
         task = self.repo.get_task(task_id)
         if task is None:
             raise FileNotFoundError(f"Unknown task: {task_id}")
         if not self.llm.is_configured():
             raise RuntimeError("LLM_API_KEY is required before task reassessment can run.")
-        job.log(f"Reassessing task {task.id}.")
+        operation.log(f"Reassessing task {task.id}.")
         usage = self.repo.task_usage(task_id)
         result = self.llm.assess_gap_task(
             task={
@@ -582,15 +619,15 @@ class WebApp:
         if evidence_refs:
             detail = f"{detail} Evidence: {evidence_refs}".strip()
         self.repo.update_task_status(task_id, status, detail)
-        job.result = {"canonical_slug": "", "paths": {"task": "tasks.yaml"}}
-        job.log(f"Task marked {status}.")
+        operation.result = {"canonical_slug": "", "paths": {"task": "tasks.yaml"}}
+        operation.log(f"Task marked {status}.")
 
     def _fetch_url_text(self, source_url: str) -> str:
         validate_public_https_url(source_url)
         request = urllib.request.Request(
             source_url,
             headers={
-                "User-Agent": "jobtracker-webui/1.0 (+local repo intake)",
+                "User-Agent": "cvai-webui/1.0 (+local repo intake)",
                 "Accept": "text/html,application/xhtml+xml",
             },
         )

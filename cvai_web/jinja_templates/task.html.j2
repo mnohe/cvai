@@ -34,7 +34,7 @@
   <article class="card">
     <div class="toolbar" style="justify-content:space-between;align-items:center;margin-bottom:10px;">
       <h3 style="margin:0;">Acceptance criteria</h3>
-      <form method="post" action="/tasks/{{ task.id }}/reassess" style="margin:0;">
+      <form method="post" action="/tasks/{{ task.id }}/reassess" hx-post="/tasks/{{ task.id }}/reassess" hx-target="#operation-notice-root" hx-swap="outerHTML" style="margin:0;">
         <button type="submit">Reassess</button>
       </form>
     </div>

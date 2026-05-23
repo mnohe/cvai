@@ -17,12 +17,12 @@ CVAI is a personal job-application management system. It serves a browser UI for
 │  │  dashboard          │   │  OpenAIClient                │  │
 │  │  cv                 │   │  (OpenAI-compatible chat    │  │
 │  │  intake             │   │   completions endpoint)     │  │
-│  │  jobs               │◄──│  (any OpenAI-compatible      │  │
+│  │  operations         │◄──│  (any OpenAI-compatible      │  │
 │  │  roles              │   │   endpoint via BASE_URL)     │  │
 │  │  downloads          │   └──────────────────────────────┘  │
 │  └──────────┬──────────┘                                     │
 │             │                         ┌──────────────────┐   │
-│  ┌──────────▼──────────┐              │   Job manager    │   │
+│  ┌──────────▼──────────┐              │ Operation manager│   │
 │  │    Repository       │◄─────────────│ worker threads   │   │
 │  │  reads YAML indexes │              │ (intake, bundle, │   │
 │  │  reads per-role     │              │  prompt update)  │   │
@@ -259,14 +259,14 @@ No LLM call. No background task.
 ### Intake (URL ingestion)
 
 1. User submits `POST /ingestions/url` with a `source_url` field.
-2. Route handler validates the URL (scheme and SSRF checks), creates a background worker thread, and immediately redirects to `GET /jobs/<job_id>`.
-3. The job page polls an HTMX fragment until the task completes or fails.
+2. Route handler validates the URL (scheme and SSRF checks), creates a background worker thread, and returns an operation notice linked to `GET /operations/<operation_id>`.
+3. The operation notice and operation page poll HTMX fragments until the task completes or fails.
 4. Background task:
    - Fetches the URL; extracts visible text.
    - Calls `OpenAIClient.extract_role()` → `company`, `role`, `location`.
    - Calls `OpenAIClient.generate_bundle()` → all generated artifacts.
    - `Repository.write_bundle()` writes the per-role directory and updates `roles.yaml` and `applications.yaml`.
-5. On completion the job page links to `GET /roles/<role_id>`.
+5. On completion the operation page links to `GET /roles/<role_id>`.
 
 ### Status update (structured form)
 
@@ -280,7 +280,7 @@ No LLM call.
 ### Status update (prompt)
 
 1. User submits `POST /roles/<role_id>/update-prompt` with a free-form `prompt`.
-2. A background task calls `OpenAIClient.interpret_status_update()`; the user waits on the job page.
+2. A background task calls `OpenAIClient.interpret_status_update()`; the user waits on the operation notice or operation page.
 3. `Repository.record_status()` and any related structured write helpers are called with the LLM result.
 4. Redirect to `GET /roles/<role_id>`.
 

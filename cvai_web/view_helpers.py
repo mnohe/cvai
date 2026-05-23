@@ -106,6 +106,6 @@ def task_eta_class(task: TaskRecord) -> str:
     return "submitted" if task.feasible_within_one_week else "rejected"
 
 
-def job_summary(job: dict) -> dict:
-    """Keep only fields needed by the dashboard's recent-job list."""
-    return {key: value for key, value in job.items() if key in {"id", "kind", "status"}}
+def operation_summary(operation: dict) -> dict:
+    """Keep only fields needed by operation lists."""
+    return {key: value for key, value in operation.items() if key in {"id", "kind", "status"}}

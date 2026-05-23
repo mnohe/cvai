@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import re
 import socket
 import tempfile
 import threading
@@ -138,7 +139,7 @@ class FakeLLM:
 class LiveServer:
     # LiveServer starts the ASGI app exactly like production does, but on a random
     # localhost port. Tests talk to it through HTTP so redirects, cookies, forms,
-    # background jobs, and template rendering all cross the real network boundary.
+    # background operations, and template rendering all cross the real network boundary.
     def __init__(self, repo: Repository, llm: FakeLLM | None = None) -> None:
         self.port = self._free_port()
         app = create_fastapi_app(repo=repo, llm=llm or FakeLLM())
@@ -178,7 +179,7 @@ class LiveServer:
 class EndToEndTests(unittest.TestCase):
     def data_root(self) -> Path:
         # Each E2E test gets a fresh, initialized data directory so writes made by
-        # forms and background jobs can be asserted without affecting fixtures.
+        # forms and background operations can be asserted without affecting fixtures.
         temp_dir = tempfile.TemporaryDirectory()
         self.addCleanup(temp_dir.cleanup)
         root = create_sample_data_root(Path(temp_dir.name))
@@ -205,7 +206,7 @@ class EndToEndTests(unittest.TestCase):
                 "/roles/ledgerly_remote_staff_backend_engineer_payments/update-prompt",
                 data={"prompt": "Rejected on 2026-05-20 with this rationale: E2E duplicate."},
             )
-            status_fragment = self._poll_job_fragment(client, status_update.headers["location"])
+            status_fragment = self._poll_operation_fragment(client, status_update.headers["location"])
             restricted_download = client.get("/download/file", params={"path": "roles.yaml"})
 
             updated_cv = client.get("/cv/")
@@ -222,13 +223,73 @@ class EndToEndTests(unittest.TestCase):
         self.assertEqual(task_update.headers["location"], "/tasks/task_control_plane_case_study")
         self.assertIn("Completed", updated_task.text)
         self.assertIn("pp-e2e-platform", updated_task.text)
-        self.assertTrue(status_update.headers["location"].startswith("/jobs/"))
+        self.assertTrue(status_update.headers["location"].startswith("/operations/"))
         self.assertIn("Applied rejected status dated 2026-05-20", status_fragment)
         self.assertIn("Rejected", updated_role.text)
         self.assertIn("E2E duplicate", updated_role.text)
+        self.assertIn("Update prompt: Rejected on 2026-05-20 with this rationale: E2E duplicate.", updated_role.text)
         self.assertEqual(restricted_download.status_code, 403)
 
-    def test_text_ingestion_runs_background_job_and_creates_role(self) -> None:
+    def test_hx_operation_launch_stays_on_page_and_updates_notice(self) -> None:
+        root = self.data_root()
+        fake_llm = FakeLLM()
+        with LiveServer(Repository(root), llm=fake_llm) as server, httpx.Client(
+            base_url=server.base_url,
+            follow_redirects=False,
+            timeout=10,
+        ) as client:
+            response = client.post(
+                "/roles/ledgerly_remote_staff_backend_engineer_payments/update-prompt",
+                data={"prompt": "Rejected on 2026-05-20 with this rationale: E2E duplicate."},
+                headers={"HX-Request": "true"},
+            )
+            operation_match = re.search(r'href="(/operations/operation-[^"]+)"', response.text)
+            self.assertIsNotNone(operation_match)
+            operation_path = operation_match.group(1)
+            notice = self._poll_operation_notice(client, operation_path)
+            operation_page = client.get(operation_path)
+            updated_role = client.get("/roles/ledgerly_remote_staff_backend_engineer_payments")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("location", response.headers)
+        self.assertIn('id="operation-notice-root"', response.text)
+        self.assertIn("completed", notice)
+        self.assertIn("COMPLETED", operation_page.text)
+        self.assertIn("finished with status completed", operation_page.text)
+        self.assertIn("Update prompt: Rejected on 2026-05-20 with this rationale: E2E duplicate.", updated_role.text)
+
+    def test_hx_quick_analysis_result_appears_in_ingestion_modal(self) -> None:
+        root = self.data_root()
+        fake_llm = FakeLLM()
+        with LiveServer(Repository(root), llm=fake_llm) as server, httpx.Client(
+            base_url=server.base_url,
+            follow_redirects=False,
+            timeout=10,
+        ) as client:
+            response = client.post(
+                "/ingestions/text",
+                data={
+                    "quick_analysis": "1",
+                    "source_text": "FakeCorp needs a Staff Engineer to build Python platform services.",
+                    "source_url": "https://example.test/fakecorp-staff-engineer",
+                },
+                headers={"HX-Request": "true"},
+            )
+            operation_match = re.search(r"/operations/(operation-[^\"]+)/modal", response.text)
+            self.assertIsNotNone(operation_match)
+            operation_path = f"/operations/{operation_match.group(1)}"
+            modal = self._poll_operation_modal(client, operation_path, markers=("Quick analysis", "failed"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("location", response.headers)
+        self.assertIn('id="operation-modal-root"', response.text)
+        self.assertIn("<dialog", response.text)
+        self.assertIn("Quick analysis", modal)
+        self.assertIn("FakeCorp is a good platform fit", modal)
+        self.assertIn("Continue full ingestion", modal)
+        self.assertIn("Abandon", modal)
+
+    def test_text_ingestion_runs_background_operation_and_creates_role(self) -> None:
         root = self.data_root()
         fake_llm = FakeLLM()
         with LiveServer(Repository(root), llm=fake_llm) as server, httpx.Client(
@@ -244,9 +305,9 @@ class EndToEndTests(unittest.TestCase):
                 },
             )
             self.assertEqual(response.status_code, 302)
-            job_path = response.headers["location"]
+            operation_path = response.headers["location"]
 
-            fragment = self._poll_job_fragment(client, job_path)
+            fragment = self._poll_operation_fragment(client, operation_path)
             role_page = client.get("/roles/fakecorp_remote_staff_engineer")
 
         self.assertEqual(len(fake_llm.generated_bundles), 1)
@@ -274,13 +335,13 @@ class EndToEndTests(unittest.TestCase):
                 },
             )
             self.assertEqual(response.status_code, 302)
-            job_path = response.headers["location"]
+            operation_path = response.headers["location"]
 
-            fragment = self._poll_job_fragment(client, job_path, markers=("Quick analysis completed", "failed"))
-            abandon = client.post(f"{job_path}/abandon")
-            abandoned_fragment = self._poll_job_fragment(
+            fragment = self._poll_operation_fragment(client, operation_path, markers=("Quick analysis completed", "failed"))
+            abandon = client.post(f"{operation_path}/abandon")
+            abandoned_fragment = self._poll_operation_fragment(
                 client,
-                job_path,
+                operation_path,
                 markers=("Quick analysis abandoned", "failed"),
             )
 
@@ -309,17 +370,17 @@ class EndToEndTests(unittest.TestCase):
                 },
             )
             self.assertEqual(response.status_code, 302)
-            preview_job_path = response.headers["location"]
+            preview_operation_path = response.headers["location"]
 
-            preview_fragment = self._poll_job_fragment(
+            preview_fragment = self._poll_operation_fragment(
                 client,
-                preview_job_path,
+                preview_operation_path,
                 markers=("Quick analysis completed", "failed"),
             )
-            continue_response = client.post(f"{preview_job_path}/continue-ingestion")
+            continue_response = client.post(f"{preview_operation_path}/continue-ingestion")
             self.assertEqual(continue_response.status_code, 302)
-            full_job_path = continue_response.headers["location"]
-            full_fragment = self._poll_job_fragment(client, full_job_path)
+            full_operation_path = continue_response.headers["location"]
+            full_fragment = self._poll_operation_fragment(client, full_operation_path)
             role_page = client.get("/roles/fakecorp_remote_staff_engineer")
 
         self.assertEqual(len(fake_llm.quick_analyses), 1)
@@ -331,12 +392,12 @@ class EndToEndTests(unittest.TestCase):
         self.assertIn("FakeCorp", role_page.text)
         self.assertTrue((root / "roles" / "fakecorp_remote_staff_engineer" / "analysis.yaml").exists())
 
-    def _poll_job_fragment(self, client: httpx.Client, job_path: str, markers: tuple[str, ...] | None = None) -> str:
-        # Background jobs complete quickly with FakeLLM, but polling keeps the test
+    def _poll_operation_fragment(self, client: httpx.Client, operation_path: str, markers: tuple[str, ...] | None = None) -> str:
+        # Background operations complete quickly with FakeLLM, but polling keeps the test
         # faithful to the browser flow and catches regressions in the fragment URL.
         markers = markers or ("Ingestion completed", "Applied ", "failed")
         deadline = time.time() + 10
-        fragment_path = f"{job_path}/fragment"
+        fragment_path = f"{operation_path}/fragment"
         latest = ""
         while time.time() < deadline:
             response = client.get(fragment_path)
@@ -344,7 +405,31 @@ class EndToEndTests(unittest.TestCase):
             if any(marker in latest for marker in markers):
                 return latest
             time.sleep(0.1)
-        self.fail(f"Background job did not finish. Last fragment: {latest}")
+        self.fail(f"Background operation did not finish. Last fragment: {latest}")
+
+    def _poll_operation_notice(self, client: httpx.Client, operation_path: str, markers: tuple[str, ...] | None = None) -> str:
+        markers = markers or ("completed", "failed")
+        deadline = time.time() + 10
+        latest = ""
+        while time.time() < deadline:
+            response = client.get(f"{operation_path}/notice")
+            latest = response.text
+            if any(marker in latest for marker in markers):
+                return latest
+            time.sleep(0.1)
+        self.fail(f"Background operation notice did not finish. Last notice: {latest}")
+
+    def _poll_operation_modal(self, client: httpx.Client, operation_path: str, markers: tuple[str, ...] | None = None) -> str:
+        markers = markers or ("completed", "failed")
+        deadline = time.time() + 10
+        latest = ""
+        while time.time() < deadline:
+            response = client.get(f"{operation_path}/modal")
+            latest = response.text
+            if any(marker in latest for marker in markers):
+                return latest
+            time.sleep(0.1)
+        self.fail(f"Background operation modal did not finish. Last modal: {latest}")
 
     def cv_form_data(self, *, summary: str) -> dict[str, str]:
         return {

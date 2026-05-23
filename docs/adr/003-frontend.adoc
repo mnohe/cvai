@@ -8,8 +8,8 @@ Date: 2026-05-19
 ADR-002 established Python + FastAPI + Jinja2 as the web application stack with server-side rendering.
 The application returns complete HTML from the server; the browser renders it.
 
-One interactive requirement exists beyond basic navigation and form submission: whilst a background job runs (LLM ingestion, role re-assessment), the job log must update in the browser without a full page reload.
-The user needs to see progress and know when the job completes or fails.
+One interactive requirement exists beyond basic navigation and form submission: whilst a background operation runs (LLM ingestion, role re-assessment), the operation log must update in the browser without a full page reload.
+The user needs to see progress and know when the operation completes or fails.
 
 All other interactions (recording a status update, downloading an artefact, reviewing a task) are single request/response cycles that do not require in-page updates.
 
@@ -35,7 +35,7 @@ It replicates what a library would provide, adds maintenance burden without a fr
 
 === Server-Sent Events
 
-SSE is an appropriate long-term mechanism for streaming job log lines from the server to the browser: the server pushes events; the client receives them on an open connection without polling.
+SSE is an appropriate long-term mechanism for streaming operation log lines from the server to the browser: the server pushes events; the client receives them on an open connection without polling.
 An asyncio-native server supports SSE natively once the threading/asyncio migration is complete.
 SSE reduces per-line latency and eliminates requests that return no new data; however, it requires a persistent connection, is less proxy-friendly than polling, and requires an additional client-side extension to integrate with HTMX.
 
@@ -48,7 +48,7 @@ Forms continue to work without JavaScript — HTMX only enhances the default sub
 
 == Decision
 
-The polling requirement (fetch a status fragment on a timer and replace the job status element with the response) is expressed in a small number of HTML attributes with no JavaScript.
+The polling requirement (fetch a status fragment on a timer and replace the operation status element with the response) is expressed in a small number of HTML attributes with no JavaScript.
 The server-rendered fragment model is consistent with Jinja2: the same template partials serve both full-page and fragment responses.
 
 When the asyncio migration is complete, migrating from polling to SSE requires changing the server endpoint, loading the SSE client extension, and updating the attributes on the status element; the page structure does not change.

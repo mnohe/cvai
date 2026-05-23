@@ -1,0 +1,27 @@
+{% extends "base.html.j2" %}
+
+{% block body %}
+<section class="grid">
+  <article class="card">
+    <h3>Operations</h3>
+    <div class="list">
+      {% for operation in operations %}
+        <div class="list-item">
+          <div class="operation-row">
+            <div>
+              <strong>{{ operation.kind|replace("_", " ")|title }}</strong><br>
+              <span class="muted"><code>{{ operation.id }}</code></span>
+            </div>
+            <div class="toolbar">
+              <span class="pill">{{ operation.status }}</span>
+              <a href="/operations/{{ operation.id }}">Open</a>
+            </div>
+          </div>
+        </div>
+      {% else %}
+        <div class="list-item muted">No operations have been launched in this session.</div>
+      {% endfor %}
+    </div>
+  </article>
+</section>
+{% endblock %}

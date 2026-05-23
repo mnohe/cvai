@@ -1,0 +1,18 @@
+<div
+  id="operation-notice-root"
+  class="flash operation-notice{% if operation.status == 'failed' %} error{% endif %}"
+  {% if not finished %}
+    hx-get="/operations/{{ operation.id }}/notice"
+    hx-trigger="load delay:2s, every 2s"
+    hx-swap="outerHTML"
+  {% endif %}
+>
+  {% include "operation_badge_oob.html.j2" %}
+  {% if operation.status == "completed" %}
+    Operation <a href="/operations/{{ operation.id }}">{{ operation.id }}</a> completed.
+  {% elif operation.status == "failed" %}
+    Operation <a href="/operations/{{ operation.id }}">{{ operation.id }}</a> failed.
+  {% else %}
+    Operation <a href="/operations/{{ operation.id }}">{{ operation.id }}</a> is {{ operation.status }}.
+  {% endif %}
+</div>

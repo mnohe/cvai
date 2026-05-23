@@ -1,0 +1,5 @@
+{% if active_operation_count %}
+  <span id="active-operation-count" class="nav-badge" hx-swap-oob="outerHTML">{{ active_operation_count }}</span>
+{% else %}
+  <span id="active-operation-count" class="nav-badge empty" hx-swap-oob="outerHTML"></span>
+{% endif %}

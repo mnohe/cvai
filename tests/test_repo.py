@@ -386,6 +386,56 @@ rationale: Good fit.
         self.assertEqual(event["detail"], "Example `Backend Engineer` role was submitted.")
         self.assertEqual(role_event["id"], event["id"])
 
+    def test_record_note_event_appends_prompt_note_without_changing_state(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            role_dir = root / "roles" / "example_role"
+            role_dir.mkdir(parents=True)
+            (root / "roles.yaml").write_text(
+                """
+roles:
+- id: example_role
+  company: Example
+  title: Backend Engineer
+  location: Dublin
+  source_url: https://example.test/job
+  captured_on: '2026-05-18'
+  active: true
+""",
+                encoding="utf-8",
+            )
+            (root / "role_states.yaml").write_text(
+                """
+role_states:
+- role_id: example_role
+  status: draft
+  status_date: null
+  status_detail: ''
+  status_artifacts: []
+  verdict: FIT
+  verdict_label: Good fit
+  rationale: Good fit.
+""",
+                encoding="utf-8",
+            )
+            (root / "events.yaml").write_text("events: []\n", encoding="utf-8")
+            (role_dir / "events.yaml").write_text("events: []\n", encoding="utf-8")
+            repo = Repository(root)
+
+            repo.record_note_event("example_role", "2026-05-23", "Update prompt:  Interview booked.  ")
+
+            state = repo.load_data("role_states.yaml")["role_states"][0]
+            event = repo.load_data("events.yaml")["events"][0]
+            role_event = repo.load_data("roles/example_role/events.yaml")["events"][0]
+
+        self.assertEqual(state["status"], "draft")
+        self.assertTrue(event["id"].startswith("event-"))
+        UUID(event["id"].removeprefix("event-"))
+        self.assertEqual(event["type"], "note")
+        self.assertEqual(event["date"], "2026-05-23")
+        self.assertEqual(event["detail"], "Update prompt: Interview booked.")
+        self.assertEqual(role_event["id"], event["id"])
+
     def test_interview_status_sentence_prefers_detail(self) -> None:
         self.assertEqual(
             status_sentence(

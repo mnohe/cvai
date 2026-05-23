@@ -8,9 +8,9 @@
     <div class="muted">Ordered by roles.yaml</div>
   </article>
   <article class="card">
-    <h3>Session intake jobs</h3>
-    <div style="font-size:34px;font-weight:700;">{{ jobs|length }}</div>
-    <div class="muted">Background runs launched since this app started</div>
+    <h3>Session operations</h3>
+    <div style="font-size:34px;font-weight:700;">{{ operations|length }}</div>
+    <div class="muted">Background actions launched since this app started</div>
   </article>
 </section>
 
@@ -55,7 +55,7 @@
       <button type="submit">Close</button>
     </div>
   </form>
-  <form id="role-update-form" method="post" action="">
+  <form id="role-update-form" method="post" action="" hx-target="#operation-notice-root" hx-swap="outerHTML">
     <label>Update prompt
       <textarea name="prompt" required placeholder="Rejected on 2026-05-16 with this rationale: ..."></textarea>
     </label>
@@ -66,27 +66,29 @@
   function openRoleUpdateDialog(title, action) {
     const dialog = document.getElementById("role-update-dialog");
     document.getElementById("role-update-title").textContent = title;
-    document.getElementById("role-update-form").action = action;
+    const form = document.getElementById("role-update-form");
+    form.action = action;
+    form.setAttribute("hx-post", action);
     dialog.showModal();
   }
 </script>
 
 <section class="grid" style="margin-top:18px;">
   <article class="card">
-    <h3>Recent intake jobs</h3>
+    <h3>Recent operations</h3>
     <div class="list">
-      {% for job in jobs[:6] %}
+      {% for operation in operations[:6] %}
         <div class="list-item">
           <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;">
             <div>
-              <strong>{{ job.kind.upper() }} ingestion</strong><br>
-              <span class="muted">{{ job.status }}</span>
+              <strong>{{ operation.kind|replace("_", " ")|title }}</strong><br>
+              <span class="muted">{{ operation.status }}</span>
             </div>
-            <a href="/jobs/{{ job.id }}">Open</a>
+            <a href="/operations/{{ operation.id }}">Open</a>
           </div>
         </div>
       {% else %}
-        <div class="list-item muted">No intake jobs yet in this session.</div>
+        <div class="list-item muted">No operations yet in this session.</div>
       {% endfor %}
     </div>
   </article>

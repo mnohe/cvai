@@ -94,6 +94,7 @@ a:hover { text-decoration: underline; }
 .nav-tab {
   display: inline-flex;
   align-items: center;
+  gap: 7px;
   min-height: 38px;
   padding: 0 12px;
   border-radius: 8px;
@@ -103,6 +104,22 @@ a:hover { text-decoration: underline; }
 .nav-tab:hover {
   background: var(--surface-2);
   text-decoration: none;
+}
+.nav-badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--warn);
+  color: white;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+}
+.nav-badge.empty {
+  display: none;
 }
 .ingest-action {
   margin-left: 0;
@@ -178,12 +195,25 @@ a:hover { text-decoration: underline; }
   margin: 0 0 8px;
   font-size: 30px;
 }
+.hero-title-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.hero-title-row h1 {
+  margin-bottom: 0;
+}
+.status-badge {
+  font-variant-caps: all-small-caps;
+  letter-spacing: 0;
+}
 .hero p {
   margin: 0;
   color: var(--muted);
   max-width: 780px;
 }
-.hero .job-id {
+.hero .operation-id {
   margin-bottom: 8px;
   color: var(--text);
   font-size: 1rem;
@@ -362,6 +392,20 @@ textarea {
   border-color: #ffcdd2;
   color: #7f1d1d;
 }
+.operation-notice a {
+  font-weight: 700;
+}
+.operation-notice .operation-result-card {
+  margin-top: 14px;
+  margin-bottom: 0;
+  box-shadow: none;
+}
+.operation-dialog {
+  width: min(760px, calc(100vw - 32px));
+}
+.operation-dialog::backdrop {
+  background: rgba(20, 32, 51, 0.58);
+}
 .list {
   display: grid;
   gap: 10px;
@@ -371,6 +415,12 @@ textarea {
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--surface);
+}
+.operation-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
 }
 .role-list {
   display: grid;

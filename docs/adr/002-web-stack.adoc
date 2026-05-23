@@ -17,7 +17,7 @@ Requirements inherited from ADR-001:
 | Server-side rendering
 | LLM API keys must not reach the browser; HTML produced from structured data must be deterministic
 
-| Async background job execution
+| Async background operation execution
 | LLM calls take 10-180 s; the HTTP request/response cycle must not block
 
 | Template engine suited to data-rich layouts
@@ -48,7 +48,7 @@ The syntax is familiar; the filter ecosystem is mature.
 
 Python's dynamic typing is well-suited to the YAML-heavy data manipulation in the core library: parsing YAML into dictionary and list structures, patching individual fields, and writing back requires no struct definition per schema shape.
 
-An asyncio-native server enables non-blocking LLM calls and is the natural upgrade path to Server-Sent Events when job log streaming is improved from polling.
+An asyncio-native server enables non-blocking LLM calls and is the natural upgrade path to Server-Sent Events when operation log streaming is improved from polling.
 
 === Bundle B — Go + Chi/Gin + html/template
 

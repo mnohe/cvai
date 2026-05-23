@@ -19,6 +19,7 @@
         <a class="nav-tab" href="/" title="Active roles ordered by the repository backlog, with status and follow-up work visible at a glance.">Dashboard</a>
         <a class="nav-tab" href="/cv/" title="Edit the structured CV data used by layouts, role matching, and PDF generation.">CV</a>
         <a class="nav-tab" href="/tasks" title="Open evidence and follow-up tasks ordered by ETA, shortest first.">Tasks</a>
+        <a class="nav-tab" href="/operations" title="Background operations launched in this session.">Operations{% include "operation_badge.html.j2" %}</a>
       </nav>
       <details class="nav-menu">
         <summary aria-label="Menu">
@@ -29,12 +30,15 @@
           <a href="/" title="Active roles ordered by the repository backlog, with status and follow-up work visible at a glance.">Dashboard</a>
           <a href="/cv/" title="Edit the structured CV data used by layouts, role matching, and PDF generation.">CV</a>
           <a href="/tasks" title="Open evidence and follow-up tasks ordered by ETA, shortest first.">Tasks</a>
+          <a href="/operations" title="Background operations launched in this session.">Operations{% if active_operation_count %}<span class="nav-badge">{{ active_operation_count }}</span>{% endif %}</a>
         </div>
       </details>
       <a class="button primary ingest-action" href="/intake">Ingest&nbsp;Role</a>
     </div>
   </header>
   <main class="page">
+    <div id="operation-notice-root"></div>
+    <div id="operation-modal-root"></div>
     {% if flash %}
       <div class="flash{% if flash[0] == 'error' %} error{% endif %}">{{ flash[1] }}</div>
     {% endif %}
@@ -128,6 +132,9 @@
     });
     document.body.addEventListener("htmx:afterSwap", () => {
       document.querySelectorAll("#cv-modal").forEach((modal) => {
+        if (!modal.open) modal.showModal();
+      });
+      document.querySelectorAll("#operation-modal").forEach((modal) => {
         if (!modal.open) modal.showModal();
       });
     });

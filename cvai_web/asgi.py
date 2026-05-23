@@ -33,7 +33,7 @@ from .view_helpers import (
     dashboard_status_badge,
     fulfillment_class,
     fulfillment_label,
-    job_summary,
+    operation_summary,
     status_sentence,
     task_eta_class,
     task_eta_label,
@@ -73,27 +73,22 @@ def create_fastapi_app(repo: Repository | None = None, llm: OpenAIClient | None 
     async def dashboard(request: Request) -> Response:
         # The dashboard is a pure read: data comes from YAML, never from an LLM.
         roles = service.repo.list_dashboard_roles()
-        jobs = [job_summary(job.as_dict()) for job in service.jobs.list()]
-        return app.state.templates.TemplateResponse(
-            request=request,
-            name="dashboard.html.j2",
-            context={
-                "request": request,
+        operations = [operation_summary(operation.as_dict()) for operation in service.operations.list()]
+        return _template(
+            app,
+            request,
+            "dashboard.html.j2",
+            {
                 "title": "Dashboard",
                 "roles": roles,
-                "jobs": jobs,
+                "operations": operations,
                 "dashboard_status_badge": dashboard_status_badge,
-                "flash": None,
             },
         )
 
     @app.get("/intake", response_class=HTMLResponse)
     async def intake(request: Request) -> Response:
-        return app.state.templates.TemplateResponse(
-            request=request,
-            name="intake.html.j2",
-            context={"request": request, "title": "Ingest Role", "flash": None},
-        )
+        return _template(app, request, "intake.html.j2", {"title": "Roles"})
 
     @app.get("/tasks", response_class=HTMLResponse)
     async def tasks(request: Request) -> Response:
@@ -202,8 +197,11 @@ def create_fastapi_app(repo: Repository | None = None, llm: OpenAIClient | None 
         task = service.repo.get_task(task_id)
         if task is None:
             return _error(app, request, "Task not found", "No task matched that ID.", 404)
-        job = service.jobs.create("task reassessment", lambda current_job: service._run_task_reassessment(current_job, task_id))
-        return _redirect(f"/jobs/{job.id}")
+        operation = service.operations.create(
+            "task reassessment",
+            lambda current_operation: service._run_task_reassessment(current_operation, task_id),
+        )
+        return _operation_response(app, request, operation.as_dict())
 
     @app.get("/favicon.svg")
     async def favicon() -> Response:
@@ -212,7 +210,7 @@ def create_fastapi_app(repo: Repository | None = None, llm: OpenAIClient | None 
     @app.post("/ingestions/url")
     async def ingest_url(request: Request, source_url: str = Form(""), quick_analysis: str = Form("")) -> Response:
         # URL ingestion can be slow or fail on remote sites, so it runs as a
-        # background job and the browser follows the job-status page.
+        # background operation and the browser polls status in place.
         source_url = source_url.strip()
         if not source_url:
             return _error(app, request, "Missing URL", "A role URL is required for URL ingestion.")
@@ -221,13 +219,17 @@ def create_fastapi_app(repo: Repository | None = None, llm: OpenAIClient | None 
         except ValueError as exc:
             return _error(app, request, "Blocked URL", str(exc), 400)
         if quick_analysis:
-            job = service.jobs.create(
+            operation = service.operations.create(
                 "quick analysis",
-                lambda current_job: service._run_url_quick_analysis(current_job, source_url),
+                lambda current_operation: service._run_url_quick_analysis(current_operation, source_url),
             )
+            return _operation_modal_or_redirect(app, request, operation.as_dict())
         else:
-            job = service.jobs.create("url", lambda current_job: service._run_url_ingestion(current_job, source_url))
-        return _redirect(f"/jobs/{job.id}")
+            operation = service.operations.create(
+                "url",
+                lambda current_operation: service._run_url_ingestion(current_operation, source_url),
+            )
+            return _operation_response(app, request, operation.as_dict())
 
     @app.post("/ingestions/text")
     async def ingest_text(
@@ -248,61 +250,98 @@ def create_fastapi_app(repo: Repository | None = None, llm: OpenAIClient | None 
             if value.strip()
         }
         if quick_analysis:
-            job = service.jobs.create(
+            operation = service.operations.create(
                 "quick analysis",
-                lambda current_job: service._run_text_quick_analysis(current_job, source_text, source_url.strip(), overrides),
+                lambda current_operation: service._run_text_quick_analysis(current_operation, source_text, source_url.strip(), overrides),
             )
+            return _operation_modal_or_redirect(app, request, operation.as_dict())
         else:
-            job = service.jobs.create(
+            operation = service.operations.create(
                 "text",
-                lambda current_job: service._run_text_ingestion(current_job, source_text, source_url.strip(), overrides),
+                lambda current_operation: service._run_text_ingestion(current_operation, source_text, source_url.strip(), overrides),
             )
-        return _redirect(f"/jobs/{job.id}")
+            return _operation_response(app, request, operation.as_dict())
 
-    @app.get("/jobs/{job_id}", response_class=HTMLResponse)
-    async def job_status(request: Request, job_id: str) -> Response:
-        job = service.jobs.get(job_id)
-        if job is None:
-            return _error(app, request, "Job not found", "That intake job does not exist.", 404)
-        return app.state.templates.TemplateResponse(
-            request=request,
-            name="job.html.j2",
-            context=_job_context(request, job.as_dict()),
+    @app.get("/operations", response_class=HTMLResponse)
+    async def operations(request: Request) -> Response:
+        return _template(
+            app,
+            request,
+            "operations.html.j2",
+            {
+                "title": "Operations",
+                "operations": [operation.as_dict() for operation in service.operations.list()],
+            },
         )
 
-    @app.get("/jobs/{job_id}/fragment", response_class=HTMLResponse)
-    async def job_status_fragment(request: Request, job_id: str) -> Response:
-        # HTMX polls this small fragment while a background job runs. Returning only
-        # the changing section avoids refreshing the whole page.
-        job = service.jobs.get(job_id)
-        if job is None:
-            return HTMLResponse('<section id="job-status" class="flash error">Job not found.</section>', status_code=404)
-        return app.state.templates.TemplateResponse(
-            request=request,
-            name="job_fragment.html.j2",
-            context=_job_context(request, job.as_dict(), fragment=True),
-        )
+    @app.get("/operations/{operation_id}", response_class=HTMLResponse)
+    async def operation_status(request: Request, operation_id: str) -> Response:
+        operation = service.operations.get(operation_id)
+        if operation is None:
+            return _error(app, request, "Operation not found", "That operation does not exist.", 404)
+        return _template(app, request, "operation.html.j2", _operation_context(request, operation.as_dict()))
 
-    @app.post("/jobs/{job_id}/continue-ingestion")
-    async def continue_ingestion(request: Request, job_id: str) -> Response:
-        preview_job = service.jobs.get(job_id)
-        if preview_job is None or not preview_job.result or not preview_job.result.get("intake"):
-            return _error(app, request, "Job not found", "That quick analysis job cannot be continued.", 404)
-        intake = dict(preview_job.result["intake"])
-        job = service.jobs.create(
+    @app.get("/operations/{operation_id}/fragment", response_class=HTMLResponse)
+    async def operation_status_fragment(request: Request, operation_id: str) -> Response:
+        # HTMX polls this small fragment while a background operation runs.
+        operation = service.operations.get(operation_id)
+        if operation is None:
+            return HTMLResponse(
+                '<section id="operation-status" class="flash error">Operation not found.</section>',
+                status_code=404,
+            )
+        return _operation_fragment_response(app, request, operation.as_dict())
+
+    @app.get("/operations/{operation_id}/notice", response_class=HTMLResponse)
+    async def operation_notice(request: Request, operation_id: str) -> Response:
+        operation = service.operations.get(operation_id)
+        if operation is None:
+            return HTMLResponse(
+                '<div id="operation-notice-root" class="flash error">Operation not found.</div>',
+                status_code=404,
+            )
+        return _operation_notice_response(app, request, operation.as_dict())
+
+    @app.get("/operations/{operation_id}/modal", response_class=HTMLResponse)
+    async def operation_modal(request: Request, operation_id: str) -> Response:
+        operation = service.operations.get(operation_id)
+        if operation is None:
+            return _operation_modal_empty_response(app, request)
+        return _operation_modal_response(app, request, operation.as_dict())
+
+    @app.post("/operations/{operation_id}/continue-ingestion")
+    async def continue_ingestion(request: Request, operation_id: str) -> Response:
+        preview_operation = service.operations.get(operation_id)
+        if preview_operation is None or not preview_operation.result or not preview_operation.result.get("intake"):
+            return _error(app, request, "Operation not found", "That quick analysis operation cannot be continued.", 404)
+        intake = dict(preview_operation.result["intake"])
+        operation = service.operations.create(
             "full ingestion",
-            lambda current_job: service._run_full_ingestion_from_preview(current_job, intake),
+            lambda current_operation: service._run_full_ingestion_from_preview(current_operation, intake),
         )
-        return _redirect(f"/jobs/{job.id}")
+        if request.headers.get("hx-request") == "true":
+            return _operation_modal_empty_with_notice_response(app, request, operation.as_dict())
+        return _operation_response(app, request, operation.as_dict())
 
-    @app.post("/jobs/{job_id}/abandon")
-    async def abandon_ingestion(request: Request, job_id: str) -> Response:
-        preview_job = service.jobs.get(job_id)
-        if preview_job is None or not preview_job.result or not preview_job.result.get("quick_analysis"):
-            return _error(app, request, "Job not found", "That quick analysis job cannot be abandoned.", 404)
-        preview_job.result["abandoned"] = True
-        preview_job.log("Quick analysis abandoned. No role files were written.")
-        return _redirect(f"/jobs/{job_id}")
+    @app.post("/operations/{operation_id}/abandon")
+    async def abandon_ingestion(request: Request, operation_id: str) -> Response:
+        preview_operation = service.operations.get(operation_id)
+        if preview_operation is None or not preview_operation.result or not preview_operation.result.get("quick_analysis"):
+            return _error(app, request, "Operation not found", "That quick analysis operation cannot be abandoned.", 404)
+        preview_operation.result["abandoned"] = True
+        preview_operation.log("Quick analysis abandoned. No role files were written.")
+        if request.headers.get("hx-request") == "true":
+            return _operation_modal_empty_response(app, request)
+        return _redirect(f"/operations/{operation_id}")
+
+    @app.post("/operations/{operation_id}/cancel")
+    async def cancel_operation(request: Request, operation_id: str) -> Response:
+        operation = service.operations.cancel(operation_id)
+        if operation is None:
+            return _operation_modal_empty_response(app, request)
+        if request.headers.get("hx-request") == "true":
+            return _operation_modal_empty_response(app, request)
+        return _redirect("/intake")
 
     @app.get("/roles/{canonical_slug}", response_class=HTMLResponse)
     async def role_detail(request: Request, canonical_slug: str) -> Response:
@@ -351,22 +390,22 @@ def create_fastapi_app(repo: Repository | None = None, llm: OpenAIClient | None 
         role = service.repo.get_role(canonical_slug)
         if role is None:
             return _error(app, request, "Role not found", "No canonical role matched that ID.", 404)
-        job = service.jobs.create(
+        operation = service.operations.create(
             "update",
-            lambda current_job: service._run_prompt_update(current_job, canonical_slug, prompt),
+            lambda current_operation: service._run_prompt_update(current_operation, canonical_slug, prompt),
         )
-        return _redirect(f"/jobs/{job.id}")
+        return _operation_response(app, request, operation.as_dict())
 
     @app.post("/roles/{canonical_slug}/reassess")
     async def reassess_role(request: Request, canonical_slug: str) -> Response:
         role = service.repo.get_role(canonical_slug)
         if role is None:
             return _error(app, request, "Role not found", "No canonical role matched that ID.", 404)
-        job = service.jobs.create(
+        operation = service.operations.create(
             "role reassessment",
-            lambda current_job: service._run_role_reassessment(current_job, canonical_slug),
+            lambda current_operation: service._run_role_reassessment(current_operation, canonical_slug),
         )
-        return _redirect(f"/jobs/{job.id}")
+        return _operation_response(app, request, operation.as_dict())
 
     @app.get("/download/generic-cv")
     async def download_generic_cv(request: Request) -> Response:
@@ -428,10 +467,16 @@ def _hx_redirect_or_normal(request: Request, location: str) -> Response:
 def _template(app: FastAPI, request: Request, name: str, context: dict, status_code: int = 200) -> Response:
     # All full-page renders share the same baseline context so templates do not
     # have to repeat flash-message plumbing.
+    service: WebApp = request.app.state.service
     return app.state.templates.TemplateResponse(
         request=request,
         name=name,
-        context={"request": request, "flash": None, **context},
+        context={
+            "request": request,
+            "flash": None,
+            "active_operation_count": service.operations.active_count(),
+            **context,
+        },
         status_code=status_code,
     )
 
@@ -633,16 +678,75 @@ def _register_template_helpers(templates: Jinja2Templates) -> None:
     env.filters["task_eta_class"] = task_eta_class
 
 
-def _job_context(request: Request, job: dict, *, fragment: bool = False) -> dict:
-    # Full job pages can display flash errors. HTMX fragments skip flash wrappers so
-    # replacing #job-status does not duplicate page-level messages.
+def _operation_response(app: FastAPI, request: Request, operation: dict) -> Response:
+    if request.headers.get("hx-request") == "true":
+        return _operation_notice_response(app, request, operation)
+    return _redirect(f"/operations/{operation['id']}")
+
+
+def _operation_modal_or_redirect(app: FastAPI, request: Request, operation: dict) -> Response:
+    if request.headers.get("hx-request") == "true":
+        return _operation_modal_response(app, request, operation)
+    return _redirect(f"/operations/{operation['id']}")
+
+
+def _operation_notice_response(app: FastAPI, request: Request, operation: dict) -> Response:
+    return app.state.templates.TemplateResponse(
+        request=request,
+        name="operation_notice.html.j2",
+        context=_operation_context(request, operation, fragment=True),
+    )
+
+
+def _operation_modal_response(app: FastAPI, request: Request, operation: dict) -> Response:
+    return app.state.templates.TemplateResponse(
+        request=request,
+        name="operation_modal.html.j2",
+        context=_operation_context(request, operation, fragment=True),
+    )
+
+
+def _operation_modal_empty_response(app: FastAPI, request: Request) -> Response:
+    service: WebApp = request.app.state.service
+    return app.state.templates.TemplateResponse(
+        request=request,
+        name="operation_modal_empty.html.j2",
+        context={
+            "request": request,
+            "flash": None,
+            "active_operation_count": service.operations.active_count(),
+        },
+    )
+
+
+def _operation_modal_empty_with_notice_response(app: FastAPI, request: Request, operation: dict) -> Response:
+    return app.state.templates.TemplateResponse(
+        request=request,
+        name="operation_modal_empty_with_notice.html.j2",
+        context=_operation_context(request, operation, fragment=True),
+    )
+
+
+def _operation_fragment_response(app: FastAPI, request: Request, operation: dict) -> Response:
+    return app.state.templates.TemplateResponse(
+        request=request,
+        name="operation_fragment.html.j2",
+        context=_operation_context(request, operation, fragment=True),
+    )
+
+
+def _operation_context(request: Request, operation: dict, *, fragment: bool = False) -> dict:
+    # Full operation pages can display flash errors. HTMX fragments skip flash
+    # wrappers so replacing operation-status does not duplicate page-level messages.
+    service: WebApp = request.app.state.service
     return {
         "request": request,
-        "title": "Ingestion job",
-        "section_title": "Jobs",
-        "job": job,
-        "finished": job["status"] in {"completed", "failed"},
-        "flash": ("error", job["error"]) if not fragment and job.get("error") else None,
+        "title": "Operation",
+        "section_title": "Operations",
+        "operation": operation,
+        "finished": operation["status"] in {"completed", "failed", "cancelled"},
+        "flash": ("error", operation["error"]) if not fragment and operation.get("error") else None,
+        "active_operation_count": service.operations.active_count(),
     }
 
 

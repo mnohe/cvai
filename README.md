@@ -161,7 +161,7 @@ Set `LLM_API_KEY` in a `.env` file beside the compose file or export it in your 
 
 Two properties of the current design require a single-pod deployment:
 
-1. **In-memory job state.** Background ingestion and reassessment jobs are tracked in a process-local dict. A browser polling `/jobs/{id}/fragment` will receive a 404 if the request is routed to a different pod than the one that started the job.
+1. **In-memory operation state.** Background ingestion and reassessment operations are tracked in a process-local dict. A browser polling `/operations/{id}/fragment` will receive a 404 if the request is routed to a different pod than the one that started the operation.
 2. **Filesystem write coordination.** Role bundles and status updates are written as YAML files under `CVAI_DATA`. Concurrent writes from two pods to the same file are not coordinated and will race.
 
 A minimal deployment for a home-lab cluster:

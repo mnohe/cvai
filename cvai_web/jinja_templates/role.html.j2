@@ -28,7 +28,7 @@
   <article class="card">
     <h3>Latest status</h3>
     <p>{{ role.role_status|status_sentence }}</p>
-    <form method="post" action="/roles/{{ role.canonical_slug }}/update-prompt">
+    <form method="post" action="/roles/{{ role.canonical_slug }}/update-prompt" hx-post="/roles/{{ role.canonical_slug }}/update-prompt" hx-target="#operation-notice-root" hx-swap="outerHTML">
       <label>Update prompt
         <textarea name="prompt" required placeholder="Rejected on 2026-05-16 with this rationale: ..."></textarea>
       </label>
@@ -41,7 +41,7 @@
   <article class="card">
     <div class="toolbar" style="justify-content:space-between;align-items:center;margin-bottom:10px;">
       <h3 style="margin:0;">Requirement coverage</h3>
-      <form method="post" action="/roles/{{ role.canonical_slug }}/reassess" style="margin:0;">
+      <form method="post" action="/roles/{{ role.canonical_slug }}/reassess" hx-post="/roles/{{ role.canonical_slug }}/reassess" hx-target="#operation-notice-root" hx-swap="outerHTML" style="margin:0;">
         <button type="submit">Reassess</button>
       </form>
     </div>

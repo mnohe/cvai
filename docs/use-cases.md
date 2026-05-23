@@ -74,14 +74,14 @@
 
 1. Click Ingest Role and submit the URL intake form (`POST /ingestions/url`).
 2. The app validates the URL scheme (`https` only) and checks the resolved IP is not in a private range.
-3. A background task starts; the user is redirected to the job status page, which streams log lines until completion or failure.
+3. A background operation starts; the current page shows an operation notice, linked to an operation detail page, until completion or failure.
 4. Background task:
    - Fetches the URL and extracts visible text.
    - Calls the LLM to extract `company`, `role`, and `location`.
-   - If metadata is not clearly recoverable, the job fails with a message directing the user to paste-text intake.
+   - If metadata is not clearly recoverable, the operation fails with a message directing the user to paste-text intake.
    - Calls the LLM to generate the full artifact bundle.
    - Writes `roles/<role_id>/` and updates `roles.yaml` and `applications.yaml`.
-5. On success, the job page links to the new role's detail page.
+5. On success, the operation page links to the new role's detail page.
 
 **LLM:** role extraction, bundle generation.
 
@@ -95,9 +95,9 @@
 
 1. Click Ingest Role and submit the pasted-text intake form (`POST /ingestions/text`) with the job description text and an optional source URL, company, location, and role title.
 2. Manual override fields (company, location, role) are passed to the LLM as hints and take precedence when provided.
-3. A background task starts; the user is redirected to the job status page.
+3. A background operation starts; the current page shows an operation notice.
 4. Background task proceeds the same as URL ingestion from step 4c onward.
-5. On success, the job page links to the new role's detail page.
+5. On success, the operation page links to the new role's detail page.
 
 **LLM:** role extraction (non-strict mode), bundle generation.
 
@@ -124,7 +124,7 @@
 1. On the dashboard, click Update on a role row to open the update dialog.
 2. Enter a free-form prompt, for example: `"Rejected on 2026-05-16 — recruiter said they went with someone with more Go experience."`
 3. Submit the form (`POST /roles/<role_id>/update-prompt`).
-4. A background task starts, the user is redirected to the job status page, and the LLM interprets the prompt.
+4. A background operation starts, the current page shows an operation notice, and the LLM interprets the prompt.
 5. The LLM returns structured status fields and any internal notes; the repository write path applies them.
 
 **LLM:** status prompt interpretation.
@@ -197,7 +197,7 @@ Two paths are available:
 
 1. Open the task detail page (`GET /tasks/<task_id>`).
 2. Click Reassess.
-3. The app starts a background job and sends the task, current CV YAML, and role requirements that reference the task to the LLM.
+3. The app starts a background operation and sends the task, current CV YAML, and role requirements that reference the task to the LLM.
 4. The LLM returns a structured result with `status`, `detail`, and optional `evidence_refs`.
 5. The app writes the updated task state to `tasks.yaml`.
 6. The task page shows the new status and evidence detail.
