@@ -5,21 +5,20 @@
     "dockerfile": "Dockerfile"
   },
   "remoteUser": "vscode",
+  "mounts": [
+    "type=bind,source=/run/user/1000/podman/podman.sock,target=/run/user/1000/podman/podman.sock"
+  ],
   "containerEnv": {
     "PYTHONDONTWRITEBYTECODE": "1",
-    "PYTHONPATH": "/workspaces/cvai"
+    "PYTHONPATH": "/workspaces/cvai",
+    "DOCKER_HOST": "unix:///run/user/1000/podman/podman.sock",
+    "HOST_WORKDIR": "${localWorkspaceFolder}"
   },
   "forwardPorts": [8080],
   "customizations": {
     "vscode": {
       "extensions": [
-        "editorconfig.editorconfig",
-        "tamasfe.even-better-toml",
-        "yzhang.markdown-all-in-one",
-        "myriad-dreamin.tinymist",
         "redhat.vscode-yaml",
-        "mathematic.vscode-pdf",
-        "openai.chatgpt",
         "ms-python.python",
         "ms-python.vscode-pylance",
         "ms-python.vscode-python-envs",
@@ -31,6 +30,5 @@
         "python.defaultInterpreterPath": "/usr/bin/python3"
       }
     }
-  },
-  "postCreateCommand": "python3 --version && typst --version"
+  }
 }

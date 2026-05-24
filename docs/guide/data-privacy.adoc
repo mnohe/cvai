@@ -1,0 +1,16 @@
+= Data and privacy
+:imagesdir: ../images
+
+link:../GUIDE.adoc[← User Guide]
+
+All your data stays on your machine.
+Nothing leaves it unless:
+
+* You add a role by URL — the server fetches that URL to download the
+  job posting.
+* An LLM is configured — the server sends job text and CV excerpts to
+  your LLM provider when running ingestion, reassessment, or bundle
+  generation.
+
+Browsing roles, editing your CV, and managing tasks never contact any
+external service.

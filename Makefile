@@ -10,7 +10,25 @@ include .env
 export
 endif
 
-.PHONY: test e2e coverage run dev validate cv
+# Ephemeral Debian+Playwright container spawned via the host Podman socket.
+# HOST_WORKDIR is set automatically in the devcontainer via ${localWorkspaceFolder}.
+# Three named volumes cache pip packages, apt archives, and the Playwright browser
+# binary so that only the first invocation is slow.
+BROWSER_RUN = docker run --rm \
+    -v "$(HOST_WORKDIR):/workspaces/cvai" \
+    -v cvai-pip:/root/.cache/pip \
+    -v cvai-apt:/var/cache/apt/archives \
+    -v cvai-playwright:/usr/local/ms-playwright \
+    -e PLAYWRIGHT_BROWSERS_PATH=/usr/local/ms-playwright \
+    -e PYTHONPATH=/workspaces/cvai \
+    -e CVAI_DATA=$(CVAI_DATA) \
+    -w /workspaces/cvai \
+    python:slim
+
+BROWSER_INSTALL = pip install -q --cache-dir /root/.cache/pip playwright -r requirements.txt \
+    && playwright install --with-deps chromium
+
+.PHONY: test e2e coverage run dev validate cv docs test-e2e
 
 test:
 	PYTHONPATH=. $(PYTHON) -m unittest discover -s tests -v
@@ -34,3 +52,9 @@ validate:
 
 cv:
 	PYTHONPATH=. $(PYTHON) -m cvai_core.pdf $(CVAI_DATA)/cv/cv.yaml $(CVAI_DATA)/cv/cv.pdf --template demo --templates-root $(CVAI_DATA)/pdf/templates
+
+docs:
+	$(BROWSER_RUN) sh -c "$(BROWSER_INSTALL) && python3 scripts/docs.py"
+
+test-e2e:
+	$(BROWSER_RUN) sh -c "$(BROWSER_INSTALL) && python3 -m pytest tests/test_browser.py -v"

@@ -1,0 +1,17 @@
+= Operations page
+:imagesdir: ../images
+
+link:../GUIDE.adoc[← User Guide]
+
+Click *Operations* in the top navigation bar to see all background
+operations started in the current session.
+
+image::operations.png[Operations page — empty on a fresh session; fills with operation cards as ingestions and reassessments are launched]
+
+Each operation shows its kind (URL ingestion, text ingestion, role
+bundle, or reassessment), its current status, and a result card once it
+completes — including the quick analysis preview if one was run.
+
+The page updates automatically while an operation is running.
+
+NOTE: Operations are not saved across server restarts.

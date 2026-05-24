@@ -1,0 +1,41 @@
+= Editing your CV
+:imagesdir: ../images
+
+link:../GUIDE.adoc[← User Guide]
+
+Click *CV* in the top navigation bar.
+
+image::cv-editor.png[CV editor with an experience entry modal open, showing the edit subform]
+
+The CV editor is a single long page organised into sections:
+
+* *Contact* — name, email, phone, city, links.
+* *Summary* — a free-text professional summary (edited inline).
+* *Languages*, *Certifications*, *Education*, *Experience*, *Projects* —
+  each in a table with *Edit* and *Remove* row actions.
+
+=== Adding an entry
+
+Click the *Add …* button at the top-right of any section.
+A modal subform slides in without navigating away from the page.
+Fill in the fields and submit to save.
+
+=== Reordering
+
+Use the ▲ / ▼ buttons on the left of each row to move entries up or
+down within their section.
+The order in the editor matches the order in the rendered PDF.
+
+=== Editing and removing
+
+Click *Edit* on any row to open its modal subform with the current
+values pre-filled.
+Click *Remove* to delete the entry (a confirmation prompt appears).
+
+== Downloading your CV as PDF
+
+When the CV data is valid, a *Download current PDF* link appears at the
+top of the CV editor page.
+
+Clicking it generates a PDF from your CV data and downloads it to your
+browser.

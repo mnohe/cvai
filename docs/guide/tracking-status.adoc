@@ -1,0 +1,29 @@
+= Tracking application status
+:imagesdir: ../images
+
+link:../GUIDE.adoc[← User Guide]
+
+The *Update* button on the roles page — and the *Record update* form on
+a role's detail page — both accept a free-form prompt that the LLM
+interprets into a structured event.
+
+Type plain English describing what happened:
+
+----
+Rejected by email on 20 May. They went with someone with more
+mobile experience.
+----
+
+The LLM extracts:
+
+* *Event type* — e.g. Applied, Interview scheduled, Offer received,
+  Rejected.
+* *Date* — extracted from the text, or today's date if none is given.
+* *Note* — a cleaned-up version of what you wrote.
+
+The result is appended to the role's event log and the status pill
+updates to reflect the latest event.
+
+TIP: You can also use the structured *Record status event* form on the
+role page if you prefer to pick the event type and date manually,
+without involving the LLM.

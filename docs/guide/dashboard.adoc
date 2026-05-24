@@ -1,0 +1,19 @@
+= The roles page
+:imagesdir: ../images
+
+link:../GUIDE.adoc[← User Guide]
+
+The Roles page is the home page.
+It lists every active role in priority order, with a status pill and an
+open-task count on each row.
+
+image::dashboard.png[Roles page showing active roles with status pills and task counts]
+
+Each row has two actions:
+
+* *Details* — navigate to the full role page.
+* *Update* — open a prompt dialog to record a status change in plain
+  English (the LLM interprets it into a structured event).
+
+Roles that have reached a terminal state — rejected, closed, or accepted
+— are hidden, keeping the list focused on work in progress.

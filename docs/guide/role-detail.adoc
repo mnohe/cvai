@@ -1,0 +1,67 @@
+= Browsing a role's detail page
+:imagesdir: ../images
+
+link:../GUIDE.adoc[← User Guide]
+
+Click *Details* on any row on the roles page.
+
+image::role-submitted.png[Role detail page showing verdict card, status update form, and requirement coverage table]
+
+The page is divided into several sections.
+
+== Verdict and rationale
+
+The top-left card shows the suitability verdict — one of
+_Clear fit_, _Good fit_, _Overqualified fit_, _Stretch fit_,
+_Weak fit_, or _Not a fit_ — the LLM's rationale, and any
+recommendation notes produced during bundle generation.
+
+== Status update
+
+The top-right card shows the current application status and a free-form
+*Update prompt* field.
+
+Type plain-English status updates — for example:
+
+----
+Had a first interview on 14 May. They said they'd get back to me in a
+week. Felt it went well.
+----
+
+The LLM interprets the prompt into a structured event and appends it to
+the role's event log.
+
+See link:tracking-status.adoc[Tracking application status] for details
+on how prompts are interpreted.
+
+== Requirement coverage
+
+image::role-requirements.png[Requirement coverage table mapping role requirements to candidate evidence]
+
+The requirement coverage table maps each extracted requirement to:
+
+* *Type* — Must-have, Nice-to-have, or Inferred.
+* *Coverage* — Met, Partially met, Unmet, or Unknown.
+* *Evidence* — specific items from your CV that satisfy it.
+* *Gaps* — linked tasks that, when completed, would close the gap.
+
+Click any task link to jump to the task's detail page.
+
+== Artifacts
+
+Scroll down to the *Artifacts* section to download generated files:
+
+* A tailored PDF résumé.
+* A cover letter.
+* A role matrix (requirements against experience).
+* A suitability report.
+
+Artifacts are only present after a bundle has been generated.
+See link:bundle.adoc[Generating a role bundle].
+
+== Events
+
+The event log at the bottom of the page lists every status change in
+chronological order, with the date, event type, and note.
+
+image::role-interviewing.png[Role detail page scrolled to show the full event timeline]

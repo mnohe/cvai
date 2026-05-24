@@ -1,0 +1,74 @@
+= CVAI User Guide
+:toc: left
+:toc-title: Contents
+:toclevels: 1
+:icons: font
+:experimental:
+
+CVAI is a local, single-user web app that keeps a private database of
+job opportunities alongside your CV.
+You paste or point it at a job posting; it extracts structured facts,
+maps the role's requirements against your profile, and generates
+application materials — cover letters, tailored résumés, role matrices —
+all without sending your data to a third party unless you explicitly
+configure an LLM provider.
+
+TIP: For installation and initial setup, see the project
+link:../README.md[README].
+This guide assumes you already have the app running at
+`http://localhost:8080`.
+
+== Use cases
+
+Ordered from simplest to most involved:
+
+. link:guide/dashboard.adoc[The roles page] —
+  overview of active roles, status pills, and open task counts.
+
+. link:guide/ingest-url.adoc[Adding a role from a URL] —
+  fetch a job posting by URL, run a quick suitability preview, then
+  commit or discard.
+
+. link:guide/ingest-text.adoc[Adding a role from pasted text] —
+  paste raw job description text when the URL can't be fetched directly.
+
+. link:guide/role-detail.adoc[Browsing a role's detail page] —
+  verdict, rationale, requirement coverage table, artifacts, and event
+  log.
+
+. link:guide/tracking-status.adoc[Tracking application status] —
+  record status changes with a free-form prompt; the LLM structures it
+  into a typed event.
+
+. link:guide/tasks.adoc[Managing tasks] —
+  view gap tasks across all roles, close them, and reassess with the
+  LLM.
+
+. link:guide/cv-editor.adoc[Editing your CV] —
+  add, edit, reorder, and remove CV entries; download the rendered PDF.
+
+. link:guide/bundle.adoc[Generating a role bundle] —
+  produce a full set of application materials: structured analysis,
+  suitability report, role matrix, tailored résumé, cover letter.
+
+. link:guide/reassess-role.adoc[Reassessing a role] —
+  re-run the LLM analysis after updating your CV or closing gap tasks.
+
+. link:guide/operations.adoc[Operations page] —
+  monitor background ingestion, bundle, and reassessment operations.
+
+. link:guide/data-privacy.adoc[Data and privacy] —
+  where your data lives and what (if anything) leaves your machine.
+
+== Regenerating screenshots
+
+Screenshots in each guide page are generated from the demo datastore
+by `scripts/docs.py`.
+The devcontainer includes Playwright; run:
+
+----
+make docs
+----
+
+The script starts the server, captures each page, and saves PNGs into
+`docs/images/`.

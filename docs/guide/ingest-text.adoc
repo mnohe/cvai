@@ -1,0 +1,24 @@
+= Adding a role from pasted text
+:imagesdir: ../images
+
+link:../GUIDE.adoc[← User Guide]
+
+Some job boards block automated fetching.
+Use the *From pasted text* card on the intake page instead.
+
+image::intake.png[Intake form — the pasted-text card is on the right]
+
+Paste the full job description into the text area.
+The optional fields let you correct anything the LLM might mis-extract,
+or supply details that are not in the text:
+
+* *Source URL* — stored for reference; the server does not fetch it.
+* *Company override* — use when the posting text is ambiguous.
+* *Location override* — useful for multi-location postings.
+* *Role title override* — use when the extracted title is too verbose.
+
+Click *Start pasted-text ingestion*.
+The rest of the flow is identical to
+link:ingest-url.adoc[URL ingestion]:
+a quick analysis preview (if enabled), then a choice to continue or
+abandon before anything is written to disk.

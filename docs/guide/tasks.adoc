@@ -1,0 +1,50 @@
+= Managing tasks
+:imagesdir: ../images
+
+link:../GUIDE.adoc[← User Guide]
+
+Tasks represent gaps in your profile relative to role requirements.
+They are created automatically during bundle generation and linked to
+the specific requirements they address.
+
+Click *Tasks* in the top navigation bar.
+
+image::tasks.png[Tasks list showing open tasks with ETA and gap descriptions]
+
+The tasks list shows every task across all roles, with columns for
+name, status, ETA estimate, and the gap description it addresses.
+
+Click a task title to open its detail page.
+
+== Task detail
+
+A task page shows:
+
+* *Gap* — what is missing from your profile to satisfy one or more
+  requirements.
+* *Acceptance criteria* — the conditions under which the gap is
+  considered closed.
+* *Status form* — mark the task `Open`, `Completed`, or `Won't do`,
+  and add evidence or a note explaining the decision.
+* *Used by requirements* — the roles whose requirement coverage depends
+  on this task.
+
+== Closing a task
+
+Select `Completed` or `Won't do` in the *Status* dropdown, fill in the
+*Evidence or note* field, and click *Update task*.
+
+Closing a task does not automatically update the requirement coverage
+table on the linked role pages.
+Trigger a link:reassess-role.adoc[role reassessment] to refresh the
+coverage analysis.
+
+== Reassessing a task with the LLM
+
+The *Reassess* button re-evaluates whether the task is already closed
+given your current CV.
+The result is an updated acceptance criteria and coverage note — it does
+not automatically change the status.
+
+Use this when you've added new CV entries and want to check whether an
+existing gap has been filled.

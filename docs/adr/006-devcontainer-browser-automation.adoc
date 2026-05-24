@@ -1,0 +1,95 @@
+= ADR-006: Browser automation toolchain for testing and documentation
+
+Status: Accepted +
+Date: 2026-05-24
+
+== Context
+
+Two workflows require browser automation:
+
+Documentation screenshots::
+  A documentation script drives a headless browser against a running local server to produce screenshots for `docs/GUIDE.adoc`.
+  The script interacts with the application as a user would: clicking elements, triggering HTMX-loaded modal content, and capturing the settled state.
+
+Browser-based end-to-end tests::
+  The existing `tests/test_e2e.py` exercises HTTP routes via `httpx` and a live uvicorn server, but does not drive a browser.
+  Browser-based tests covering navigation, form submission, and HTMX interactions are planned.
+  The documentation script is a preview of the wait patterns those tests will require.
+
+The application is HTMX-heavy: partial page updates, polling operation fragments, and HTMX-triggered modal loads all involve asynchronous DOM mutations.
+A browser automation tool must reliably wait for those mutations to complete before asserting or screenshotting.
+
+=== Relationship to ADR-002
+
+ADR-002 established an Alpine-based production runtime image.
+The devcontainer (development environment) matches that base image, providing parity: bugs caused by Alpine's musl-libc, its package versions, or its filesystem layout are visible locally rather than only in production.
+
+== Alternatives considered
+
+=== Alpine + Selenium
+
+Selenium is a browser automation library with pure-Python wheels that install on Alpine (`musl-libc`) without issue.
+Chromium and ChromeDriver are available directly from `apk`, requiring no additional downloads at image build time.
+The devcontainer base image could remain Alpine, preserving full parity with the runtime.
+
+The critical limitation is the absence of a `networkidle` wait primitive.
+Selenium's `WebDriverWait` can block until a specific DOM element is present or visible, but has no mechanism to wait until all in-flight network requests have settled.
+For HTMX interactions, this matters: clicking a trigger fires an XHR request that populates a partial — an assertion or screenshot taken before that request completes captures an empty or intermediate state.
+The workaround is either a fixed `time.sleep()` (slow and fragile) or polling for a specific element inside the loaded content, which couples tests to template internals rather than to observable user-facing behaviour.
+
+The CV editor modal is a concrete example: clicking the edit button fires an HTMX request that loads the form fields into the modal.
+There is no stable sentinel element to wait on without hard-coding knowledge of the modal's content.
+This problem recurs at every HTMX interaction boundary.
+
+The ChromeDriver package in Alpine `apk` is maintained by the Alpine community rather than the Chromium project, and must stay in sync with the `chromium` package.
+Version skew between the two introduces driver/browser incompatibility outside the project's control.
+
+=== Debian devcontainer + Playwright
+
+Switching the devcontainer base to a Debian image allows `pip install playwright` to succeed (Playwright only publishes `manylinux`/glibc wheels; Alpine's musl-libc is incompatible even with the `gcompat` shim installed) and enables `playwright install --with-deps chromium` to install the browser at image build time.
+
+Playwright provides `page.wait_for_load_state("networkidle")`, which blocks until the browser reports no pending network requests.
+Any HTMX-triggered request is a network request; waiting for `networkidle` after a user action guarantees all partial updates have completed without coupling tests to template internals.
+
+The cost is losing devcontainer parity with the Alpine production runtime.
+Tests running on Debian glibc cannot guarantee identical behaviour on Alpine musl: native extensions (`pydantic-core`, `MarkupSafe`, `coverage`) compile against different system libraries; libc edge cases in string handling, file I/O, and signal behaviour differ.
+A green test suite on Debian does not fully validate the production environment.
+
+=== Alpine devcontainer + ephemeral Debian container for browser tasks (chosen)
+
+The devcontainer retains Alpine, preserving runtime parity for all regular development and the non-browser test suite.
+
+Browser automation runs in an ephemeral `python:slim` (Debian) container spawned on demand via the host Podman socket (Docker-outside-of-Docker).
+The documentation script and browser-based test suite run inside that container, which mounts the workspace volume and starts its own server process — no cross-container networking is required.
+The container is discarded after each invocation.
+
+Both the documentation task and browser tests are invoked through `make docs` and `make test-e2e`, which are defined in terms of a shared `BROWSER_RUN` variable.
+`HOST_WORKDIR` (the host-side workspace path needed for the volume mount) is set automatically in the devcontainer via the `${localWorkspaceFolder}` built-in devcontainer variable, requiring no manual configuration.
+
+==== Performance and caching
+
+A bare `python:slim` container installing Playwright and Chromium on every invocation would be impractical (~2 minutes for the first run, repeated on every call).
+Three named Podman volumes on the host provide caching:
+
+* `cvai-pip` (`/root/.cache/pip`): pip package cache; subsequent `pip install` calls complete in ~3 s.
+* `cvai-playwright` (`/usr/local/ms-playwright`): Playwright browser binary; `playwright install` detects the binary is present and skips the ~300 MB download.
+* `cvai-apt` (`/var/cache/apt/archives`): apt package archive; `playwright install --with-deps` uses cached `.deb` files rather than re-downloading them.
+
+After the first invocation (~2 minutes), subsequent runs incur approximately 10-15 seconds of setup overhead before the actual task executes.
+These volumes are scoped to the host Podman daemon and survive devcontainer rebuilds.
+
+== Decision
+
+The devcontainer base image remains Alpine.
+Browser automation (Playwright) runs in an ephemeral `python:slim` container spawned via the host Podman socket when `make docs` or `make test-browser` is invoked.
+The host workspace is mounted into the ephemeral container via `HOST_WORKDIR`, set automatically from `${localWorkspaceFolder}`.
+Three named volumes cache pip packages, apt archives, and the Playwright browser binary between invocations.
+
+== Consequences
+
+* The devcontainer retains Alpine, preserving parity with the production runtime for all regular development and the non-browser test suite.
+* Browser-based end-to-end tests use `pytest-playwright` fixtures and `page.wait_for_load_state("networkidle")` for HTMX interaction boundaries.
+* The documentation screenshot script uses Playwright's `sync_playwright` API.
+* The first invocation of `make docs` or `make test-e2e` is slow (~2 minutes); subsequent invocations take ~10-15 seconds before the task begins.
+* The host Podman socket must be mounted into the devcontainer; its path (`/run/user/1000/podman/podman.sock`) is hardcoded and matches the hardcoded `USER_UID=1000` in the devcontainer Dockerfile.
+* A devcontainer rebuild does not invalidate the volume caches; only explicit volume removal does.

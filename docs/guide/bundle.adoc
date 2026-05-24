@@ -1,0 +1,34 @@
+= Generating a role bundle
+:imagesdir: ../images
+
+link:../GUIDE.adoc[← User Guide]
+
+A _bundle_ is the full set of application materials for a role:
+structured job facts, a suitability analysis, a role matrix, a tailored
+résumé, and a cover letter — all generated in one operation.
+
+TIP: Bundle generation requires a configured LLM.
+See the README for setup instructions.
+
+== Generating a bundle
+
+On a role's detail page, click the *Reassess* button in the
+*Requirement coverage* card header.
+
+The bundle generation runs as a background operation.
+Navigate to the link:operations.adoc[Operations page] to watch progress.
+When it finishes, refresh the role page — the *Artifacts* section will
+list the downloadable files.
+
+== What the bundle contains
+
+Once complete, the following files are available to download from the
+*Artifacts* section of the role page:
+
+* A tailored PDF résumé.
+* A cover letter.
+* A role matrix — requirements mapped against your experience.
+* A suitability report.
+
+The role page also shows an updated requirement coverage table and
+verdict reflecting the latest analysis.

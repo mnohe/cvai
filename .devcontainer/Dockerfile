@@ -14,17 +14,19 @@ RUN apk add --no-cache \
     bubblewrap \
     ca-certificates \
     curl \
+    docker-cli \
     fontconfig \
+    freetype \
+    gcompat \
     git \
+    harfbuzz \
     jq \
     make \
+    nss \
     openssh-client \
     perl \
-    py3-jsonschema \
     py3-pip \
-    py3-yaml \
     python3 \
-    py3-requests \
     ripgrep \
     shadow \
     tar \

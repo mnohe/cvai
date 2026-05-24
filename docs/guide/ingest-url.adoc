@@ -1,0 +1,40 @@
+= Adding a role from a URL
+:imagesdir: ../images
+
+link:../GUIDE.adoc[← User Guide]
+
+This is the most common workflow.
+You have a job posting URL and want to pull it into your records.
+
+Click *Ingest Role* in the top navigation bar.
+
+image::intake.png[Intake form with URL and pasted-text sections side by side]
+
+Fill in the *Role URL* field and click *Start URL ingestion*.
+
+By default, *Quick analysis before full ingestion* is checked.
+This runs a fast suitability check before saving anything, so you can
+review the result and decide whether to proceed or discard.
+
+image::operations.png[Operations page showing a running or completed ingestion]
+
+While the extraction runs you are taken to the operations page, which
+updates automatically — you do not need to refresh.
+
+== Quick analysis
+
+When the quick analysis completes, the result card shows:
+
+* *Fit level* — High fit, Moderate fit, or Low fit.
+* *Recommendation* — Apply, Apply with caveats, or Skip.
+* *Matching abilities* — your strongest evidence for this role.
+* *Important gaps* — unfulfilled requirements with estimated effort.
+
+You then choose:
+
+* *Continue full ingestion* — saves the role and generates a full
+  analysis.
+* *Abandon* — discards the run; the role is not saved.
+
+If you unchecked *Quick analysis before full ingestion*, the full
+ingestion runs immediately without the preview step.
