@@ -6,7 +6,11 @@
   },
   "remoteUser": "vscode",
   "mounts": [
-    "type=bind,source=/run/user/1000/podman/podman.sock,target=/run/user/1000/podman/podman.sock"
+    "type=bind,source=/run/user/1000/podman/podman.sock,target=/run/user/1000/podman/podman.sock",
+    "type=bind,source=${localEnv:HOME}/.gitconfig,target=/home/vscode/.gitconfig,readonly",
+    "type=bind,source=${localEnv:HOME}/.gitignore,target=/home/vscode/.gitignore,readonly",
+    "type=bind,source=${localEnv:HOME}/.ssh,target=/home/vscode/.ssh,readonly",
+    "type=bind,source=${localEnv:HOME}/.claude,target=/home/vscode/.claude"
   ],
   "containerEnv": {
     "PYTHONDONTWRITEBYTECODE": "1",
