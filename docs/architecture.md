@@ -69,7 +69,7 @@ The public-safe web application. The only component users interact with directly
 | LLM HTTP | `urllib` (stdlib; no SDK dependency) |
 | Data serialisation | PyYAML |
 
-### Data Directory
+### Data directory
 
 Structured data store and canonical source of truth for all runtime state. Local development uses the checked-in demo datastore at `tests/fixture_data/demo-db`; deployments mount a writable directory via `CVAI_DATA`.
 
@@ -81,7 +81,7 @@ Typst templates and their fonts are data assets under `CVAI_DATA/pdf/templates/<
 
 ---
 
-## Data Model
+## Data model
 
 All role process state is stored as structured YAML. Fields are machine-readable; the web app reads them directly and never parses status, verdict, or rationale out of prose text.
 
@@ -204,7 +204,7 @@ Example: `amazon_dublin_software_development_engineer_network_capacity_services`
 
 ---
 
-## LLM Integration
+## LLM integration
 
 ### Allowed uses
 
@@ -245,7 +245,7 @@ All LLM HTTP uses `urllib` from the Python standard library. The app does not de
 
 ---
 
-## Request Lifecycle
+## Request lifecycle
 
 ### Read request (e.g. dashboard)
 
@@ -286,7 +286,7 @@ No LLM call.
 
 ---
 
-## Security Model
+## Security model
 
 - **Data separation.** Secrets and real candidate artifacts should live in the configured runtime data directory, not in the public demo fixture.
 - **Authentication.** The initial release is intended for local, single-user deployment and does not implement application-layer authentication. Do not expose CVAI directly to the public internet without a trusted authentication layer in front of it.
@@ -296,7 +296,7 @@ No LLM call.
 
 ---
 
-## Configuration Reference
+## Configuration reference
 
 All configuration uses environment variables. A `.env` file at the root of `CVAI_DATA` is loaded on startup if present; variables already in the process environment take precedence.
 

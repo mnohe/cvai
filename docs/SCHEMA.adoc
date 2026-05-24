@@ -15,7 +15,7 @@ PYTHONPATH=. python3 -m cvai_web init /tmp/cvai-empty-data
 PYTHONPATH=. python3 -m cvai_web validate tests/fixture_data/demo-db
 ----
 
-== Design Rules
+== Design rules
 
 * YAML files are the source of truth for role process state.
 * Markdown files are artifacts for humans or downloads; the app must not parse them to render pages.
@@ -23,7 +23,7 @@ PYTHONPATH=. python3 -m cvai_web validate tests/fixture_data/demo-db
 * Role IDs are human-readable slugs using `a-z`, `0-9`, and `_`.
 * If a slug collides, add a deterministic human-readable suffix such as the posting ID or `_2`; do not use UUIDs.
 
-== Root Files
+== Root files
 
 === `roles.yaml`
 
@@ -201,7 +201,7 @@ PYTHONPATH=. python3 -m cvai_web validate tests/fixture_data/demo-db
 | Artifact paths mentioned by the event.
 |===
 
-== Per-Role Files
+== Per-role files
 
 Each role lives under `roles/<role_id>/`.
 
@@ -337,7 +337,7 @@ The per-role mirror of the corresponding `applications.yaml` row.
 | Private matching context. May include responsibilities, must-haves, nice-to-haves, and interview focus.
 |===
 
-=== Requirement Coverage Row
+=== Requirement coverage row
 
 [cols="1,1,3"]
 |===
@@ -404,19 +404,19 @@ Per-role task file. Currently reserved; root `tasks.yaml` is the canonical task 
 Per-role event mirror with the same row shape as root `events.yaml`.
 If `role_id` is present, it must match the folder name.
 
-== Candidate Context And Evidence
+== Candidate context and evidence
 
 `context/context.yaml` and `library/evidence.yaml` are created by initialization as empty structured projections for LLM matching and reassessment.
 They are intentionally looser than role/role process state while the matching vocabulary settles.
 Markdown files in `context/` and `library/` are human-authored source notes; workflows should consume the YAML projections.
 
-== CV Format Schema
+== CV format schema
 
 The canonical CV format is JSON Schema `cvai_core/schemas/cv.schema.json` in the public `cvai` repository.
 Private data directories do not carry their own copy; CVAI owns the schema in code and validates `cv/cv.yaml` against the package version.
 The schema has a stable public `$id` suitable for publishing on a CVAI website: `https://mnohe.github.io/cvai/schemas/cv.schema.json`.
 
-== PDF Templates
+== PDF templates
 
 PDF templates live under `pdf/templates/<template_id>/` in the configured data directory.
 They are data assets rather than Python package files so installations can keep custom templates and licensed fonts outside the public application repository.
@@ -463,7 +463,7 @@ The validator checks:
 * artifact path existence;
 * per-role event role IDs.
 
-== Why The Validator Is Python
+== Why the validator is Python
 
 The validator is Python because CVAI is Python, already depends on PyYAML, and needs cross-file checks close to the repository code.
 This keeps validation in the same test suite and avoids a second build toolchain.

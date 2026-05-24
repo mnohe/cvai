@@ -8,7 +8,7 @@ runtime through `CVAI_DATA`. PDF rendering code is called through
 `cvai_core.pdf`; templates and fonts are data assets under
 `CVAI_DATA/pdf/templates/<template>/`.
 
-## Data Contract
+## Data contract
 
 The web app renders dashboards, role details, tasks, statuses, events, and
 artifact links from structured YAML. Normal page reads must not call an LLM.

@@ -1,4 +1,4 @@
-# Use Cases
+# Use cases
 
 ## Actors
 
@@ -8,7 +8,7 @@
 
 ---
 
-## Browse the Active Dashboard
+## Browse the active dashboard
 
 **Actor**: user
 
@@ -24,7 +24,7 @@
 
 ---
 
-## View Role Details
+## View role details
 
 **Actor**: user
 
@@ -36,7 +36,7 @@
 
 ---
 
-## Download a Role Artifact
+## Download a role artifact
 
 **Actor**: user
 
@@ -47,7 +47,7 @@
 
 ---
 
-## Edit and Download the Generic CV
+## Edit and download the generic CV
 
 **Actor**: user
 
@@ -66,7 +66,7 @@
 
 ---
 
-## Ingest a Role from a URL
+## Ingest a role from a URL
 
 **Actor**: user + LLM
 
@@ -87,7 +87,7 @@
 
 ---
 
-## Ingest a Role from Pasted Text
+## Ingest a role from pasted text
 
 **Actor**: user + LLM
 
@@ -103,7 +103,7 @@
 
 ---
 
-## Record a Status Update from the Structured Form
+## Record a status update from the structured form
 
 **Actor**: user
 
@@ -117,7 +117,7 @@
 
 ---
 
-## Record a Status Update from a Free-Form Prompt
+## Record a status update from a free-form prompt
 
 **Actor**: user + LLM
 
@@ -131,7 +131,7 @@
 
 ---
 
-## Initialize a New Data Directory
+## Initialize a new data directory
 
 **Actor**: user (first-time setup)
 
@@ -144,7 +144,7 @@
 
 ---
 
-## Build or Rebuild a CV PDF
+## Build or rebuild a CV PDF
 
 **Actor**: user
 
@@ -166,7 +166,7 @@ Two paths are available:
 
 ---
 
-## Import a PDF Template
+## Import a PDF template
 
 **Actor**: user
 
@@ -179,7 +179,7 @@ Two paths are available:
 
 ---
 
-## Configure the LLM Provider
+## Configure the LLM provider
 
 **Actor**: user
 
@@ -191,7 +191,7 @@ Two paths are available:
 
 ---
 
-## Reassess a Gap Task
+## Reassess a gap task
 
 **Actor**: user + LLM
 
@@ -206,7 +206,7 @@ Two paths are available:
 
 ---
 
-## Add a New LLM Provider (contributor)
+## Add a new LLM provider (contributor)
 
 **Actor**: contributor
 

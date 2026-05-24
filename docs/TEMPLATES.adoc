@@ -6,7 +6,7 @@ CVAI renders PDFs from Typst template packs stored under `CVAI_DATA/pdf/template
 Templates are data assets, so private installations can
 install or replace them without modifying the application container.
 
-== Directory Structure
+== Directory structure
 
 A template pack is a directory with this minimum structure:
 
