@@ -12,44 +12,23 @@ The application is intended for local, single-user use and is distributed as a D
 
 ## Quick Start
 
-Build and run the app locally:
+Pull and run the published image:
 
 ```bash
-cd /path/to/cvai
-docker build -t cvai:local .
 docker run --rm \
   -p 8080:8080 \
   -e CVAI_DATA=/data \
   -e LLM_API_KEY="${LLM_API_KEY}" \
-  -v "$PWD/tests/fixture_data/demo-db:/data" \
-  cvai:local
+  -v /path/to/your-data:/data \
+  ghcr.io/mnohe/cvai:latest
 ```
 
 Then open `http://localhost:8080`.
 
-If you prefer running from a source checkout without Docker:
-
-```bash
-PYTHONPATH=. python3 -m cvai_web validate tests/fixture_data/demo-db
-PYTHONPATH=. CVAI_DATA=tests/fixture_data/demo-db python3 -m cvai_web serve
-```
-
-For local development, the Makefile defaults `CVAI_DATA` to
-`tests/fixture_data/demo-db`, a public demo datastore with realistic sample
-content. This lets `make dev` start a live-reloading server immediately:
-
-```bash
-make dev
-```
-
-Use a separate writable datastore for real applications:
-
-```bash
-make dev CVAI_DATA=/path/to/your-data
-```
-
 `LLM_API_KEY` is only needed for role ingestion, free-form status updates, and
 reassessment. You can browse and edit existing structured data without an LLM.
+
+For a persistent setup, see [Docker Compose](#docker-compose) below.
 
 ## Quick Tour
 
@@ -94,7 +73,7 @@ presentation.
 Import a local template checkout with:
 
 ```bash
-cvai templates import /path/to/template-pack tests/fixture_data/demo-db
+cvai templates import /path/to/template-pack /path/to/your-data
 ```
 
 Template-pack requirements are documented in [docs/TEMPLATES.adoc](docs/TEMPLATES.adoc).
@@ -108,36 +87,22 @@ Set these values in the environment or in a `.env` file inside `CVAI_DATA`:
 - `LLM_MODEL`: model name.
 - `LLM_BASE_URL`: OpenAI-compatible API base URL.
 
-When using the Makefile from a source checkout, `CVAI_DATA` defaults to the
-checked-in demo datastore at `tests/fixture_data/demo-db`; Docker examples use
-`/data` because they expect a mounted private data directory. `make run` and
-other Makefile targets also load a repo-root `.env` file when one is present.
-
-## Docker
-
-```bash
-docker build -t cvai .
-docker run --rm -p 8080:8080 -e CVAI_DATA=/data -e LLM_API_KEY -v "$PWD/tests/fixture_data/demo-db:/data" cvai
-```
-
 ## Docker Compose
 
-Use the checked-in compose file from the source checkout, or create an equivalent
-file with the demo datastore mounted:
+Create a `compose.yaml` pointing at your data directory:
 
 ```yaml
 services:
   cvai:
-    image: cvai
-    build: /path/to/cvai          # or use image: ghcr.io/mnohe/cvai:latest
+    image: ghcr.io/mnohe/cvai:latest
     ports:
       - "8080:8080"
     volumes:
-      - ./tests/fixture_data/demo-db:/data
+      - /path/to/your-data:/data
     environment:
       CVAI_DATA: /data
       LLM_API_KEY: "${LLM_API_KEY}"
-      LLM_MODEL: "${LLM_MODEL:-gpt-4o}"
+      LLM_MODEL: "${LLM_MODEL:-gpt-5.1}"
       LLM_BASE_URL: "${LLM_BASE_URL:-https://api.openai.com/v1}"
     restart: unless-stopped
     healthcheck:
@@ -185,7 +150,7 @@ spec:
     spec:
       containers:
         - name: cvai
-          image: ghcr.io/you/cvai:latest
+          image: ghcr.io/mnohe/cvai:latest
           ports:
             - containerPort: 8080
           env:
@@ -235,4 +200,4 @@ The `Recreate` rollout strategy ensures the old pod terminates before the new on
 
 This package is intended to be public. Do not store private candidate data, `.env`, or generated role artifacts here.
 
-CVAI is intended for local single-user deployment, on localhost or trusted LANs. Do not expose it directly to the public internet without adding an authentication layer in front of it.
+CVAI is intended for local single-user deployment, on localhost or trusted LANs. Do not expose it directly to the public internet without adding an authentication layer in front of it. Even then, probably do not expose it.

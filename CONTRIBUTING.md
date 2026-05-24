@@ -35,6 +35,39 @@ Other versions may work but are not tested.
   contributors can run `make dev` against realistic public demo data. Override
   `CVAI_DATA` when testing against a private datastore.
 
+## Running locally
+
+Build and run the image from a source checkout:
+
+```bash
+docker build -t cvai:local .
+docker run --rm \
+  -p 8080:8080 \
+  -e CVAI_DATA=/data \
+  -e LLM_API_KEY="${LLM_API_KEY}" \
+  -v "$PWD/tests/fixture_data/demo-db:/data" \
+  cvai:local
+```
+
+The Makefile defaults `CVAI_DATA` to `tests/fixture_data/demo-db`, a public demo
+datastore with realistic sample content. `make dev` starts a live-reloading
+server against it immediately:
+
+```bash
+make dev
+make dev CVAI_DATA=/path/to/your-data   # override for a private datastore
+```
+
+`make run` and other Makefile targets load a repo-root `.env` file when one is
+present.
+
+To run outside the container (Python 3.12 required):
+
+```bash
+PYTHONPATH=. python3 -m cvai_web validate tests/fixture_data/demo-db
+PYTHONPATH=. CVAI_DATA=tests/fixture_data/demo-db python3 -m cvai_web serve
+```
+
 ## Checks
 
 Run web tests after web or data-model changes:
