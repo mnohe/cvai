@@ -78,6 +78,19 @@ class FastAPIRouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("CVAI", response.text)
         self.assertIn("/roles/", response.text)
+        self.assertIn('class="nav-tab active" href="/"', response.text)
+        self.assertIn('aria-current="page">Roles</a>', response.text)
+        self.assertIn('<span class="nav-current">Roles</span>', response.text)
+        self.assertIn("New&nbsp;role", response.text)
+        self.assertNotIn("Ingest&nbsp;role", response.text)
+
+    def test_detail_routes_highlight_their_parent_nav_section(self) -> None:
+        client = self.client()
+        task_response = client.get("/tasks/task_control_plane_case_study")
+
+        self.assertEqual(task_response.status_code, 200)
+        self.assertIn('class="nav-tab active" href="/tasks"', task_response.text)
+        self.assertIn('<span class="nav-current">Tasks</span>', task_response.text)
 
     def test_health_endpoint_is_available_for_container_smoke_tests(self) -> None:
         response = self.client().get("/healthz")

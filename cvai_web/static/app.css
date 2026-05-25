@@ -78,14 +78,6 @@ a:hover { text-decoration: underline; }
   gap: 10px;
   flex-wrap: wrap;
 }
-.header-title {
-  margin: 0;
-  font-size: 220%;
-  font-weight: lighter;
-  margin-top: .8rem;
-  line-height: 1.2;
-  white-space: nowrap;
-}
 .nav-tabs {
   display: flex;
   gap: 4px;
@@ -106,6 +98,11 @@ a:hover { text-decoration: underline; }
 .nav-tab:hover {
   background: var(--surface-2);
   text-decoration: none;
+}
+.nav-tab.active,
+.nav-menu-list a.active {
+  font-weight: 700;
+  font-size: 125%;
 }
 .nav-badge {
   display: inline-grid;
@@ -128,10 +125,18 @@ a:hover { text-decoration: underline; }
 }
 .nav-menu {
   display: none;
-  position: relative;
   margin-left: auto;
+  align-items: center;
+  gap: 10px;
 }
-.nav-menu summary {
+.nav-menu-details {
+  position: relative;
+}
+.nav-current {
+  color: var(--text);
+  font-weight: 700;
+}
+.nav-menu-details summary {
   cursor: pointer;
   list-style: none;
   display: inline-grid;
@@ -142,7 +147,7 @@ a:hover { text-decoration: underline; }
   border-radius: 8px;
   color: var(--text);
 }
-.nav-menu summary::-webkit-details-marker {
+.nav-menu-details summary::-webkit-details-marker {
   display: none;
 }
 .menu-icon {
@@ -159,7 +164,8 @@ a:hover { text-decoration: underline; }
 .nav-menu-list {
   position: absolute;
   right: 0;
-  top: calc(100% + 10px);
+  top: 0;
+  z-index: 1;
   display: grid;
   min-width: 180px;
   padding: 8px;
@@ -763,7 +769,7 @@ textarea {
     display: none;
   }
   .nav-menu {
-    display: block;
+    display: inline-flex;
   }
   .ingest-action {
     margin-left: 0;

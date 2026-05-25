@@ -9,31 +9,43 @@
   <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
 </head>
 <body>
+  {% set path = request.url.path %}
+  {% if path.startswith("/cv") %}
+    {% set current_section = "CV" %}
+  {% elif path.startswith("/tasks") %}
+    {% set current_section = "Tasks" %}
+  {% elif path.startswith("/operations") %}
+    {% set current_section = "Operations" %}
+  {% else %}
+    {% set current_section = "Roles" %}
+  {% endif %}
   <header class="topbar">
     <div class="topbar-inner">
       <div class="header-left">
         <a class="brand" href="/"><img class="brand-logo" src="/static/cvai-h.svg" alt=""><span class="brand-text">CVAI</span></a>
-        <h1 class="header-title">{{ section_title|default(title) }}</h1>
       </div>
       <nav class="nav-tabs" aria-label="Primary">
-        <a class="nav-tab" href="/" title="Active roles ordered by the repository backlog, with status and follow-up work visible at a glance.">Roles</a>
-        <a class="nav-tab" href="/cv/" title="Edit the structured CV data used by layouts, role matching, and PDF generation.">CV</a>
-        <a class="nav-tab" href="/tasks" title="Open evidence and follow-up tasks ordered by ETA, shortest first.">Tasks</a>
-        <a class="nav-tab" href="/operations" title="Background operations launched in this session.">Operations{% include "operation_badge.html.j2" %}</a>
+        <a class="nav-tab{% if current_section == "Roles" %} active{% endif %}" href="/" title="Active roles ordered by the repository backlog, with status and follow-up work visible at a glance."{% if current_section == "Roles" %} aria-current="page"{% endif %}>Roles</a>
+        <a class="nav-tab{% if current_section == "CV" %} active{% endif %}" href="/cv/" title="Edit the structured CV data used by layouts, role matching, and PDF generation."{% if current_section == "CV" %} aria-current="page"{% endif %}>CV</a>
+        <a class="nav-tab{% if current_section == "Tasks" %} active{% endif %}" href="/tasks" title="Open evidence and follow-up tasks ordered by ETA, shortest first."{% if current_section == "Tasks" %} aria-current="page"{% endif %}>Tasks</a>
+        <a class="nav-tab{% if current_section == "Operations" %} active{% endif %}" href="/operations" title="Background operations launched in this session."{% if current_section == "Operations" %} aria-current="page"{% endif %}>Operations{% include "operation_badge.html.j2" %}</a>
       </nav>
-      <details class="nav-menu">
-        <summary aria-label="Menu">
-          <span class="menu-icon" aria-hidden="true"><span></span><span></span><span></span></span>
-          <span class="visually-hidden">Menu</span>
-        </summary>
-        <div class="nav-menu-list">
-          <a href="/" title="Active roles ordered by the repository backlog, with status and follow-up work visible at a glance.">Roles</a>
-          <a href="/cv/" title="Edit the structured CV data used by layouts, role matching, and PDF generation.">CV</a>
-          <a href="/tasks" title="Open evidence and follow-up tasks ordered by ETA, shortest first.">Tasks</a>
-          <a href="/operations" title="Background operations launched in this session.">Operations{% if active_operation_count %}<span class="nav-badge">{{ active_operation_count }}</span>{% endif %}</a>
-        </div>
-      </details>
-      <a class="button primary ingest-action" href="/intake">Ingest&nbsp;role</a>
+      <div class="nav-menu">
+        <span class="nav-current">{{ current_section }}</span>
+        <details class="nav-menu-details">
+          <summary aria-label="Menu">
+            <span class="menu-icon" aria-hidden="true"><span></span><span></span><span></span></span>
+            <span class="visually-hidden">Menu</span>
+          </summary>
+          <div class="nav-menu-list">
+            <a class="{% if current_section == "Roles" %}active{% endif %}" href="/" title="Active roles ordered by the repository backlog, with status and follow-up work visible at a glance."{% if current_section == "Roles" %} aria-current="page"{% endif %}>Roles</a>
+            <a class="{% if current_section == "CV" %}active{% endif %}" href="/cv/" title="Edit the structured CV data used by layouts, role matching, and PDF generation."{% if current_section == "CV" %} aria-current="page"{% endif %}>CV</a>
+            <a class="{% if current_section == "Tasks" %}active{% endif %}" href="/tasks" title="Open evidence and follow-up tasks ordered by ETA, shortest first."{% if current_section == "Tasks" %} aria-current="page"{% endif %}>Tasks</a>
+            <a class="{% if current_section == "Operations" %}active{% endif %}" href="/operations" title="Background operations launched in this session."{% if current_section == "Operations" %} aria-current="page"{% endif %}>Operations{% if active_operation_count %}<span class="nav-badge">{{ active_operation_count }}</span>{% endif %}</a>
+          </div>
+        </details>
+      </div>
+      <a class="button primary ingest-action" href="/intake">New&nbsp;role</a>
     </div>
   </header>
   <main class="page">
