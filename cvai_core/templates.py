@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import shutil
+import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -27,6 +28,20 @@ class TemplatePackError(ValueError):
     """Raised when a template pack cannot be safely imported."""
 
 
+def list_template_packs(data_root: Path) -> list[TemplatePack]:
+    """Return validated template packs installed in `CVAI_DATA`."""
+    templates_root = data_root / "pdf" / "templates"
+    if not templates_root.exists():
+        return []
+    packs = []
+    for path in sorted(child for child in templates_root.iterdir() if child.is_dir()):
+        try:
+            packs.append(validate_template_pack(path))
+        except TemplatePackError:
+            continue
+    return packs
+
+
 def import_template_pack(source: Path, data_root: Path, *, replace: bool = False) -> Path:
     """Copy a validated template pack into `CVAI_DATA/pdf/templates/<template_id>`.
 
@@ -43,6 +58,34 @@ def import_template_pack(source: Path, data_root: Path, *, replace: bool = False
         shutil.rmtree(destination)
     templates_root.mkdir(parents=True, exist_ok=True)
     shutil.copytree(source, destination, ignore=shutil.ignore_patterns(".git", "__pycache__"))
+    return destination
+
+
+def import_template_zip(source: Path, data_root: Path, *, replace: bool = False) -> Path:
+    """Extract and import a local ZIP template pack into the data directory."""
+    if not source.is_file():
+        raise TemplatePackError(f"Template ZIP does not exist: {source}")
+    unpack_root = data_root / "tmp" / "template-upload"
+    if unpack_root.exists():
+        shutil.rmtree(unpack_root)
+    unpack_root.mkdir(parents=True, exist_ok=True)
+    try:
+        with zipfile.ZipFile(source) as archive:
+            _extract_zip_safely(archive, unpack_root)
+        source_dir = _find_template_root(unpack_root)
+        return import_template_pack(source_dir, data_root, replace=replace)
+    finally:
+        shutil.rmtree(unpack_root, ignore_errors=True)
+
+
+def remove_template_pack(data_root: Path, template_id: str) -> Path:
+    """Remove an installed template pack by id."""
+    if not _valid_template_id(template_id):
+        raise TemplatePackError("template id must use lowercase letters, numbers, underscores, or hyphens")
+    destination = data_root / "pdf" / "templates" / template_id
+    if not destination.is_dir():
+        raise FileNotFoundError(f"Unknown CV template: {template_id}")
+    shutil.rmtree(destination)
     return destination
 
 
@@ -92,3 +135,22 @@ def _required_string(mapping: dict[str, Any], field: str) -> str:
 
 def _valid_template_id(value: str) -> bool:
     return bool(value) and all(char.isalnum() or char in {"_", "-"} for char in value) and value.lower() == value
+
+
+def _extract_zip_safely(archive: zipfile.ZipFile, destination: Path) -> None:
+    destination = destination.resolve()
+    for member in archive.infolist():
+        member_path = destination / member.filename
+        resolved = member_path.resolve()
+        if destination not in resolved.parents and resolved != destination:
+            raise TemplatePackError("Template ZIP contains a path outside the extraction directory")
+        archive.extract(member, destination)
+
+
+def _find_template_root(unpack_root: Path) -> Path:
+    if (unpack_root / "template.yaml").exists():
+        return unpack_root
+    candidates = [path for path in unpack_root.iterdir() if path.is_dir() and (path / "template.yaml").exists()]
+    if len(candidates) == 1:
+        return candidates[0]
+    raise TemplatePackError("Template ZIP must contain exactly one template.yaml")

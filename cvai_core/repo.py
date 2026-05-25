@@ -11,6 +11,7 @@ from typing import Iterable
 import yaml
 
 from .pdf import PDFRenderer
+from .templates import TemplatePack, list_template_packs
 from .yaml_format import dump_yaml
 
 
@@ -683,10 +684,35 @@ class Repository:
     def ensure_generic_cv(self) -> Path:
         # The web app serves the PDF from CVAI_DATA. If it is missing, the bundled
         # Typst renderer builds it on demand from the structured CV YAML.
-        output_path = self.resolve("cv/cv.pdf")
+        return self.ensure_cv_pdf("demo")
+
+    def list_pdf_templates(self) -> list[TemplatePack]:
+        """List installed PDF templates from the data directory."""
+        return list_template_packs(self.root)
+
+    def cv_pdf_filename(self, template: str) -> str:
+        """Build the deterministic cached PDF filename for a template."""
+        cv = self.load_data("cv/cv.yaml", {})
+        contact = cv.get("contact") if isinstance(cv, dict) else {}
+        if not isinstance(contact, dict):
+            contact = {}
+        first_name = str(contact.get("name") or "").strip()
+        last_name = str(contact.get("surname") or "").strip()
+        initial = slugify(first_name[:1] or "cv")
+        surname = slugify(last_name or "cv")
+        template_slug = slugify(template)
+        return f"{initial}{surname}-{template_slug}.pdf"
+
+    def ensure_cv_pdf(self, template: str) -> Path:
+        """Build or return the cached base-CV PDF for one installed template."""
+        output_path = self.resolve(f"cv/{self.cv_pdf_filename(template)}")
         if output_path.exists():
             return output_path
-        return PDFRenderer(self.resolve("pdf/templates")).build_cv(source=self.resolve("cv/cv.yaml"), output=output_path)
+        return PDFRenderer(self.resolve("pdf/templates")).build_cv(
+            source=self.resolve("cv/cv.yaml"),
+            output=output_path,
+            template=template,
+        )
 
     def _upsert_global_row(self, relative_path: str, key: str, row: dict, id_field: str) -> None:
         # Mirrors are keyed by their natural ID. Upsert keeps writes idempotent when

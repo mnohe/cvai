@@ -34,8 +34,15 @@ Click *Remove* to delete the entry (a confirmation prompt appears).
 
 == Downloading your CV as PDF
 
-When the CV data is valid, a *Download current PDF* link appears at the
-top of the CV editor page.
+When the CV data is valid, the *PDF downloads* panel lists every installed
+PDF template.
 
-Clicking it generates a PDF from your CV data and downloads it to your
-browser.
+Click *Download* beside a template to generate the current CV with that
+layout and download the PDF. CVAI reuses the cached file until the CV data
+changes; saving any CV section clears the cached PDFs so the next download
+is rebuilt from current data.
+
+Click *Add template* to choose a local ZIP template pack from your computer.
+
+Click *Remove* beside a template to open a confirmation modal before the
+template is deleted.

@@ -11,17 +11,17 @@
         <div class="role-title-line">
           <a class="role-title" href="/roles/{{ role_record.canonical_slug }}">{{ role_record.role }}</a>
           <span class="pill {{ badge[1] }}">{{ badge[0] }}</span>
-        </div>
-        <div class="role-subtitle">{{ role_record.company }}, {{ role_record.location }}</div>
-        <div class="role-meta">
           {% if role.open_task_count %}
             <span class="task-notice">{{ role.open_task_count }} {{ task_label }}</span>
           {% endif %}
+        </div>
+        <div class="role-subtitle">{{ role_record.company }}, {{ role_record.location }}</div>
+        <div class="role-meta">
           <span class="muted">{{ role_record.role_status|status_sentence }}</span>
         </div>
       </div>
-      <div class="role-actions">
-        <a class="button primary" href="/roles/{{ role_record.canonical_slug }}">Details</a>
+      <div class="row-actions">
+        <a href="/roles/{{ role_record.canonical_slug }}">Details</a>
         <button
           type="button"
           data-title="{{ role_record.company }} · {{ role_record.role }}"

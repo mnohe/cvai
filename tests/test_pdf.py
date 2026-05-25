@@ -6,6 +6,9 @@ from pathlib import Path
 from unittest import mock
 
 from cvai_core.pdf import PDFRenderer, default_templates_root, main
+from cvai_core.repo import Repository
+from cvai_core.yaml_format import dump_yaml
+from test_cv import valid_cv
 
 
 class PDFRendererTests(unittest.TestCase):
@@ -105,6 +108,17 @@ class PDFRendererTests(unittest.TestCase):
         self.assertEqual(build_cv.call_args.kwargs["source"], source)
         self.assertEqual(build_cv.call_args.kwargs["output"], output)
         self.assertEqual(build_cv.call_args.kwargs["template"], "compact")
+
+    def test_repository_uses_deterministic_template_pdf_filename(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            (root / "cv").mkdir()
+            (root / "cv" / "cv.yaml").write_text(dump_yaml(valid_cv()), encoding="utf-8")
+            repo = Repository(root)
+
+            filename = repo.cv_pdf_filename("demo")
+
+        self.assertEqual(filename, "alovelace-demo.pdf")
 
 
 if __name__ == "__main__":

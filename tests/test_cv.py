@@ -86,6 +86,7 @@ class CVDocumentTests(unittest.TestCase):
             root = Path(temp_dir)
             cv_path = self.write_cv(root, valid_cv())
             (root / "cv" / "cv.pdf").write_bytes(b"%PDF")
+            (root / "cv" / "alovelace-demo.pdf").write_bytes(b"%PDF")
 
             bad_section = parse_section_payload("not_a_section", "value")
             issues = update_cv_section(root, "languages", "[]")
@@ -94,6 +95,7 @@ class CVDocumentTests(unittest.TestCase):
 
             updated = load_cv(root)
             pdf_exists = (root / "cv" / "cv.pdf").exists()
+            template_pdf_exists = (root / "cv" / "alovelace-demo.pdf").exists()
 
         self.assertIn("not a known", bad_section[1][0].message)
         self.assertTrue(any(issue.path == "languages" for issue in issues))
@@ -101,6 +103,7 @@ class CVDocumentTests(unittest.TestCase):
         self.assertEqual(success, [])
         self.assertEqual(updated.data["summary"], "Updated summary.")
         self.assertFalse(pdf_exists)
+        self.assertFalse(template_pdf_exists)
 
     def test_save_cv_form_builds_nested_cv_without_exposing_yaml(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -3,6 +3,8 @@
   --bg: #f4f6fb;
   --surface: #ffffff;
   --surface-2: #eef2f8;
+  --button: #f8fafc;
+  --button-hover: #ffffff;
   --text: #142033;
   --muted: #5e6c84;
   --border: #d8e0ee;
@@ -170,7 +172,6 @@ a:hover { text-decoration: underline; }
   padding: 10px 12px;
   border-radius: 8px;
   color: var(--text);
-  font-weight: 700;
 }
 .nav-menu-list a:hover {
   background: var(--surface-2);
@@ -221,43 +222,75 @@ a:hover { text-decoration: underline; }
 .button, button {
   appearance: none;
   border: 1px solid var(--border);
-  background: var(--surface);
+  background: var(--button);
   color: var(--text);
   padding: 10px 14px;
   border-radius: 8px;
   font: inherit;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.2;
+}
+.button:hover,
+button:hover {
+  background: var(--button-hover);
+  text-decoration: none;
 }
 .button.primary, button.primary {
   background: var(--accent);
   border-color: var(--accent);
   color: white;
 }
+.button.primary:hover,
+button.primary:hover {
+  background: #1e75d6;
+  border-color: #1e75d6;
+}
 .button.action, button.action {
   background: var(--warn);
   border-color: var(--warn);
   color: white;
+}
+.button.action:hover,
+button.action:hover {
+  background: #c77900;
+  border-color: #c77900;
 }
 .button.success, button.success {
   background: var(--good);
   border-color: var(--good);
   color: white;
 }
+.button.success:hover,
+button.success:hover {
+  background: #378d3c;
+  border-color: #378d3c;
+}
 .button.danger, button.danger {
   background: var(--bad);
   border-color: var(--bad);
   color: white;
+}
+.button.danger:hover,
+button.danger:hover {
+  background: #d83737;
+  border-color: #d83737;
 }
 button.subtle-danger {
   background: #ffebee;
   border-color: #ffcdd2;
   color: var(--bad);
 }
+button.subtle-danger:hover {
+  background: #fff5f6;
+}
 .button.secondary {
   background: var(--surface-2);
 }
-.download-link {
-  font-weight: 700;
+.button.secondary:hover {
+  background: #f7faff;
 }
 .grid {
   display: grid;
@@ -341,6 +374,9 @@ button.subtle-danger {
 .event-table th, .event-table td {
   padding: 8px 12px 8px 0;
   vertical-align: top;
+}
+.event-table .eta-cell {
+  white-space: nowrap;
 }
 .event-table td:last-child, .event-table th:last-child {
   padding-right: 0;
@@ -436,6 +472,10 @@ textarea {
   border-radius: 8px;
   background: var(--surface);
 }
+.role-row > .row-actions {
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+}
 .role-title {
   font-weight: 700;
   font-size: 17px;
@@ -466,7 +506,6 @@ textarea {
   background: #fff4e5;
   color: var(--warn);
   font-size: 13px;
-  font-weight: 700;
 }
 .role-actions {
   display: flex;
@@ -553,6 +592,19 @@ textarea {
 }
 .compact-list {
   gap: 6px;
+}
+.artifact-template-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+}
+.inline-upload-form {
+  margin: 0;
+}
+.inline-upload-form .button {
+  display: inline-flex;
+  align-items: center;
 }
 .cv-section-list {
   display: grid;
@@ -669,6 +721,7 @@ textarea {
 }
 .compact-editor-card .row-actions {
   justify-content: flex-end;
+  vertical-align: middle;
 }
 .move-stack {
   position: absolute;
@@ -690,9 +743,10 @@ textarea {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
-  align-items: flex-end;
+  align-items: center;
   font-size: 75%;
 }
+.row-actions .button,
 .row-actions button,
 .repeat-row > button {
   padding: 8px 10px;
@@ -705,9 +759,6 @@ textarea {
   .brand-logo {
     width: 104px;
   }
-  .header-title {
-    font-size: 17px;
-  }
   .nav-tabs {
     display: none;
   }
@@ -716,6 +767,16 @@ textarea {
   }
   .ingest-action {
     margin-left: 0;
+  }
+  .artifact-template-row {
+    grid-template-columns: 1fr;
+  }
+  .role-row {
+    grid-template-columns: 1fr;
+  }
+  .role-row > .row-actions {
+    flex-wrap: wrap;
+    justify-content: flex-start;
   }
 }
 .move-button,
@@ -791,12 +852,6 @@ code {
   }
   .hero {
     flex-direction: column;
-  }
-  .role-row {
-    grid-template-columns: 1fr;
-  }
-  .role-actions {
-    justify-content: flex-start;
   }
   .repeat-row {
     grid-template-columns: 1fr;

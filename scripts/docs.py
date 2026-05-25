@@ -20,14 +20,17 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-from playwright.sync_api import Page, sync_playwright
+if TYPE_CHECKING:
+    from playwright.sync_api import Page
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DOCS_IMAGES = REPO_ROOT / "docs" / "images"
 CVAI_DATA = os.environ.get("CVAI_DATA", str(REPO_ROOT / "tests" / "fixture_data" / "demo-db"))
 PORT = 8765
 BASE_URL = f"http://localhost:{PORT}"
+DOCS_VENV = REPO_ROOT / ".venv-docs"
 
 # Role slugs chosen from demo-db for their visual richness:
 #   ledgerly — submitted, has requirement coverage + artifacts
@@ -35,14 +38,40 @@ BASE_URL = f"http://localhost:{PORT}"
 ROLE_SUBMITTED = "ledgerly_remote_staff_backend_engineer_payments"
 ROLE_INTERVIEWING = "northstar_dublin_engineering_manager_identity"
 
-WINDOW_WIDTH = 1280
-WINDOW_HEIGHT = 900
+WINDOW_WIDTH = 900
+WINDOW_HEIGHT = 600
 
 
-def ensure_browser() -> None:
-    """Download Playwright's Chromium on first use; no-op if already present."""
-    import subprocess as sp
-    sp.run(["playwright", "install", "chromium"], check=True)
+def ensure_playwright() -> None:
+    """Install Playwright's Python package and Chromium on first use."""
+    try:
+        import playwright.sync_api  # noqa: F401
+    except ModuleNotFoundError:
+        if os.environ.get("CVAI_DOCS_VENV") != "1":
+            venv_python = _ensure_docs_venv()
+            env = {**os.environ, "CVAI_DOCS_VENV": "1", "PYTHONPATH": str(REPO_ROOT)}
+            os.execve(str(venv_python), [str(venv_python), str(Path(__file__).resolve())], env)
+        raise RuntimeError("Playwright is not installed in the docs virtual environment.")
+    subprocess.run([sys.executable, "-m", "playwright", "install", "chromium"], check=True)
+
+
+def _ensure_docs_venv() -> Path:
+    venv_python = DOCS_VENV / "bin" / "python"
+    if not venv_python.exists():
+        subprocess.run([sys.executable, "-m", "venv", str(DOCS_VENV)], check=True)
+    subprocess.run(
+        [
+            str(venv_python),
+            "-m",
+            "pip",
+            "install",
+            "-r",
+            str(REPO_ROOT / "requirements.txt"),
+            "playwright",
+        ],
+        check=True,
+    )
+    return venv_python
 
 
 def wait_for_server(timeout: int = 30) -> None:
@@ -59,7 +88,7 @@ def wait_for_server(timeout: int = 30) -> None:
     raise RuntimeError(f"Server did not start within {timeout}s")
 
 
-def screenshot(page: Page, name: str, url: str, *, scroll_bottom: bool = False) -> None:
+def screenshot(page: "Page", name: str, url: str, *, scroll_bottom: bool = False) -> None:
     page.goto(url)
     page.wait_for_load_state("networkidle")
     if scroll_bottom:
@@ -72,7 +101,8 @@ def screenshot(page: Page, name: str, url: str, *, scroll_bottom: bool = False) 
 
 def main() -> None:
     DOCS_IMAGES.mkdir(parents=True, exist_ok=True)
-    ensure_browser()
+    ensure_playwright()
+    from playwright.sync_api import sync_playwright
 
     env = {**os.environ, "CVAI_DATA": CVAI_DATA, "PORT": str(PORT), "PYTHONPATH": str(REPO_ROOT)}
     proc = subprocess.Popen(

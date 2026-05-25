@@ -109,11 +109,7 @@ def update_cv_section(data_root: Path, section: str, raw_value: str, relative_pa
     if issues:
         return issues
     document.path.write_text(dump_yaml(updated), encoding="utf-8")
-    # The PDF generated from the old YAML is now stale. Removing it lets the
-    # existing on-demand PDF route rebuild from the updated CV.
-    pdf_path = data_root / CV_PDF
-    if pdf_path.exists():
-        pdf_path.unlink()
+    invalidate_cv_pdfs(data_root)
     return []
 
 
@@ -196,9 +192,7 @@ def save_cv_form(data_root: Path, form: dict[str, Any], relative_path: str = CV_
         return issues
 
     document.path.write_text(dump_yaml(payload), encoding="utf-8")
-    pdf_path = data_root / CV_PDF
-    if pdf_path.exists():
-        pdf_path.unlink()
+    invalidate_cv_pdfs(data_root)
     return []
 
 
@@ -371,10 +365,18 @@ def _validate_and_write_cv(path: Path, data_root: Path, payload: dict[str, Any])
     if issues:
         return issues
     path.write_text(dump_yaml(payload), encoding="utf-8")
-    pdf_path = data_root / CV_PDF
-    if pdf_path.exists():
-        pdf_path.unlink()
+    invalidate_cv_pdfs(data_root)
     return []
+
+
+def invalidate_cv_pdfs(data_root: Path) -> None:
+    """Remove all cached base-CV PDFs after structured CV data changes."""
+    cv_dir = data_root / "cv"
+    if not cv_dir.exists():
+        return
+    for pdf_path in cv_dir.glob("*.pdf"):
+        if pdf_path.is_file():
+            pdf_path.unlink()
 
 
 def _store_cv_list_items(payload: dict[str, Any], section: str, items: list[dict[str, Any]]) -> None:

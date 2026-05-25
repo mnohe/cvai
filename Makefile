@@ -16,6 +16,7 @@ endif
 # Three named volumes cache pip packages, apt archives, and the Playwright browser
 # binary so that only the first invocation is slow.
 BROWSER_RUN = docker run --rm \
+    --network host \
     -v "$(HOST_WORKDIR):/workspaces/cvai" \
     -v cvai-pip:/root/.cache/pip \
     -v cvai-apt:/var/cache/apt/archives \
@@ -26,7 +27,7 @@ BROWSER_RUN = docker run --rm \
     -w /workspaces/cvai \
     python:slim
 
-BROWSER_INSTALL = pip install -q --cache-dir /root/.cache/pip playwright -r requirements.txt \
+BROWSER_INSTALL = pip install -q --root-user-action=ignore --cache-dir /root/.cache/pip playwright -r requirements.txt \
     && playwright install --with-deps chromium
 
 .PHONY: test test-unit test-integration test-e2e coverage run dev validate cv docs

@@ -45,7 +45,7 @@ Ordered from simplest to most involved:
   LLM.
 
 . link:guide/cv-editor.adoc[Editing your CV] —
-  add, edit, reorder, and remove CV entries; download the rendered PDF.
+  add, edit, reorder, and remove CV entries; download PDFs from installed templates.
 
 . link:guide/bundle.adoc[Generating a role bundle] —
   produce a full set of application materials: structured analysis,

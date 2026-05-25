@@ -1,8 +1,16 @@
 import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 
-from cvai_core.templates import TemplatePackError, import_template_pack, validate_template_pack
+from cvai_core.templates import (
+    TemplatePackError,
+    import_template_pack,
+    import_template_zip,
+    list_template_packs,
+    remove_template_pack,
+    validate_template_pack,
+)
 
 
 class TemplatePackTests(unittest.TestCase):
@@ -146,6 +154,35 @@ fonts:
             replaced_destination = import_template_pack(source, data_root, replace=True)
             self.assertEqual(first_destination, replaced_destination)
             self.assertEqual((replaced_destination / "cv.typ").read_text(encoding="utf-8"), "second\n")
+
+    def test_list_remove_and_import_template_zip(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = self._template_source(root / "source")
+            archive = root / "compact.zip"
+            data_root = root / "data"
+            with zipfile.ZipFile(archive, "w") as zip_file:
+                for path in source.rglob("*"):
+                    zip_file.write(path, Path("compact") / path.relative_to(source))
+
+            destination = import_template_zip(archive, data_root)
+            packs = list_template_packs(data_root)
+            removed = remove_template_pack(data_root, "compact")
+
+            self.assertEqual(destination, data_root / "pdf" / "templates" / "compact")
+            self.assertEqual([pack.template_id for pack in packs], ["compact"])
+            self.assertEqual(removed, data_root / "pdf" / "templates" / "compact")
+            self.assertFalse(removed.exists())
+
+    def test_import_template_zip_rejects_path_escapes(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            archive = root / "bad.zip"
+            with zipfile.ZipFile(archive, "w") as zip_file:
+                zip_file.writestr("../template.yaml", "id: bad\nname: Bad\nentrypoint: cv.typ\n")
+
+            with self.assertRaisesRegex(TemplatePackError, "outside"):
+                import_template_zip(archive, root / "data")
 
     def _template_source(self, source: Path, *, body: str = "#set text()\n") -> Path:
         source.mkdir(parents=True)

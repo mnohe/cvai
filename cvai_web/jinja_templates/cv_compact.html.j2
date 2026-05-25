@@ -53,12 +53,6 @@
 {% endmacro %}
 
 {% block body %}
-{% if document.valid %}
-  <div class="toolbar page-actions">
-    <a class="download-link" href="/download/generic-cv">Download current PDF</a>
-  </div>
-{% endif %}
-
 {% if document.is_empty %}
   <section class="card">
     <h2>Start your CV</h2>
@@ -85,19 +79,37 @@
       </div>
       <div class="muted">{{ cv.contact.email }}</div>
       {% if cv.contact.linkedin %}
-        <div><a class="download-link" href="https://www.linkedin.com/in/{{ cv.contact.linkedin }}" target="_blank" rel="noreferrer">LinkedIn</a></div>
+        {% set linkedin_url = 'https://www.linkedin.com/in/' ~ cv.contact.linkedin %}
+        <div><a href="{{ linkedin_url }}" target="_blank" rel="noreferrer">{{ linkedin_url }}</a></div>
       {% endif %}
       {% if cv.contact.github %}
-        <div><a class="download-link" href="https://github.com/{{ cv.contact.github }}" target="_blank" rel="noreferrer">GitHub</a></div>
+        {% set github_url = 'https://github.com/' ~ cv.contact.github %}
+        <div><a href="{{ github_url }}" target="_blank" rel="noreferrer">{{ github_url }}</a></div>
       {% endif %}
     </article>
     <article class="card">
-      <h3>PDF artifacts</h3>
+      <div class="section-heading toolbar">
+        <h3>PDF downloads</h3>
+        <form method="post" action="/cv/templates/upload" enctype="multipart/form-data" class="inline-upload-form">
+          <label class="button secondary">Add template
+            <input class="visually-hidden" type="file" name="template_zip" accept=".zip,application/zip" onchange="this.form.submit()">
+          </label>
+        </form>
+      </div>
       <div class="list compact-list">
-        {% for pdf in pdfs %}
-          <div><a class="download-link" href="/download/file?path=cv/{{ pdf.name }}">{{ pdf.name }}</a></div>
+        {% for template in pdf_templates %}
+          <div class="list-item artifact-template-row">
+            <div>
+              <strong>{{ template.name }}</strong>
+              <div class="muted">{{ template.filename }}{% if template.cached %} · cached{% endif %}</div>
+            </div>
+            <div class="row-actions">
+              <a href="/download/cv/{{ template.id }}">Download</a>
+              <button type="button" class="danger subtle-danger" hx-get="/cv/templates/{{ template.id }}/remove-confirm" hx-target="#modal-root" hx-swap="innerHTML">Remove</button>
+            </div>
+          </div>
         {% else %}
-          <div class="muted">No PDF has been built yet.</div>
+          <div class="muted">No PDF templates are installed yet.</div>
         {% endfor %}
       </div>
     </article>
@@ -107,8 +119,8 @@
     <section class="card">
       <h2>Summary</h2>
       <label>Profile summary
-        <textarea name="summary" required>{{ cv.summary }}</textarea>
       </label>
+      <textarea name="summary" required>{{ cv.summary }}</textarea>
       <div class="sticky-actions">
         <button class="primary" type="submit">Save summary</button>
       </div>

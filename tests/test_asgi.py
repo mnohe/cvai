@@ -1,4 +1,6 @@
 import unittest
+import io
+import zipfile
 from pathlib import Path
 import sys
 import tempfile
@@ -237,7 +239,7 @@ class FastAPIRouteTests(unittest.TestCase):
         deadline = time.time() + 5
         while time.time() < deadline:
             modal = client.get(f"{operation_path}/modal").text
-            if "Quick analysis" in modal or "failed" in modal:
+            if "Promising fit." in modal or "failed" in modal:
                 break
             time.sleep(0.05)
 
@@ -340,12 +342,16 @@ class FastAPIRouteTests(unittest.TestCase):
         self.assertIn("invalid YAML", malformed.text)
 
         cv_path.write_text(dump_yaml(valid_cv()), encoding="utf-8")
-        (root / "cv" / "cv.pdf").write_bytes(b"%PDF")
+        (root / "cv" / "alovelace-demo.pdf").write_bytes(b"%PDF")
         valid = client.get("/cv/")
         self.assertEqual(valid.status_code, 200)
         self.assertIn("Ada Lovelace", valid.text)
-        self.assertIn("Download current PDF", valid.text)
-        self.assertIn("cv.pdf", valid.text)
+        self.assertIn("PDF downloads", valid.text)
+        self.assertIn("Download", valid.text)
+        self.assertIn("Remove", valid.text)
+        self.assertIn("alovelace-demo.pdf", valid.text)
+        self.assertIn('hx-get="/cv/templates/demo/remove-confirm"', valid.text)
+        self.assertIn('name="template_zip"', valid.text)
         self.assertIn("action=\"/cv/summary\"", valid.text)
         self.assertIn('hx-get="/cv/contact/edit"', valid.text)
         self.assertIn('hx-get="/cv/experience/0/edit"', valid.text)
@@ -362,6 +368,44 @@ class FastAPIRouteTests(unittest.TestCase):
         self.assertEqual(modal.status_code, 200)
         self.assertIn("<dialog", modal.text)
         self.assertIn("Analytical Engines", modal.text)
+
+    def test_cv_template_download_and_remove_routes(self) -> None:
+        client = self.client()
+        root = client.app.state.service.repo.root
+        (root / "cv" / "cv.yaml").write_text(dump_yaml(valid_cv()), encoding="utf-8")
+        pdf_path = root / "cv" / "alovelace-demo.pdf"
+        pdf_path.write_bytes(b"%PDF")
+        modal = client.get("/cv/templates/demo/remove-confirm")
+        removed = client.post("/cv/templates/demo/remove", headers={"HX-Request": "true"})
+
+        self.assertEqual(modal.status_code, 200)
+        self.assertIn("Remove Template", modal.text)
+        self.assertIn("/cv/templates/demo/remove", modal.text)
+        self.assertEqual(removed.status_code, 204)
+        self.assertEqual(removed.headers["HX-Redirect"], "/cv/")
+        self.assertFalse((root / "pdf" / "templates" / "demo").exists())
+
+    def test_cv_template_zip_upload_imports_template(self) -> None:
+        client = self.client()
+        root = client.app.state.service.repo.root
+        archive = io.BytesIO()
+        with zipfile.ZipFile(archive, "w") as zip_file:
+            zip_file.writestr(
+                "compact/template.yaml",
+                "id: compact\nname: Compact\nversion: 1\nentrypoint: cv.typ\n",
+            )
+            zip_file.writestr("compact/cv.typ", "#set text()\n")
+        archive.seek(0)
+
+        response = client.post(
+            "/cv/templates/upload",
+            files={"template_zip": ("compact.zip", archive.getvalue(), "application/zip")},
+            follow_redirects=False,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.headers["location"], "/cv/")
+        self.assertTrue((root / "pdf" / "templates" / "compact" / "cv.typ").exists())
 
     def test_cv_section_updates_validate_and_persist(self) -> None:
         client = self.client()

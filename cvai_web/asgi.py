@@ -8,7 +8,7 @@ from datetime import date
 from pathlib import Path
 
 import uvicorn
-from fastapi import FastAPI, Form, Query, Request
+from fastapi import FastAPI, File, Form, Query, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -27,6 +27,7 @@ from cvai_core.cv import (
 from cvai_core.llm import OpenAIClient
 from cvai_core.repo import Repository, default_repo_root
 from cvai_core.schema import assert_valid_data_root, initialize_data_root
+from cvai_core.templates import TemplatePackError, import_template_zip, remove_template_pack
 from .server import WebApp, load_repo_env, validate_public_https_url
 from .view_helpers import (
     category_label,
@@ -85,7 +86,7 @@ def create_fastapi_app(repo: Repository | None = None, llm: OpenAIClient | None 
 
     @app.get("/intake", response_class=HTMLResponse)
     async def intake(request: Request) -> Response:
-        return _template(app, request, "intake.html.j2", {"title": "Ingest Role"})
+        return _template(app, request, "intake.html.j2", {"title": "Roles"})
 
     @app.get("/tasks", response_class=HTMLResponse)
     async def tasks(request: Request) -> Response:
@@ -149,6 +150,51 @@ def create_fastapi_app(repo: Repository | None = None, llm: OpenAIClient | None 
         if issues:
             return _cv_response(app, request, issues=issues, status_code=400, form_data=form)
         return _redirect("/cv/")
+
+    @app.post("/cv/templates/upload")
+    async def upload_cv_template(request: Request, template_zip: UploadFile = File(...)) -> Response:
+        if not template_zip.filename or not template_zip.filename.lower().endswith(".zip"):
+            return _cv_response(app, request, status_code=400, flash=("error", "Choose a ZIP template pack to upload."))
+        upload_path = service.repo.resolve("tmp/template-upload.zip")
+        upload_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            upload_path.write_bytes(await template_zip.read())
+            import_template_zip(upload_path, service.repo.root)
+        except FileExistsError as exc:
+            return _cv_response(app, request, status_code=409, flash=("error", str(exc)))
+        except (TemplatePackError, OSError) as exc:
+            return _cv_response(app, request, status_code=400, flash=("error", str(exc)))
+        finally:
+            upload_path.unlink(missing_ok=True)
+        return _redirect("/cv/")
+
+    @app.get("/cv/templates/{template_id}/remove-confirm", response_class=HTMLResponse)
+    async def confirm_remove_cv_template(request: Request, template_id: str) -> Response:
+        templates = {template.template_id: template for template in service.repo.list_pdf_templates()}
+        template = templates.get(template_id)
+        if template is None:
+            return HTMLResponse('<div id="modal-root"></div>', status_code=404)
+        return app.state.templates.TemplateResponse(
+            request=request,
+            name="template_remove_modal.html.j2",
+            context={
+                "request": request,
+                "title": "Remove Template",
+                "template": template,
+                "flash": None,
+            },
+        )
+
+    @app.post("/cv/templates/{template_id}/remove")
+    async def remove_cv_template(request: Request, template_id: str) -> Response:
+        try:
+            remove_template_pack(service.repo.root, template_id)
+            for pdf_path in service.repo.resolve("cv").glob(f"*-{template_id}.pdf"):
+                if pdf_path.is_file():
+                    pdf_path.unlink()
+        except (FileNotFoundError, TemplatePackError) as exc:
+            return _cv_response(app, request, status_code=404, flash=("error", str(exc)))
+        return _hx_redirect_or_normal(request, "/cv/")
 
     @app.get("/cv/{section}/new", response_class=HTMLResponse)
     async def new_cv_item(request: Request, section: str) -> Response:
@@ -413,6 +459,16 @@ def create_fastapi_app(repo: Repository | None = None, llm: OpenAIClient | None 
         except subprocess.CalledProcessError:
             return _error(app, request, "CV PDF unavailable", "Typst could not build the CV PDF. Check the selected template and CV YAML.", 500)
 
+    @app.get("/download/cv/{template_id}")
+    async def download_cv_template(request: Request, template_id: str) -> Response:
+        try:
+            pdf_path = service.repo.ensure_cv_pdf(template_id)
+            return FileResponse(pdf_path, media_type="application/pdf", filename=pdf_path.name)
+        except FileNotFoundError as exc:
+            return _error(app, request, "CV PDF unavailable", str(exc), 404)
+        except subprocess.CalledProcessError:
+            return _error(app, request, "CV PDF unavailable", "Typst could not build the CV PDF. Check the selected template and CV YAML.", 500)
+
     @app.get("/download/file")
     async def download_file(request: Request, path: str = Query("")) -> Response:
         # Repository.file_info validates that the requested path stays inside
@@ -567,8 +623,16 @@ def _cv_response(
     service: WebApp = request.app.state.service
     document = load_cv(service.repo.root)
     display_issues = issues if issues is not None else document.issues
-    pdf_dir = service.repo.resolve("cv")
-    pdfs = sorted(path for path in pdf_dir.glob("*.pdf") if path.is_file())
+    templates = [
+        {
+            "id": template.template_id,
+            "name": template.name,
+            "version": template.version,
+            "filename": service.repo.cv_pdf_filename(template.template_id) if document.valid else "",
+            "cached": service.repo.exists(f"cv/{service.repo.cv_pdf_filename(template.template_id)}") if document.valid else False,
+        }
+        for template in service.repo.list_pdf_templates()
+    ]
     return _template(
         app,
         request,
@@ -577,7 +641,7 @@ def _cv_response(
             "title": "CV",
             "document": document,
             "issues": display_issues,
-            "pdfs": pdfs,
+            "pdf_templates": templates,
             "form_data": form_data,
             "flash": flash,
         },
