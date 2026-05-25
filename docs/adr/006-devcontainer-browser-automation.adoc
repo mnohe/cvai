@@ -11,9 +11,9 @@ Documentation screenshots::
   A documentation script drives a headless browser against a running local server to produce screenshots for `docs/GUIDE.adoc`.
   The script interacts with the application as a user would: clicking elements, triggering HTMX-loaded modal content, and capturing the settled state.
 
-Browser-based end-to-end tests::
-  The existing `tests/test_e2e.py` exercises HTTP routes via `httpx` and a live uvicorn server, but does not drive a browser.
-  Browser-based tests covering navigation, form submission, and HTMX interactions are planned.
+Browser-rendered end-to-end tests::
+  The existing `tests/test_integration.py` exercises HTTP routes via `httpx` and a live uvicorn server, but does not drive a browser.
+  Browser-rendered tests covering navigation, form submission, and HTMX interactions are planned but not implemented yet.
   The documentation script is a preview of the wait patterns those tests will require.
 
 The application is HTMX-heavy: partial page updates, polling operation fragments, and HTMX-triggered modal loads all involve asynchronous DOM mutations.
@@ -63,7 +63,8 @@ Browser automation runs in an ephemeral `python:slim` (Debian) container spawned
 The documentation script and browser-based test suite run inside that container, which mounts the workspace volume and starts its own server process — no cross-container networking is required.
 The container is discarded after each invocation.
 
-Both the documentation task and browser tests are invoked through `make docs` and `make test-e2e`, which are defined in terms of a shared `BROWSER_RUN` variable.
+The documentation task is invoked through `make docs`, which is defined in terms of a shared `BROWSER_RUN` variable.
+The reserved `make test-e2e` target will use the same browser container once browser-rendered tests exist.
 `HOST_WORKDIR` (the host-side workspace path needed for the volume mount) is set automatically in the devcontainer via the `${localWorkspaceFolder}` built-in devcontainer variable, requiring no manual configuration.
 
 ==== Performance and caching
@@ -81,15 +82,15 @@ These volumes are scoped to the host Podman daemon and survive devcontainer rebu
 == Decision
 
 The devcontainer base image remains Alpine.
-Browser automation (Playwright) runs in an ephemeral `python:slim` container spawned via the host Podman socket when `make docs` or `make test-browser` is invoked.
+Browser automation (Playwright) runs in an ephemeral `python:slim` container spawned via the host Podman socket when `make docs` is invoked, and when the reserved `make test-e2e` target gains browser-rendered tests.
 The host workspace is mounted into the ephemeral container via `HOST_WORKDIR`, set automatically from `${localWorkspaceFolder}`.
 Three named volumes cache pip packages, apt archives, and the Playwright browser binary between invocations.
 
 == Consequences
 
 * The devcontainer retains Alpine, preserving parity with the production runtime for all regular development and the non-browser test suite.
-* Browser-based end-to-end tests use `pytest-playwright` fixtures and `page.wait_for_load_state("networkidle")` for HTMX interaction boundaries.
+* Browser-rendered end-to-end tests will use Playwright wait patterns such as `page.wait_for_load_state("networkidle")` for HTMX interaction boundaries.
 * The documentation screenshot script uses Playwright's `sync_playwright` API.
-* The first invocation of `make docs` or `make test-e2e` is slow (~2 minutes); subsequent invocations take ~10-15 seconds before the task begins.
+* The first browser-container invocation such as `make docs` is slow (~2 minutes); subsequent invocations take ~10-15 seconds before the task begins.
 * The host Podman socket must be mounted into the devcontainer; its path (`/run/user/1000/podman/podman.sock`) is hardcoded and matches the hardcoded `USER_UID=1000` in the devcontainer Dockerfile.
 * A devcontainer rebuild does not invalidate the volume caches; only explicit volume removal does.

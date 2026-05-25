@@ -73,8 +73,15 @@ PYTHONPATH=. CVAI_DATA=tests/fixture_data/demo-db python3 -m cvai_web serve
 Run web tests after web or data-model changes:
 
 ```bash
-python3 -m unittest discover -s tests -v
+make test
 ```
+
+`make test` runs `make test-unit`, `make test-integration`, `make test-e2e`,
+and `make coverage` in order. `make test-unit` runs the non-live-socket test
+suite. `make test-integration` runs the HTTP integration suite in
+`tests/test_integration.py`, which starts a local uvicorn server and talks to it
+through `httpx`. Browser-rendered end-to-end tests are planned but not
+implemented yet; `make test-e2e` is reserved for that suite.
 
 Run the schema validator against a local data directory after changing schemas,
 repository code, ingestion, or reassessment logic:

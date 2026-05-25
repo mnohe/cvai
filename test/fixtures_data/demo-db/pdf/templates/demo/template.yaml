@@ -1,5 +1,0 @@
-id: demo
-name: Demo
-version: 1
-entrypoint: cv.typ
-description: Plain CV template for the demo data fixture.

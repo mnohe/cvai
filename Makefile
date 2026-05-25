@@ -3,6 +3,7 @@ MAKEFLAGS += --no-print-directory
 CVAI_DATA ?= tests/fixture_data/demo-db
 PORT ?= 8080
 PYTHON ?= python3
+UNIT_TESTS := $(patsubst tests/%.py,tests.%,$(filter-out tests/test_integration.py,$(wildcard tests/test_*.py)))
 
 # If there is an .env file, load it.
 ifneq (,$(wildcard .env))
@@ -28,16 +29,18 @@ BROWSER_RUN = docker run --rm \
 BROWSER_INSTALL = pip install -q --cache-dir /root/.cache/pip playwright -r requirements.txt \
     && playwright install --with-deps chromium
 
-.PHONY: test e2e coverage run dev validate cv docs test-e2e
+.PHONY: test test-unit test-integration test-e2e coverage run dev validate cv docs
 
-test:
-	PYTHONPATH=. $(PYTHON) -m unittest discover -s tests -v
+test: test-unit test-integration test-e2e coverage
 
-e2e:
-	PYTHONPATH=. $(PYTHON) -m unittest tests.test_e2e -v
+test-unit:
+	PYTHONPATH=.:tests $(PYTHON) -m unittest $(UNIT_TESTS) -v
+
+test-integration:
+	PYTHONPATH=.:tests $(PYTHON) -m unittest tests.test_integration -v
 
 coverage:
-	PYTHONPATH=. $(PYTHON) -m coverage run -m unittest discover -s tests -v
+	PYTHONPATH=.:tests $(PYTHON) -m coverage run -m unittest $(UNIT_TESTS) -v
 	$(PYTHON) -m coverage report -m
 	$(PYTHON) -m coverage xml
 
@@ -57,4 +60,8 @@ docs:
 	$(BROWSER_RUN) sh -c "$(BROWSER_INSTALL) && python3 scripts/docs.py"
 
 test-e2e:
-	$(BROWSER_RUN) sh -c "$(BROWSER_INSTALL) && python3 -m pytest tests/test_browser.py -v"
+	@if [ -f tests/test_browser.py ]; then \
+		$(BROWSER_RUN) sh -c "$(BROWSER_INSTALL) && python3 -m pytest tests/test_browser.py -v"; \
+	else \
+		echo "Browser-rendered E2E tests are not implemented yet."; \
+	fi

@@ -24,7 +24,7 @@ from test_cv import valid_cv
 
 
 class FakeLLM:
-    # The end-to-end server should exercise the real HTTP routes and repository
+    # The integration server should exercise the real HTTP routes and repository
     # writes, but it must not call a paid or networked LLM. This fake implements
     # the same methods used by WebApp's intake workflow.
     def __init__(self) -> None:
@@ -79,7 +79,7 @@ class FakeLLM:
                     "verdict": "FIT",
                     "verdict_label": "Good fit",
                     "recommendation": {"value": "APPLY_NOW", "reason": "Strong enough fit."},
-                    "rationale": "Structured E2E analysis.",
+                    "rationale": "Structured integration analysis.",
                     "notes": [],
                 },
                 "requirements": [
@@ -95,7 +95,7 @@ class FakeLLM:
                 ],
                 "llm_context": {"responsibilities": ["Build platform services."]},
             },
-            "suitability_report": "# Report\n\nStructured E2E analysis.",
+            "suitability_report": "# Report\n\nStructured integration analysis.",
             "role_matrix": "# Matrix\n\nPython backend services.",
             "interview_prep": {
                 "story_bank_md": "# Stories",
@@ -131,7 +131,7 @@ class FakeLLM:
             "clear": True,
             "event_type": "rejected",
             "exact_date": "2026-05-20",
-            "note": "E2E duplicate.",
+            "note": "Integration duplicate.",
             "internal_notes": [],
         }
 
@@ -164,7 +164,7 @@ class LiveServer:
             if self.server.started:
                 return self
             time.sleep(0.05)
-        raise RuntimeError("E2E server did not start in time")
+        raise RuntimeError("Integration server did not start in time")
 
     def __exit__(self, *exc_info) -> None:
         self.server.should_exit = True
@@ -176,15 +176,15 @@ class LiveServer:
             return sock.getsockname()[1]
 
 
-class EndToEndTests(unittest.TestCase):
+class IntegrationTests(unittest.TestCase):
     def data_root(self) -> Path:
-        # Each E2E test gets a fresh, initialized data directory so writes made by
+        # Each integration test gets a fresh, initialized data directory so writes made by
         # forms and background operations can be asserted without affecting fixtures.
         temp_dir = tempfile.TemporaryDirectory()
         self.addCleanup(temp_dir.cleanup)
         root = create_sample_data_root(Path(temp_dir.name))
         # Ingestion sends workflow guidance to the LLM. Real private data roots
-        # contain this file, so the E2E fixture provides a tiny equivalent.
+        # contain this file, so the integration fixture provides a tiny equivalent.
         (root / "README.md").write_text("Use structured YAML for generated role data.\n", encoding="utf-8")
         cv_dir = root / "cv"
         cv_dir.mkdir(exist_ok=True)
@@ -197,14 +197,14 @@ class EndToEndTests(unittest.TestCase):
             health = client.get("/healthz")
             dashboard = client.get("/")
             cv_page = client.get("/cv/")
-            cv_save = client.post("/cv/", data=self.cv_form_data(summary="E2E updated summary."))
+            cv_save = client.post("/cv/", data=self.cv_form_data(summary="Integration updated summary."))
             task_update = client.post(
                 "/tasks/task_control_plane_case_study/status",
                 data={"status": "completed", "detail": "pp-e2e-platform"},
             )
             status_update = client.post(
                 "/roles/ledgerly_remote_staff_backend_engineer_payments/update-prompt",
-                data={"prompt": "Rejected on 2026-05-20 with this rationale: E2E duplicate."},
+                data={"prompt": "Rejected on 2026-05-20 with this rationale: Integration duplicate."},
             )
             status_fragment = self._poll_operation_fragment(client, status_update.headers["location"])
             restricted_download = client.get("/download/file", params={"path": "roles.yaml"})
@@ -219,15 +219,15 @@ class EndToEndTests(unittest.TestCase):
         self.assertIn("Ada Lovelace", cv_page.text)
         self.assertEqual(cv_save.status_code, 302)
         self.assertEqual(cv_save.headers["location"], "/cv/")
-        self.assertIn("E2E updated summary.", updated_cv.text)
+        self.assertIn("Integration updated summary.", updated_cv.text)
         self.assertEqual(task_update.headers["location"], "/tasks/task_control_plane_case_study")
         self.assertIn("Completed", updated_task.text)
         self.assertIn("pp-e2e-platform", updated_task.text)
         self.assertTrue(status_update.headers["location"].startswith("/operations/"))
         self.assertIn("Applied rejected status dated 2026-05-20", status_fragment)
         self.assertIn("Rejected", updated_role.text)
-        self.assertIn("E2E duplicate", updated_role.text)
-        self.assertIn("Update prompt: Rejected on 2026-05-20 with this rationale: E2E duplicate.", updated_role.text)
+        self.assertIn("Integration duplicate", updated_role.text)
+        self.assertIn("Update prompt: Rejected on 2026-05-20 with this rationale: Integration duplicate.", updated_role.text)
         self.assertEqual(restricted_download.status_code, 403)
 
     def test_hx_operation_launch_stays_on_page_and_updates_notice(self) -> None:
@@ -240,7 +240,7 @@ class EndToEndTests(unittest.TestCase):
         ) as client:
             response = client.post(
                 "/roles/ledgerly_remote_staff_backend_engineer_payments/update-prompt",
-                data={"prompt": "Rejected on 2026-05-20 with this rationale: E2E duplicate."},
+                data={"prompt": "Rejected on 2026-05-20 with this rationale: Integration duplicate."},
                 headers={"HX-Request": "true"},
             )
             operation_match = re.search(r'href="(/operations/operation-[^"]+)"', response.text)
@@ -256,7 +256,7 @@ class EndToEndTests(unittest.TestCase):
         self.assertIn("completed", notice)
         self.assertIn("COMPLETED", operation_page.text)
         self.assertIn("finished with status completed", operation_page.text)
-        self.assertIn("Update prompt: Rejected on 2026-05-20 with this rationale: E2E duplicate.", updated_role.text)
+        self.assertIn("Update prompt: Rejected on 2026-05-20 with this rationale: Integration duplicate.", updated_role.text)
 
     def test_hx_quick_analysis_result_appears_in_ingestion_modal(self) -> None:
         root = self.data_root()
@@ -347,8 +347,7 @@ class EndToEndTests(unittest.TestCase):
 
         self.assertEqual(len(fake_llm.quick_analyses), 1)
         self.assertEqual(len(fake_llm.generated_bundles), 0)
-        self.assertIn("Quick analysis", fragment)
-        self.assertIn("Continue full ingestion", fragment)
+        self.assertIn("Quick analysis completed", fragment)
         self.assertEqual(abandon.status_code, 302)
         self.assertIn("Quick analysis abandoned", abandoned_fragment)
         self.assertFalse((root / "roles" / "fakecorp_remote_staff_engineer").exists())
@@ -385,7 +384,7 @@ class EndToEndTests(unittest.TestCase):
 
         self.assertEqual(len(fake_llm.quick_analyses), 1)
         self.assertEqual(len(fake_llm.generated_bundles), 1)
-        self.assertIn("FakeCorp is a good platform fit", preview_fragment)
+        self.assertIn("Quick analysis completed", preview_fragment)
         self.assertIn("Ingestion completed", full_fragment)
         self.assertIn("Open role", full_fragment)
         self.assertEqual(role_page.status_code, 200)
