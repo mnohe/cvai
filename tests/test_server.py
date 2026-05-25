@@ -1,4 +1,5 @@
 import unittest
+from datetime import date
 from pathlib import Path
 import socket
 import sys
@@ -307,6 +308,7 @@ class ServerUtilityTests(unittest.TestCase):
             "evidence_refs": ["pp-api"],
         }
         app = WebApp(repo, llm)
+        today = date.today().isoformat()
 
         update_job = Operation(id="job-update", kind="update")
         app._run_prompt_update(update_job, "example_remote_engineer", "They wrote back")
@@ -324,7 +326,7 @@ class ServerUtilityTests(unittest.TestCase):
             "example_remote_engineer",
             ["Prepare a recent technical project story."],
         )
-        repo.record_note_event.assert_called_once_with("example_remote_engineer", "2026-05-23", "Update prompt: They wrote back")
+        repo.record_note_event.assert_called_once_with("example_remote_engineer", today, "Update prompt: They wrote back")
         repo.update_task_status.assert_called_once_with("task-python", "completed", "Evidence now exists. Evidence: pp-api")
         self.assertEqual(update_job.result["canonical_slug"], "example_remote_engineer")
         self.assertEqual(task_job.result["paths"], {"task": "tasks.yaml"})
@@ -364,6 +366,7 @@ class ServerUtilityTests(unittest.TestCase):
             ],
         }
         app = WebApp(repo, llm)
+        today = date.today().isoformat()
         job = Operation(id="job-update", kind="update")
 
         app._run_prompt_update(job, "example_remote_engineer", "Update the role and notes.")
@@ -379,7 +382,7 @@ class ServerUtilityTests(unittest.TestCase):
             "example_remote_engineer",
             ["Prepare a recent project story."],
         )
-        repo.record_note_event.assert_called_once_with("example_remote_engineer", "2026-05-23", "Update prompt: Update the role and notes.")
+        repo.record_note_event.assert_called_once_with("example_remote_engineer", today, "Update prompt: Update the role and notes.")
         repo.write_text.assert_not_called()
         self.assertEqual(job.result["paths"], {"operations": ["record_status", "append_analysis_notes"]})
 
@@ -411,6 +414,7 @@ class ServerUtilityTests(unittest.TestCase):
             ],
         }
         app = WebApp(repo, llm)
+        today = date.today().isoformat()
         job = Operation(id="job-update", kind="update")
 
         app._run_prompt_update(job, "example_remote_engineer", "Hiring manager screen booked.")
@@ -422,7 +426,7 @@ class ServerUtilityTests(unittest.TestCase):
             "Hiring manager screen booked.",
             artifacts=[],
         )
-        repo.record_note_event.assert_called_once_with("example_remote_engineer", "2026-05-23", "Update prompt: Hiring manager screen booked.")
+        repo.record_note_event.assert_called_once_with("example_remote_engineer", today, "Update prompt: Hiring manager screen booked.")
         self.assertEqual(job.result["paths"], {"operations": ["record_status"]})
 
 
