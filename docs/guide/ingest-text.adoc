@@ -20,5 +20,5 @@ or supply details that are not in the text:
 Click *Start pasted-text ingestion*.
 The rest of the flow is identical to
 link:ingest-url.adoc[URL ingestion]:
-a quick analysis preview (if enabled), then a choice to continue or
-abandon before anything is written to disk.
+a quick analysis preview (if enabled), then a choice to continue or close
+the preview before anything is written to disk.

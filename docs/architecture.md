@@ -17,12 +17,12 @@ CVAI is a personal job-application management system. It serves a browser UI for
 │  │  dashboard          │   │  OpenAIClient                │  │
 │  │  cv                 │   │  (OpenAI-compatible chat    │  │
 │  │  intake             │   │   completions endpoint)     │  │
-│  │  operations         │◄──│  (any OpenAI-compatible      │  │
+│  │  actions            │◄──│  (any OpenAI-compatible      │  │
 │  │  roles              │   │   endpoint via BASE_URL)     │  │
 │  │  downloads          │   └──────────────────────────────┘  │
 │  └──────────┬──────────┘                                     │
 │             │                         ┌──────────────────┐   │
-│  ┌──────────▼──────────┐              │ Operation manager│   │
+│  ┌──────────▼──────────┐              │ Action manager   │   │
 │  │    Repository       │◄─────────────│ worker threads   │   │
 │  │  reads YAML indexes │              │ (intake, bundle, │   │
 │  │  reads per-role     │              │  prompt update)  │   │
@@ -77,7 +77,7 @@ The data directory is an instance directory, not a template repository. `cvai` o
 
 ### PDF templates
 
-Typst templates and their fonts are data assets under `CVAI_DATA/pdf/templates/<template>/`. `cvai_core.pdf` reads `CVAI_DATA/cv/cv.yaml`, calls Typst with the selected template's `cv.typ`, and writes PDFs. CVAI invokes it for the generic CV download endpoint when the cached PDF is missing. The runtime needs the `typst` binary for builds; the Docker image installs it.
+Typst templates and their fonts are data assets under `CVAI_DATA/pdf/templates/<template>/`. `cvai_core.pdf` reads `CVAI_DATA/cv/cv.yaml`, calls Typst with the selected template's `cv.typ`, and writes PDFs. CVAI invokes it from `GET /cv/?layout=<layout>` when the client requests `application/pdf` and the cached PDF is missing. The runtime needs the `typst` binary for builds; the Docker image installs it.
 
 ---
 
@@ -240,6 +240,7 @@ Free-form role update prompts always go through the LLM. Even short prompts can 
 | `LLM_API_KEY` | API key used for LLM-backed workflows. |
 | `LLM_MODEL` | Model name sent to the chat completions endpoint. |
 | `LLM_BASE_URL` | API base URL. |
+| `LLM_REASONING_EFFORT` | Optional reasoning effort override for providers that support it. OpenAI GPT-5/o-series models default to `low`. |
 
 All LLM HTTP uses `urllib` from the Python standard library. The app does not depend on a provider SDK.
 
@@ -258,15 +259,15 @@ No LLM call. No background task.
 
 ### Intake (URL ingestion)
 
-1. User submits `POST /ingestions/url` with a `source_url` field.
-2. Route handler validates the URL (scheme and SSRF checks), creates a background worker thread, and returns an operation notice linked to `GET /operations/<operation_id>`.
-3. The operation notice and operation page poll HTMX fragments until the task completes or fails.
-4. Background task:
+1. User submits `POST /roles/` with `source_kind=url` and a `source_url` field.
+2. Route handler validates the URL (scheme and SSRF checks), creates a durable action with a background operation, and returns an action notice linked to `GET /actions/<action_id>`.
+3. The action notice and action page poll HTMX fragments until the operation completes or fails.
+4. Background operation:
    - Fetches the URL; extracts visible text.
    - Calls `OpenAIClient.extract_role()` → `company`, `role`, `location`.
    - Calls `OpenAIClient.generate_bundle()` → all generated artifacts.
    - `Repository.write_bundle()` writes the per-role directory and updates `roles.yaml` and `applications.yaml`.
-5. On completion the operation page links to `GET /roles/<role_id>`.
+5. On completion the action page links to `GET /roles/<role_id>`.
 
 ### Status update (structured form)
 
@@ -279,8 +280,8 @@ No LLM call.
 
 ### Status update (prompt)
 
-1. User submits `POST /roles/<role_id>/update-prompt` with a free-form `prompt`.
-2. A background task calls `OpenAIClient.interpret_status_update()`; the user waits on the operation notice or operation page.
+1. User submits `POST /actions` with `action_type=role_update_prompt`, a role target, and a free-form `prompt`.
+2. A background operation calls `OpenAIClient.interpret_status_update()`; the user waits on the action notice or action page.
 3. `Repository.record_status()` and any related structured write helpers are called with the LLM result.
 4. Redirect to `GET /roles/<role_id>`.
 
@@ -307,3 +308,4 @@ All configuration uses environment variables. A `.env` file at the root of `CVAI
 | `LLM_API_KEY` | when using LLM workflows | — | API key for the selected provider. |
 | `LLM_MODEL` | no | `gpt-5` | Model name for the selected provider. |
 | `LLM_BASE_URL` | no | `https://api.openai.com/v1` | Base URL for the selected provider. |
+| `LLM_REASONING_EFFORT` | no | `low` for OpenAI GPT-5/o-series models, otherwise unset | Reasoning effort override when the provider supports it. |

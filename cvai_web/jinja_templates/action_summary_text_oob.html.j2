@@ -2,6 +2,6 @@
   {% if finished %}
     {{ operation.kind|replace("_", " ")|title }} finished with status {{ operation.status }}.
   {% else %}
-    {{ operation.kind|replace("_", " ")|title }} is running in the background. This page updates while the operation is active.
+    {{ operation.kind|replace("_", " ")|title }} is running in the background. This page updates while the action is active.
   {% endif %}
 </p>

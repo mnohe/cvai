@@ -96,6 +96,13 @@ Run a PDF smoke build after renderer or template-related changes:
 PYTHONPATH=. python3 -m cvai_core.pdf tests/fixture_data/demo-db/cv/cv.yaml /tmp/cvai-smoke.pdf --templates-root tests/fixture_data/demo-db/pdf/templates
 ```
 
+## ADRs
+
+Accepted ADRs are historical records. Do not edit their context, decision, or
+consequences after acceptance; write a new ADR instead. The only accepted-ADR
+field that may change in place is `Status`, to mark an ADR as
+`Deprecated`, while providing a reference to the updated ADR.
+
 ## LLM Providers
 
 CVAI currently talks to OpenAI-compatible chat-completions APIs through
@@ -104,6 +111,7 @@ CVAI currently talks to OpenAI-compatible chat-completions APIs through
 - `LLM_API_KEY`
 - `LLM_MODEL`
 - `LLM_BASE_URL`
+- `LLM_REASONING_EFFORT`
 
 Prefer supporting new OpenAI-compatible providers by documenting the correct
 `LLM_BASE_URL` and model name rather than adding a new provider class. Add

@@ -7,6 +7,32 @@ import urllib.request
 from dataclasses import dataclass
 
 
+# Keep enough posting text for role extraction and quick analysis without
+# letting a long career page crowd out CV/context tokens.
+MAX_SOURCE_TEXT_CHARS = 24_000
+
+# Workflow-specific completion budgets. These are intentionally separate
+# because GPT-5/o-series max_completion_tokens includes hidden reasoning tokens
+# as well as visible JSON; compact workflows need less room than full bundle
+# generation, but all need enough budget to emit parseable structured output.
+EXTRACT_ROLE_MAX_COMPLETION_TOKENS = 4_000
+GENERATE_BUNDLE_MAX_COMPLETION_TOKENS = 12_000
+QUICK_ANALYSIS_MAX_COMPLETION_TOKENS = 6_000
+STATUS_UPDATE_MAX_COMPLETION_TOKENS = 4_000
+DATASTORE_ACTION_MAX_COMPLETION_TOKENS = 5_000
+TASK_ASSESSMENT_MAX_COMPLETION_TOKENS = 3_000
+ROLE_REASSESSMENT_MAX_COMPLETION_TOKENS = 8_000
+
+# Chat-completions calls can include a remote fetch plus model reasoning. The
+# background action UI can keep polling, so favor completion over a short client
+# timeout.
+LLM_REQUEST_TIMEOUT_SECONDS = 180
+
+# Error logs should include enough provider output to diagnose malformed JSON
+# without dumping a long response into the action page.
+MALFORMED_JSON_PREVIEW_CHARS = 200
+
+
 @dataclass
 class LLMConfig:
     # Configuration is kept in one dataclass so tests can inject fake endpoints and
@@ -18,7 +44,7 @@ class LLMConfig:
 
 @dataclass
 class OpenAIAPIError(RuntimeError):
-    # The UI shows user_message. Logs and operation pages can include detail when the
+    # The UI shows user_message. Logs and action pages can include detail when the
     # caller needs a more technical explanation of what the API returned.
     status_code: int | None
     error_code: str | None
@@ -63,7 +89,7 @@ class OpenAIClient:
             "source_url": source_url,
             "strict": strict,
             "manual_overrides": overrides or {},
-            "source_text": source_text[:24000],
+            "source_text": source_text[:MAX_SOURCE_TEXT_CHARS],
             "required_fields": ["company", "role", "location"],
             "output_schema": {
                 "clear": True,
@@ -74,7 +100,7 @@ class OpenAIClient:
                 "confidence_notes": ["string"],
             },
         }
-        return self._json_chat(system, user, max_tokens=1600)
+        return self._json_chat(system, user, max_tokens=EXTRACT_ROLE_MAX_COMPLETION_TOKENS)
 
     def generate_bundle(
         self,
@@ -210,7 +236,7 @@ class OpenAIClient:
                 "For claim_updates and todo_updates, return an empty list unless there is a concrete addition worth making.",
             ],
         }
-        return self._json_chat(system, user, max_tokens=12000)
+        return self._json_chat(system, user, max_tokens=GENERATE_BUNDLE_MAX_COMPLETION_TOKENS)
 
     def quick_analyze_role(
         self,
@@ -233,7 +259,7 @@ class OpenAIClient:
         user = {
             "source_kind": source_kind,
             "source_url": source_url,
-            "source_text": source_text[:24000],
+            "source_text": source_text[:MAX_SOURCE_TEXT_CHARS],
             "cv_yaml": cv_yaml,
             "context": context,
             "evidence_library": evidence_library,
@@ -267,7 +293,7 @@ class OpenAIClient:
                 "Keep output short enough to read before deciding whether to run full ingestion.",
             ],
         }
-        return self._json_chat(system, user, max_tokens=2400)
+        return self._json_chat(system, user, max_tokens=QUICK_ANALYSIS_MAX_COMPLETION_TOKENS)
 
     def interpret_status_update(self, *, role: dict[str, str], prompt: str, today: str) -> dict:
         # Free-form role updates are LLM interpreted because even terse user input
@@ -310,8 +336,11 @@ class OpenAIClient:
             "operation_rules": [
                 "Prefer operations whenever the prompt implies more than one durable change.",
                 "Use record_status for status, date, event, and current role-state changes.",
+                "Treat interview-loop, recruiter-screen, phone-screen, onsite, or final-loop availability requested/provided as event_type interviewing, even if the prompt says no slot is confirmed yet.",
+                "If interview availability was provided but confirmation is still pending, keep any matching follow-up task open and put the waiting-for-confirmation detail on it.",
+                "Do not classify an interview availability response as submitted merely because the user provided availability.",
                 "Use append_analysis_notes for durable internal notes, logistics, preparation notes, or interview focus.",
-                "Use update_task_status only when the prompt clearly asks to open, complete, or won't-do a named task.",
+                "Use update_task_status when the prompt clearly asks to open, complete, or won't-do a named task, or when it updates the live detail for a related scheduling follow-up task.",
                 "Return operations as an empty list if the scalar status fields and internal_notes are sufficient.",
             ],
             "date_rules": [
@@ -332,7 +361,54 @@ class OpenAIClient:
                 "Keep each internal note concise and self-contained.",
             ],
         }
-        return self._json_chat(system, user, max_tokens=2000)
+        return self._json_chat(system, user, max_tokens=STATUS_UPDATE_MAX_COMPLETION_TOKENS)
+
+    def interpret_datastore_action(self, *, prompt: str, today: str, roles: list[dict], tasks: list[dict]) -> dict:
+        system = (
+            "You convert a user's CVAI prompt into small, targeted structured data operations. "
+            "Use only the supplied role/task summaries and the prompt. "
+            "If the prompt is not clearly about CVAI role or task data, mark it unclear. "
+            "Only return operations from the allowed list. Do not invent files, role ids, or task ids."
+        )
+        user = {
+            "today": today,
+            "prompt": prompt,
+            "roles": roles,
+            "tasks": tasks,
+            "allowed_event_types": ["submitted", "interviewing", "accepted", "rejected", "closed"],
+            "allowed_operations": ["record_status", "append_analysis_notes", "update_task_status"],
+            "output_schema": {
+                "clear": True,
+                "operations": [
+                    {
+                        "op": "record_status | append_analysis_notes | update_task_status",
+                        "role_id": "required canonical role id for role-scoped operations",
+                        "event_type": "for record_status",
+                        "exact_date": "YYYY-MM-DD, for record_status",
+                        "note": "for record_status",
+                        "notes": ["for append_analysis_notes"],
+                        "task_id": "for update_task_status",
+                        "status": "open | completed | wont_do, for update_task_status",
+                        "detail": "for update_task_status",
+                    }
+                ],
+                "reason": "string when clear is false",
+            },
+            "rules": [
+                "Every record_status and append_analysis_notes operation must include a role_id from the supplied roles.",
+                "Every update_task_status operation must include a task_id from the supplied tasks.",
+                "Use record_status for status, date, event, and current role-state changes.",
+                "Treat interview-loop, recruiter-screen, phone-screen, onsite, or final-loop availability requested/provided as event_type interviewing, even if the prompt says no slot is confirmed yet.",
+                "If interview availability was provided but confirmation is still pending, keep any matching follow-up task open and put the waiting-for-confirmation detail on it.",
+                "Do not classify an interview availability response as submitted merely because the user provided availability.",
+                "Use append_analysis_notes for durable internal notes, logistics, preparation notes, or interview focus.",
+                "Use update_task_status when the prompt clearly asks to open, complete, or won't-do a named task, or when it updates the live detail for a related scheduling follow-up task.",
+                "For broad prompts, return one explicit operation per affected role or task.",
+                "Return dates in ISO YYYY-MM-DD format. If no date is present but a status is clear, use today.",
+                "Keep notes concise and do not copy long pasted messages verbatim.",
+            ],
+        }
+        return self._json_chat(system, user, max_tokens=DATASTORE_ACTION_MAX_COMPLETION_TOKENS)
 
     def assess_gap_task(self, *, task: dict, cv_yaml: str, roles: list[dict]) -> dict:
         system = (
@@ -359,7 +435,7 @@ class OpenAIClient:
                 "Return evidence refs only for claims that are explicitly supported by the provided data.",
             ],
         }
-        return self._json_chat(system, user, max_tokens=1600)
+        return self._json_chat(system, user, max_tokens=TASK_ASSESSMENT_MAX_COMPLETION_TOKENS)
 
     def reassess_role_analysis(
         self,
@@ -448,7 +524,7 @@ class OpenAIClient:
                 "Preserve useful comments and notes from current_analysis when they still apply.",
             ],
         }
-        return self._json_chat(system, user, max_tokens=8000)
+        return self._json_chat(system, user, max_tokens=ROLE_REASSESSMENT_MAX_COMPLETION_TOKENS)
 
     def _json_chat(self, system: str, user_payload: dict, max_tokens: int) -> dict:
         if not self.is_configured():
@@ -469,6 +545,9 @@ class OpenAIClient:
             "response_format": {"type": "json_object"},
             "max_completion_tokens": max_tokens,
         }
+        reasoning_effort = self._reasoning_effort()
+        if reasoning_effort:
+            payload["reasoning_effort"] = reasoning_effort
         request = urllib.request.Request(
             url=f"{self.config.base_url.rstrip('/')}/chat/completions",
             data=json.dumps(payload).encode("utf-8"),
@@ -479,7 +558,7 @@ class OpenAIClient:
             method="POST",
         )
         try:
-            with urllib.request.urlopen(request, timeout=180) as response:
+            with urllib.request.urlopen(request, timeout=LLM_REQUEST_TIMEOUT_SECONDS) as response:
                 body = json.loads(response.read().decode("utf-8"))
         except urllib.error.HTTPError as exc:
             details = exc.read().decode("utf-8", errors="replace")
@@ -493,12 +572,40 @@ class OpenAIClient:
             ) from exc
 
         try:
-            content = body["choices"][0]["message"]["content"]
+            choice = body["choices"][0]
+            content = choice["message"]["content"]
         except (KeyError, IndexError, TypeError) as exc:
             raise RuntimeError(f"Unexpected OpenAI API response: {body}") from exc
         # response_format requests a JSON object, but parsing here is still the
         # final guard before repository code applies any model-produced changes.
-        return json.loads(content)
+        try:
+            return json.loads(content)
+        except json.JSONDecodeError as exc:
+            finish_reason = choice.get("finish_reason") if isinstance(choice, dict) else None
+            usage = body.get("usage") if isinstance(body, dict) else None
+            preview = (content or "")[:MALFORMED_JSON_PREVIEW_CHARS]
+            if finish_reason == "length":
+                message = (
+                    "The LLM response reached max_completion_tokens before returning valid JSON. "
+                    "Retry the action; if it repeats, lower LLM_REASONING_EFFORT or raise the token budget."
+                )
+            elif not content:
+                message = "The LLM API returned an empty response instead of the requested JSON."
+            else:
+                message = "The LLM API returned text that was not valid JSON."
+            detail = f"{message} finish_reason={finish_reason!r}; usage={usage!r}; content_preview={preview!r}"
+            raise RuntimeError(detail) from exc
+
+    def _reasoning_effort(self) -> str:
+        configured = os.environ.get("LLM_REASONING_EFFORT")
+        if configured is not None:
+            return configured.strip()
+        if "api.openai.com" not in self.config.base_url:
+            return ""
+        model = self.config.model.lower()
+        if model.startswith("gpt-5") or model.startswith(("o1", "o3", "o4")):
+            return "low"
+        return ""
 
     def _build_api_error(self, status_code: int, details: str) -> OpenAIAPIError:
         # OpenAI-compatible providers vary in their error bodies. Extract the

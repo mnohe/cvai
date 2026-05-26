@@ -335,6 +335,24 @@ def move_cv_list_item(data_root: Path, section: str, index: int, direction: str,
     return _validate_and_write_cv(document.path, data_root, updated)
 
 
+def reorder_cv_list_items(data_root: Path, section: str, order: list[int], relative_path: str = CV_SOURCE) -> list[CVIssue]:
+    """Replace a repeatable CV section's order after validating the result."""
+    document = load_cv(data_root, relative_path)
+    if document.is_empty:
+        return [CVIssue(relative_path, "create a CV before editing sections")]
+    if document.issues:
+        return document.issues
+    if section not in CV_LIST_SECTIONS:
+        return [CVIssue(section, "is not an editable CV list section")]
+
+    updated = dict(document.data)
+    items = list(cv_list_items(updated, section))
+    if sorted(order) != list(range(len(items))):
+        return [CVIssue(section, "item order must reference each item exactly once")]
+    _store_cv_list_items(updated, section, [items[index] for index in order])
+    return _validate_and_write_cv(document.path, data_root, updated)
+
+
 def validate_cv(payload: dict[str, Any]) -> list[CVIssue]:
     """Validate the CV fields used by the renderer and web editor.
 

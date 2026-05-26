@@ -54,8 +54,8 @@ Ordered from simplest to most involved:
 . link:guide/reassess-role.adoc[Reassessing a role] —
   re-run the LLM analysis after updating your CV or closing gap tasks.
 
-. link:guide/operations.adoc[Operations page] —
-  monitor background ingestion, bundle, and reassessment operations.
+. link:guide/actions.adoc[Actions page] —
+  run free-form prompts and monitor LLM-backed actions.
 
 . link:guide/data-privacy.adoc[Data and privacy] —
   where your data lives and what (if anything) leaves your machine.

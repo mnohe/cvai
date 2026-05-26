@@ -15,8 +15,8 @@ Use it after you have:
 
 Click *Reassess* in the *Requirement coverage* card header on the role's
 detail page.
-The operation runs in the background; navigate to the
-link:operations.adoc[Operations page] to watch its progress.
+The action runs in the background; navigate to the
+link:actions.adoc[Actions page] to watch its progress.
 
 When complete, refresh the role page to see the updated coverage table.
 

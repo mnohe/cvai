@@ -17,7 +17,7 @@ from cvai_core.cv import (
     cv_list_items,
     delete_cv_list_item,
     load_cv,
-    move_cv_list_item,
+    reorder_cv_list_items,
     save_cv_contact_form,
     save_cv_form,
     save_cv_list_item_form,
@@ -106,9 +106,17 @@ def create_fastapi_app(repo: Repository | None = None, llm: OpenAIClient | None 
         return _redirect("/cv/")
 
     @app.get("/cv/", response_class=HTMLResponse)
-    async def cv_editor(request: Request) -> Response:
+    async def cv_editor(request: Request, layout: str = Query(""), mime: str = Query("")) -> Response:
         # CV data is read directly from structured YAML. The LLM is not needed to
         # display or edit a valid CV.
+        if _wants_pdf(request, mime):
+            try:
+                pdf_path = service.repo.ensure_cv_pdf(layout.strip() or "demo")
+                return FileResponse(pdf_path, media_type="application/pdf", filename=pdf_path.name)
+            except FileNotFoundError as exc:
+                return _error(app, request, "CV PDF unavailable", str(exc), 404)
+            except subprocess.CalledProcessError:
+                return _error(app, request, "CV PDF unavailable", "Typst could not build the CV PDF. Check the selected template and CV YAML.", 500)
         return _cv_response(app, request)
 
     @app.post("/cv/")
@@ -131,8 +139,10 @@ def create_fastapi_app(repo: Repository | None = None, llm: OpenAIClient | None 
             return _cv_response(app, request, issues=issues, status_code=400, form_data=form)
         return _redirect("/cv/")
 
-    @app.get("/cv/contact/edit", response_class=HTMLResponse)
+    @app.get("/cv/contact/modals/edit", response_class=HTMLResponse)
     async def edit_cv_contact(request: Request) -> Response:
+        if not _accepts_html(request):
+            return Response(status_code=406)
         return _cv_contact_modal(app, request)
 
     @app.post("/cv/contact")
@@ -151,7 +161,7 @@ def create_fastapi_app(repo: Repository | None = None, llm: OpenAIClient | None 
             return _cv_response(app, request, issues=issues, status_code=400, form_data=form)
         return _redirect("/cv/")
 
-    @app.post("/cv/templates/upload")
+    @app.post("/cv/templates")
     async def upload_cv_template(request: Request, template_zip: UploadFile = File(...)) -> Response:
         if not template_zip.filename or not template_zip.filename.lower().endswith(".zip"):
             return _cv_response(app, request, status_code=400, flash=("error", "Choose a ZIP template pack to upload."))
@@ -168,8 +178,10 @@ def create_fastapi_app(repo: Repository | None = None, llm: OpenAIClient | None 
             upload_path.unlink(missing_ok=True)
         return _redirect("/cv/")
 
-    @app.get("/cv/templates/{template_id}/remove-confirm", response_class=HTMLResponse)
+    @app.get("/cv/templates/{template_id}/modals/remove-confirm", response_class=HTMLResponse)
     async def confirm_remove_cv_template(request: Request, template_id: str) -> Response:
+        if not _accepts_html(request):
+            return Response(status_code=406)
         templates = {template.template_id: template for template in service.repo.list_pdf_templates()}
         template = templates.get(template_id)
         if template is None:
@@ -185,7 +197,7 @@ def create_fastapi_app(repo: Repository | None = None, llm: OpenAIClient | None 
             },
         )
 
-    @app.post("/cv/templates/{template_id}/remove")
+    @app.delete("/cv/templates/{template_id}")
     async def remove_cv_template(request: Request, template_id: str) -> Response:
         try:
             remove_template_pack(service.repo.root, template_id)
@@ -196,12 +208,16 @@ def create_fastapi_app(repo: Repository | None = None, llm: OpenAIClient | None 
             return _cv_response(app, request, status_code=404, flash=("error", str(exc)))
         return _hx_redirect_or_normal(request, "/cv/")
 
-    @app.get("/cv/{section}/new", response_class=HTMLResponse)
+    @app.get("/cv/{section}/modals/new", response_class=HTMLResponse)
     async def new_cv_item(request: Request, section: str) -> Response:
+        if not _accepts_html(request):
+            return Response(status_code=406)
         return _cv_item_modal(app, request, section, None)
 
-    @app.get("/cv/{section}/{index}/edit", response_class=HTMLResponse)
+    @app.get("/cv/{section}/{index}/modals/edit", response_class=HTMLResponse)
     async def edit_cv_item(request: Request, section: str, index: int) -> Response:
+        if not _accepts_html(request):
+            return Response(status_code=406)
         return _cv_item_modal(app, request, section, index)
 
     @app.post("/cv/{section}/{index}")
@@ -214,16 +230,21 @@ def create_fastapi_app(repo: Repository | None = None, llm: OpenAIClient | None 
             return _cv_item_modal(app, request, section, index, issues=issues, form_data=form, status_code=400)
         return _hx_redirect_or_normal(request, "/cv/")
 
-    @app.post("/cv/{section}/{index}/delete")
+    @app.delete("/cv/{section}/{index}")
     async def delete_cv_item(request: Request, section: str, index: int) -> Response:
         issues = delete_cv_list_item(service.repo.root, section, index)
         if issues:
             return _cv_response(app, request, issues=issues, status_code=400)
         return _hx_redirect_or_normal(request, "/cv/")
 
-    @app.post("/cv/{section}/{index}/move")
-    async def move_cv_item(request: Request, section: str, index: int, direction: str = Form("")) -> Response:
-        issues = move_cv_list_item(service.repo.root, section, index, direction)
+    @app.patch("/cv/{section}")
+    async def reorder_cv_items(request: Request, section: str) -> Response:
+        form = await request.form()
+        try:
+            order = [int(item) for item in form.getlist("items")]
+        except ValueError:
+            return _cv_response(app, request, issues=[], status_code=400, flash=("error", "CV item order must contain numeric item references."))
+        issues = reorder_cv_list_items(service.repo.root, section, order)
         if issues:
             return _cv_response(app, request, issues=issues, status_code=400)
         if request.headers.get("hx-request") == "true":
@@ -235,151 +256,144 @@ def create_fastapi_app(repo: Repository | None = None, llm: OpenAIClient | None 
         service.repo.update_task_status(task_id, status, detail)
         return _redirect(f"/tasks/{task_id}")
 
-    @app.post("/tasks/{task_id}/reassess")
-    async def reassess_task(request: Request, task_id: str) -> Response:
-        task = service.repo.get_task(task_id)
-        if task is None:
-            return _error(app, request, "Task not found", "No task matched that ID.", 404)
-        operation = service.operations.create(
-            "task reassessment",
-            lambda current_operation: service._run_task_reassessment(current_operation, task_id),
-        )
-        return _operation_response(app, request, operation.as_dict())
-
     @app.get("/favicon.svg")
     async def favicon() -> Response:
         return FileResponse(Path(__file__).resolve().parent / "static" / "cvai-v.svg", media_type="image/svg+xml")
 
-    @app.post("/ingestions/url")
-    async def ingest_url(request: Request, source_url: str = Form(""), quick_analysis: str = Form("")) -> Response:
-        # URL ingestion can be slow or fail on remote sites, so it runs as a
-        # background operation and the browser polls status in place.
-        source_url = source_url.strip()
-        if not source_url:
-            return _error(app, request, "Missing URL", "A role URL is required for URL ingestion.")
-        try:
-            validate_public_https_url(source_url)
-        except ValueError as exc:
-            return _error(app, request, "Blocked URL", str(exc), 400)
-        if quick_analysis:
-            operation = service.operations.create(
-                "quick analysis",
-                lambda current_operation: service._run_url_quick_analysis(current_operation, source_url),
-            )
-            return _operation_modal_or_redirect(app, request, operation.as_dict())
-        else:
-            operation = service.operations.create(
-                "url",
-                lambda current_operation: service._run_url_ingestion(current_operation, source_url),
-            )
-            return _operation_response(app, request, operation.as_dict())
-
-    @app.post("/ingestions/text")
-    async def ingest_text(
+    @app.post("/roles/")
+    async def create_role(
         request: Request,
-        source_text: str = Form(""),
+        url: str = Query(""),
+        source_kind: str = Form(""),
         source_url: str = Form(""),
+        source_text: str = Form(""),
         company: str = Form(""),
         location: str = Form(""),
         role: str = Form(""),
         quick_analysis: str = Form(""),
     ) -> Response:
-        source_text = source_text.strip()
-        if not source_text:
-            return _error(app, request, "Missing text", "Paste the job description text before starting text ingestion.")
-        overrides = {
-            key: value.strip()
-            for key, value in {"company": company, "location": location, "role": role}.items()
-            if value.strip()
-        }
-        if quick_analysis:
-            operation = service.operations.create(
-                "quick analysis",
-                lambda current_operation: service._run_text_quick_analysis(current_operation, source_text, source_url.strip(), overrides),
+        source_url = source_url or url
+        source_kind = (source_kind or ("url" if source_url and not source_text else "text")).strip()
+        if source_kind == "url":
+            return _create_role_from_url(app, request, service, source_url, quick_analysis)
+        return _create_role_from_text(app, request, service, source_text, source_url, company, location, role, quick_analysis)
+
+    @app.post("/actions")
+    async def create_action(
+        request: Request,
+        action_type: str = Form(""),
+        target_type: str = Form(""),
+        target_id: str = Form(""),
+        prompt: str = Form(""),
+    ) -> Response:
+        action_type = action_type.strip()
+        target_type = target_type.strip()
+        target_id = target_id.strip()
+        prompt = prompt.strip()
+        if not action_type and prompt:
+            action = service.actions.create(
+                "prompt",
+                lambda current_action: service._run_datastore_prompt_action(current_action, prompt),
+                action_type="prompt",
+                prompt=prompt,
+                input={"prompt": prompt},
             )
-            return _operation_modal_or_redirect(app, request, operation.as_dict())
-        else:
-            operation = service.operations.create(
-                "text",
-                lambda current_operation: service._run_text_ingestion(current_operation, source_text, source_url.strip(), overrides),
+            return _operation_response(app, request, action.as_dict())
+        if action_type == "task_assessment" and target_type == "task":
+            task = service.repo.get_task(target_id)
+            if task is None:
+                return _error(app, request, "Task not found", "No task matched that ID.", 404)
+            operation = service.actions.create(
+                "task reassessment",
+                lambda current_operation: service._run_task_reassessment(current_operation, target_id),
+                action_type=action_type,
+                target_type=target_type,
+                target_id=target_id,
             )
             return _operation_response(app, request, operation.as_dict())
+        if action_type == "role_update_prompt" and target_type == "role":
+            if not prompt:
+                return _error(app, request, "Missing prompt", "Enter an update prompt before submitting.")
+            role_record = service.repo.get_role(target_id)
+            if role_record is None:
+                return _error(app, request, "Role not found", "No canonical role matched that ID.", 404)
+            operation = service.actions.create(
+                "update",
+                lambda current_operation: service._run_prompt_update(current_operation, target_id, prompt),
+                action_type=action_type,
+                target_type=target_type,
+                target_id=target_id,
+                prompt=prompt,
+                input={"prompt": prompt},
+            )
+            return _operation_response(app, request, operation.as_dict())
+        if action_type == "role_assessment" and target_type == "role":
+            role_record = service.repo.get_role(target_id)
+            if role_record is None:
+                return _error(app, request, "Role not found", "No canonical role matched that ID.", 404)
+            operation = service.actions.create(
+                "role reassessment",
+                lambda current_operation: service._run_role_reassessment(current_operation, target_id),
+                action_type=action_type,
+                target_type=target_type,
+                target_id=target_id,
+            )
+            return _operation_response(app, request, operation.as_dict())
+        return _error(app, request, "Unknown action", "The submitted action type and target were not recognized.", 400)
 
-    @app.get("/operations", response_class=HTMLResponse)
+    @app.get("/actions", response_class=HTMLResponse)
     async def operations(request: Request) -> Response:
         return _template(
             app,
             request,
-            "operations.html.j2",
+            "actions.html.j2",
             {
-                "title": "Operations",
-                "operations": [operation.as_dict() for operation in service.operations.list()],
+                "title": "Actions",
+                "operations": [operation.as_dict() for operation in service.actions.list()],
             },
         )
 
-    @app.get("/operations/{operation_id}", response_class=HTMLResponse)
+    @app.get("/actions/{operation_id}", response_class=HTMLResponse)
     async def operation_status(request: Request, operation_id: str) -> Response:
-        operation = service.operations.get(operation_id)
+        operation = service.actions.get(operation_id)
         if operation is None:
-            return _error(app, request, "Operation not found", "That operation does not exist.", 404)
-        return _template(app, request, "operation.html.j2", _operation_context(request, operation.as_dict()))
+            return _error(app, request, "Action not found", "That action does not exist.", 404)
+        return _template(app, request, "action.html.j2", _operation_context(request, operation.as_dict()))
 
-    @app.get("/operations/{operation_id}/fragment", response_class=HTMLResponse)
+    @app.get("/actions/{operation_id}/fragment", response_class=HTMLResponse)
     async def operation_status_fragment(request: Request, operation_id: str) -> Response:
-        # HTMX polls this small fragment while a background operation runs.
-        operation = service.operations.get(operation_id)
+        # HTMX polls this small fragment while a background action runs.
+        operation = service.actions.get(operation_id)
         if operation is None:
             return HTMLResponse(
-                '<section id="operation-status" class="flash error">Operation not found.</section>',
+                '<section id="operation-status" class="flash error">Action not found.</section>',
                 status_code=404,
             )
         return _operation_fragment_response(app, request, operation.as_dict())
 
-    @app.get("/operations/{operation_id}/notice", response_class=HTMLResponse)
+    @app.get("/actions/{operation_id}/notice", response_class=HTMLResponse)
     async def operation_notice(request: Request, operation_id: str) -> Response:
-        operation = service.operations.get(operation_id)
+        operation = service.actions.get(operation_id)
         if operation is None:
             return HTMLResponse(
-                '<div id="operation-notice-root" class="flash error">Operation not found.</div>',
+                '<div id="operation-notice-root" class="flash error">Action not found.</div>',
                 status_code=404,
             )
         return _operation_notice_response(app, request, operation.as_dict())
 
-    @app.get("/operations/{operation_id}/modal", response_class=HTMLResponse)
+    @app.get("/actions/{operation_id}/modal", response_class=HTMLResponse)
     async def operation_modal(request: Request, operation_id: str) -> Response:
-        operation = service.operations.get(operation_id)
+        operation = service.actions.get(operation_id)
         if operation is None:
             return _operation_modal_empty_response(app, request)
         return _operation_modal_response(app, request, operation.as_dict())
 
-    @app.post("/operations/{operation_id}/continue-ingestion")
-    async def continue_ingestion(request: Request, operation_id: str) -> Response:
-        preview_operation = service.operations.get(operation_id)
-        if preview_operation is None or not preview_operation.result or not preview_operation.result.get("intake"):
-            return _error(app, request, "Operation not found", "That quick analysis operation cannot be continued.", 404)
-        intake = dict(preview_operation.result["intake"])
-        operation = service.operations.create(
-            "full ingestion",
-            lambda current_operation: service._run_full_ingestion_from_preview(current_operation, intake),
-        )
-        if request.headers.get("hx-request") == "true":
-            return _operation_modal_empty_with_notice_response(app, request, operation.as_dict())
-        return _operation_response(app, request, operation.as_dict())
-
-    @app.post("/operations/{operation_id}/abandon")
-    async def abandon_ingestion(request: Request, operation_id: str) -> Response:
-        preview_operation = service.operations.get(operation_id)
-        if preview_operation is None or not preview_operation.result or not preview_operation.result.get("quick_analysis"):
-            return _error(app, request, "Operation not found", "That quick analysis operation cannot be abandoned.", 404)
-        preview_operation.result["abandoned"] = True
-        preview_operation.log("Quick analysis abandoned. No role files were written.")
-        if request.headers.get("hx-request") == "true":
-            return _operation_modal_empty_response(app, request)
-        return _redirect(f"/operations/{operation_id}")
-
-    @app.post("/operations/{operation_id}/cancel")
+    @app.patch("/actions/{operation_id}")
     async def cancel_operation(request: Request, operation_id: str) -> Response:
-        operation = service.operations.cancel(operation_id)
+        form = await request.form()
+        if str(form.get("status", "")).strip() != "cancelled":
+            return _error(app, request, "Unsupported action update", "Only action cancellation is supported.", 400)
+        operation = service.actions.cancel(operation_id)
         if operation is None:
             return _operation_modal_empty_response(app, request)
         if request.headers.get("hx-request") == "true":
@@ -423,83 +437,32 @@ def create_fastapi_app(repo: Repository | None = None, llm: OpenAIClient | None 
         service.repo.record_status(canonical_slug, event_type.strip(), exact_date.strip() or date.today().isoformat(), note.strip(), artifacts=artifacts)
         return _redirect(f"/roles/{canonical_slug}")
 
-    @app.post("/roles/{canonical_slug}/update-prompt")
-    async def update_role_from_prompt(request: Request, canonical_slug: str, prompt: str = Form("")) -> Response:
-        # Free-text updates always go through the LLM. Even short prompts can imply
-        # multiple durable changes across role notes, tasks, events, or status.
-        prompt = prompt.strip()
-        if not prompt:
-            return _error(app, request, "Missing prompt", "Enter an update prompt before submitting.")
-        role = service.repo.get_role(canonical_slug)
-        if role is None:
-            return _error(app, request, "Role not found", "No canonical role matched that ID.", 404)
-        operation = service.operations.create(
-            "update",
-            lambda current_operation: service._run_prompt_update(current_operation, canonical_slug, prompt),
-        )
-        return _operation_response(app, request, operation.as_dict())
-
-    @app.post("/roles/{canonical_slug}/reassess")
-    async def reassess_role(request: Request, canonical_slug: str) -> Response:
-        role = service.repo.get_role(canonical_slug)
-        if role is None:
-            return _error(app, request, "Role not found", "No canonical role matched that ID.", 404)
-        operation = service.operations.create(
-            "role reassessment",
-            lambda current_operation: service._run_role_reassessment(current_operation, canonical_slug),
-        )
-        return _operation_response(app, request, operation.as_dict())
-
-    @app.get("/download/generic-cv")
-    async def download_generic_cv(request: Request) -> Response:
-        try:
-            return FileResponse(service.repo.ensure_generic_cv(), media_type="application/pdf", filename="cv.pdf")
-        except FileNotFoundError as exc:
-            return _error(app, request, "CV PDF unavailable", str(exc), 404)
-        except subprocess.CalledProcessError:
-            return _error(app, request, "CV PDF unavailable", "Typst could not build the CV PDF. Check the selected template and CV YAML.", 500)
-
-    @app.get("/download/cv/{template_id}")
-    async def download_cv_template(request: Request, template_id: str) -> Response:
-        try:
-            pdf_path = service.repo.ensure_cv_pdf(template_id)
-            return FileResponse(pdf_path, media_type="application/pdf", filename=pdf_path.name)
-        except FileNotFoundError as exc:
-            return _error(app, request, "CV PDF unavailable", str(exc), 404)
-        except subprocess.CalledProcessError:
-            return _error(app, request, "CV PDF unavailable", "Typst could not build the CV PDF. Check the selected template and CV YAML.", 500)
-
-    @app.get("/download/file")
-    async def download_file(request: Request, path: str = Query("")) -> Response:
+    @app.get("/roles/{canonical_slug}/files/{file_path:path}")
+    async def role_file(request: Request, canonical_slug: str, file_path: str, preview: str = Query("")) -> Response:
         # Repository.file_info validates that the requested path stays inside
-        # CVAI_DATA before FastAPI streams it back to the browser.
-        if not path:
-            # This route is normally used by links, so a plain response is enough
-            # when callers omit the required query string.
-            return HTMLResponse("No repository file path was provided.", status_code=400)
-        if not _is_downloadable_artifact(path):
+        # CVAI_DATA before FastAPI streams it back to the browser. This route is
+        # limited to generated artifacts for the requested role.
+        path = f"roles/{canonical_slug}/artifacts/{file_path.strip().lstrip('/')}"
+        if not _is_role_artifact(canonical_slug, path):
             return _error(app, request, "File unavailable", "Only generated artifacts can be downloaded from the web app.", 403)
+        if not service.repo.exists(path):
+            return _error(app, request, "File unavailable", "That generated artifact does not exist.", 404)
         file_path, mime = service.repo.file_info(path)
+        if preview and path.endswith(".md"):
+            return app.state.templates.TemplateResponse(
+                request=request,
+                name="artifact_preview.html.j2",
+                context={
+                    "request": request,
+                    "path": path,
+                    "role_slug": canonical_slug,
+                    "file_path": path.split("/artifacts/", 1)[1],
+                    "filename": file_path.name,
+                    "content_html": _render_basic_markdown(service.repo.read_text(path)),
+                    "flash": None,
+                },
+            )
         return FileResponse(file_path, media_type=mime, filename=file_path.name)
-
-    @app.get("/preview/file", response_class=HTMLResponse)
-    async def preview_file(request: Request, path: str = Query("")) -> Response:
-        if not path:
-            return HTMLResponse("No repository file path was provided.", status_code=400)
-        if not _is_downloadable_artifact(path) or not path.endswith(".md"):
-            return _error(app, request, "Preview unavailable", "Only generated Markdown artifacts can be previewed.", 403)
-        file_path, _ = service.repo.file_info(path)
-        return app.state.templates.TemplateResponse(
-            request=request,
-            name="artifact_preview.html.j2",
-            context={
-                "request": request,
-                "path": path,
-                "filename": file_path.name,
-                "content_html": _render_basic_markdown(service.repo.read_text(path)),
-                "flash": None,
-            },
-        )
 
     return app
 
@@ -527,7 +490,7 @@ def _template(app: FastAPI, request: Request, name: str, context: dict, status_c
         context={
             "request": request,
             "flash": None,
-            "active_operation_count": service.operations.active_count(),
+            "active_operation_count": service.actions.active_count(),
             **context,
         },
         status_code=status_code,
@@ -544,13 +507,90 @@ def _error(app: FastAPI, request: Request, title: str, message: str, status_code
     )
 
 
-def _is_downloadable_artifact(path: str) -> bool:
-    # Database YAML and internal Markdown are not exposed directly. Downloads are
-    # limited to built CV PDFs and generated role artifacts.
-    normalized = path.strip().lstrip("/")
-    if normalized.startswith("cv/") and normalized.endswith(".pdf"):
+def _accepts_html(request: Request) -> bool:
+    accept = request.headers.get("accept", "")
+    return not accept or "text/html" in accept or "*/*" in accept
+
+
+def _wants_pdf(request: Request, mime: str) -> bool:
+    if mime.strip().lower() == "application/pdf":
         return True
-    return normalized.startswith("roles/") and "/artifacts/" in normalized
+    return "application/pdf" in request.headers.get("accept", "").lower()
+
+
+def _create_role_from_url(app: FastAPI, request: Request, service: WebApp, source_url: str, quick_analysis: str) -> Response:
+    # URL ingestion can be slow or fail on remote sites, so it runs as a
+    # background action and the browser polls status in place.
+    source_url = source_url.strip()
+    if not source_url:
+        return _error(app, request, "Missing URL", "A role URL is required for URL ingestion.")
+    try:
+        validate_public_https_url(source_url)
+    except ValueError as exc:
+        return _error(app, request, "Blocked URL", str(exc), 400)
+    if quick_analysis:
+        operation = service.actions.create(
+            "quick analysis",
+            lambda current_operation: service._run_url_quick_analysis(current_operation, source_url),
+            action_type="quick_role_assessment",
+            input={"source_kind": "url", "source_url": source_url},
+        )
+        return _operation_modal_or_redirect(app, request, operation.as_dict())
+    operation = service.actions.create(
+        "url",
+        lambda current_operation: service._run_url_ingestion(current_operation, source_url),
+        action_type="role_ingestion",
+        input={"source_kind": "url", "source_url": source_url},
+    )
+    return _operation_response(app, request, operation.as_dict())
+
+
+def _create_role_from_text(
+    app: FastAPI,
+    request: Request,
+    service: WebApp,
+    source_text: str,
+    source_url: str,
+    company: str,
+    location: str,
+    role: str,
+    quick_analysis: str,
+) -> Response:
+    source_text = source_text.strip()
+    if not source_text:
+        return _error(app, request, "Missing text", "Paste the job description text before starting text ingestion.")
+    overrides = {
+        key: value.strip()
+        for key, value in {"company": company, "location": location, "role": role}.items()
+        if value.strip()
+    }
+    if quick_analysis:
+        operation = service.actions.create(
+            "quick analysis",
+            lambda current_operation: service._run_text_quick_analysis(current_operation, source_text, source_url.strip(), overrides),
+            action_type="quick_role_assessment",
+            input={"source_kind": "text", "source_url": source_url.strip(), "source_text": source_text, "overrides": overrides},
+        )
+        return _operation_modal_or_redirect(app, request, operation.as_dict())
+    operation = service.actions.create(
+        "text",
+        lambda current_operation: service._run_text_ingestion(current_operation, source_text, source_url.strip(), overrides),
+        action_type="role_ingestion",
+        input={"source_kind": "text", "source_url": source_url.strip(), "source_text": source_text, "overrides": overrides},
+    )
+    return _operation_response(app, request, operation.as_dict())
+
+
+def _is_role_artifact(canonical_slug: str, path: str) -> bool:
+    parts = path.strip().lstrip("/").split("/")
+    return (
+        len(parts) >= 4
+        and ".." not in parts
+        and parts[0] == "roles"
+        and parts[1] == canonical_slug
+        and parts[2] == "artifacts"
+        and bool(parts[-1])
+    )
 
 
 def _render_basic_markdown(markdown: str) -> str:
@@ -742,19 +782,19 @@ def _register_template_helpers(templates: Jinja2Templates) -> None:
 def _operation_response(app: FastAPI, request: Request, operation: dict) -> Response:
     if request.headers.get("hx-request") == "true":
         return _operation_notice_response(app, request, operation)
-    return _redirect(f"/operations/{operation['id']}")
+    return _redirect(f"/actions/{operation['id']}")
 
 
 def _operation_modal_or_redirect(app: FastAPI, request: Request, operation: dict) -> Response:
     if request.headers.get("hx-request") == "true":
         return _operation_modal_response(app, request, operation)
-    return _redirect(f"/operations/{operation['id']}")
+    return _redirect(f"/actions/{operation['id']}")
 
 
 def _operation_notice_response(app: FastAPI, request: Request, operation: dict) -> Response:
     return app.state.templates.TemplateResponse(
         request=request,
-        name="operation_notice.html.j2",
+        name="action_notice.html.j2",
         context=_operation_context(request, operation, fragment=True),
     )
 
@@ -762,7 +802,7 @@ def _operation_notice_response(app: FastAPI, request: Request, operation: dict) 
 def _operation_modal_response(app: FastAPI, request: Request, operation: dict) -> Response:
     return app.state.templates.TemplateResponse(
         request=request,
-        name="operation_modal.html.j2",
+        name="action_modal.html.j2",
         context=_operation_context(request, operation, fragment=True),
     )
 
@@ -771,11 +811,11 @@ def _operation_modal_empty_response(app: FastAPI, request: Request) -> Response:
     service: WebApp = request.app.state.service
     return app.state.templates.TemplateResponse(
         request=request,
-        name="operation_modal_empty.html.j2",
+        name="action_modal_empty.html.j2",
         context={
             "request": request,
             "flash": None,
-            "active_operation_count": service.operations.active_count(),
+            "active_operation_count": service.actions.active_count(),
         },
     )
 
@@ -783,7 +823,7 @@ def _operation_modal_empty_response(app: FastAPI, request: Request) -> Response:
 def _operation_modal_empty_with_notice_response(app: FastAPI, request: Request, operation: dict) -> Response:
     return app.state.templates.TemplateResponse(
         request=request,
-        name="operation_modal_empty_with_notice.html.j2",
+        name="action_modal_empty_with_notice.html.j2",
         context=_operation_context(request, operation, fragment=True),
     )
 
@@ -791,23 +831,27 @@ def _operation_modal_empty_with_notice_response(app: FastAPI, request: Request, 
 def _operation_fragment_response(app: FastAPI, request: Request, operation: dict) -> Response:
     return app.state.templates.TemplateResponse(
         request=request,
-        name="operation_fragment.html.j2",
+        name="action_fragment.html.j2",
         context=_operation_context(request, operation, fragment=True),
     )
 
 
 def _operation_context(request: Request, operation: dict, *, fragment: bool = False) -> dict:
-    # Full operation pages can display flash errors. HTMX fragments skip flash
-    # wrappers so replacing operation-status does not duplicate page-level messages.
+    # Action errors render inside the action page header. Fragments skip global
+    # flash wrappers so replacing operation-status does not move page messages.
     service: WebApp = request.app.state.service
+    log_lines = list(operation.get("log_lines") or [])
+    if operation.get("status") == "failed" and operation.get("error") and log_lines and operation["error"] in log_lines[-1]:
+        log_lines = log_lines[:-1]
     return {
         "request": request,
-        "title": "Operation",
-        "section_title": "Operations",
+        "title": "Action",
+        "section_title": "Actions",
         "operation": operation,
+        "display_log": "\n".join(log_lines),
         "finished": operation["status"] in {"completed", "failed", "cancelled"},
-        "flash": ("error", operation["error"]) if not fragment and operation.get("error") else None,
-        "active_operation_count": service.operations.active_count(),
+        "flash": None,
+        "active_operation_count": service.actions.active_count(),
     }
 
 

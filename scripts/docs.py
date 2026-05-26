@@ -131,7 +131,7 @@ def main() -> None:
                 screenshot(page, "dashboard", f"{BASE_URL}/")
                 screenshot(page, "intake", f"{BASE_URL}/intake")
                 screenshot(page, "tasks", f"{BASE_URL}/tasks")
-                screenshot(page, "operations", f"{BASE_URL}/operations")
+                screenshot(page, "operations", f"{BASE_URL}/actions")
 
                 # CV editor: open the first experience entry modal to show the editing UI
                 page.goto(f"{BASE_URL}/cv/")

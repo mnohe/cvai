@@ -1,0 +1,18 @@
+= Actions page
+:imagesdir: ../images
+
+link:../GUIDE.adoc[← User Guide]
+
+Click *Actions* in the top navigation bar to run a free-form prompt or inspect
+previous LLM-backed actions.
+
+image::actions.png[Actions page with prompt form and action history]
+
+Each action shows its kind (URL ingestion, text ingestion, prompt update, or
+reassessment), its current status, and a result card once it completes —
+including the quick analysis preview if one was run.
+
+The page updates automatically while an action is running.
+
+Actions are saved in `CVAI_DATA/actions.yaml` so the log survives server
+restarts.

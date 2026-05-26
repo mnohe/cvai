@@ -14,8 +14,8 @@
     {% set current_section = "CV" %}
   {% elif path.startswith("/tasks") %}
     {% set current_section = "Tasks" %}
-  {% elif path.startswith("/operations") %}
-    {% set current_section = "Operations" %}
+  {% elif path.startswith("/actions") %}
+    {% set current_section = "Actions" %}
   {% else %}
     {% set current_section = "Roles" %}
   {% endif %}
@@ -28,7 +28,7 @@
         <a class="nav-tab{% if current_section == "Roles" %} active{% endif %}" href="/" title="Active roles ordered by the repository backlog, with status and follow-up work visible at a glance."{% if current_section == "Roles" %} aria-current="page"{% endif %}>Roles</a>
         <a class="nav-tab{% if current_section == "CV" %} active{% endif %}" href="/cv/" title="Edit the structured CV data used by layouts, role matching, and PDF generation."{% if current_section == "CV" %} aria-current="page"{% endif %}>CV</a>
         <a class="nav-tab{% if current_section == "Tasks" %} active{% endif %}" href="/tasks" title="Open evidence and follow-up tasks ordered by ETA, shortest first."{% if current_section == "Tasks" %} aria-current="page"{% endif %}>Tasks</a>
-        <a class="nav-tab{% if current_section == "Operations" %} active{% endif %}" href="/operations" title="Background operations launched in this session."{% if current_section == "Operations" %} aria-current="page"{% endif %}>Operations{% include "operation_badge.html.j2" %}</a>
+        <a class="nav-tab{% if current_section == "Actions" %} active{% endif %}" href="/actions" title="Durable LLM-backed actions and their execution logs."{% if current_section == "Actions" %} aria-current="page"{% endif %}>Actions{% include "action_badge.html.j2" %}</a>
       </nav>
       <div class="nav-menu">
         <span class="nav-current">{{ current_section }}</span>
@@ -41,7 +41,7 @@
             <a class="{% if current_section == "Roles" %}active{% endif %}" href="/" title="Active roles ordered by the repository backlog, with status and follow-up work visible at a glance."{% if current_section == "Roles" %} aria-current="page"{% endif %}>Roles</a>
             <a class="{% if current_section == "CV" %}active{% endif %}" href="/cv/" title="Edit the structured CV data used by layouts, role matching, and PDF generation."{% if current_section == "CV" %} aria-current="page"{% endif %}>CV</a>
             <a class="{% if current_section == "Tasks" %}active{% endif %}" href="/tasks" title="Open evidence and follow-up tasks ordered by ETA, shortest first."{% if current_section == "Tasks" %} aria-current="page"{% endif %}>Tasks</a>
-            <a class="{% if current_section == "Operations" %}active{% endif %}" href="/operations" title="Background operations launched in this session."{% if current_section == "Operations" %} aria-current="page"{% endif %}>Operations{% if active_operation_count %}<span class="nav-badge">{{ active_operation_count }}</span>{% endif %}</a>
+            <a class="{% if current_section == "Actions" %}active{% endif %}" href="/actions" title="Durable LLM-backed actions and their execution logs."{% if current_section == "Actions" %} aria-current="page"{% endif %}>Actions{% if active_operation_count %}<span class="nav-badge">{{ active_operation_count }}</span>{% endif %}</a>
           </div>
         </details>
       </div>
@@ -109,34 +109,46 @@
       const modal = event.target.closest("#cv-modal");
       if (modal) cvModalReindex(modal);
     });
-    function cvReindexRows(section) {
-      document.querySelectorAll(`[data-cv-row][data-section="${section}"]`).forEach((row, index) => {
-        row.dataset.index = index;
-        row.querySelectorAll("[data-move-form]").forEach((form) => {
-          const url = `/cv/${section}/${index}/move`;
-          form.action = url;
-          form.setAttribute("hx-post", url);
-        });
-        const editButton = row.querySelector("[data-edit-button]");
-        if (editButton) editButton.setAttribute("hx-get", `/cv/${section}/${index}/edit`);
-        row.querySelectorAll('form[action$="/delete"]').forEach((form) => {
-          const url = `/cv/${section}/${index}/delete`;
-          form.action = url;
-          form.setAttribute("hx-post", url);
-        });
-      });
-    }
-    document.addEventListener("submit", (event) => {
-      const form = event.target.closest("[data-move-form]");
-      if (!form) return;
-      const row = form.closest("[data-cv-row]");
-      const direction = new FormData(form).get("direction");
-      const sibling = direction === "up" ? row.previousElementSibling : row.nextElementSibling;
-      if (!sibling || !sibling.matches("[data-cv-row]")) return;
-      if (direction === "up") row.parentElement.insertBefore(row, sibling);
-      if (direction === "down") row.parentElement.insertBefore(sibling, row);
-      setTimeout(() => cvReindexRows(row.dataset.section), 0);
-    });
+	    function cvReindexRows(section) {
+	      document.querySelectorAll(`[data-cv-row][data-section="${section}"]`).forEach((row, index) => {
+	        row.dataset.index = index;
+	        row.querySelectorAll("[data-move-form]").forEach((form) => {
+	          const url = `/cv/${section}`;
+	          form.action = url;
+	          form.setAttribute("hx-patch", url);
+	        });
+	        const editButton = row.querySelector("[data-edit-button]");
+	        if (editButton) editButton.setAttribute("hx-get", `/cv/${section}/${index}/modals/edit`);
+	        row.querySelectorAll("[hx-delete]").forEach((button) => {
+	          button.setAttribute("hx-delete", `/cv/${section}/${index}`);
+	        });
+	      });
+	    }
+	    function cvAttachOrder(form, section) {
+	      form.querySelectorAll('input[name="items"]').forEach((input) => input.remove());
+	      document.querySelectorAll(`[data-cv-row][data-section="${section}"]`).forEach((row) => {
+	        const input = document.createElement("input");
+	        input.type = "hidden";
+	        input.name = "items";
+	        input.value = row.dataset.itemId;
+	        form.appendChild(input);
+	      });
+	    }
+	    document.addEventListener("submit", (event) => {
+	      const form = event.target.closest("[data-move-form]");
+	      if (!form) return;
+	      const row = form.closest("[data-cv-row]");
+	      const direction = new FormData(form).get("direction");
+	      const sibling = direction === "up" ? row.previousElementSibling : row.nextElementSibling;
+	      if (!sibling || !sibling.matches("[data-cv-row]")) {
+	        event.preventDefault();
+	        return;
+	      }
+	      if (direction === "up") row.parentElement.insertBefore(row, sibling);
+	      if (direction === "down") row.parentElement.insertBefore(sibling, row);
+	      cvAttachOrder(form, row.dataset.section);
+	      setTimeout(() => cvReindexRows(row.dataset.section), 0);
+	    });
     document.body.addEventListener("htmx:beforeRequest", (event) => {
       if (event.target.matches("[data-edit-button]")) {
         document.querySelectorAll("#cv-modal").forEach((modal) => modal.remove());

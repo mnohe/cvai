@@ -4,10 +4,8 @@
   </form>
   <h2>Remove Template</h2>
   <p class="muted">Remove {{ template.name }} from installed PDF templates?</p>
-  <form method="post" action="/cv/templates/{{ template.template_id }}/remove" hx-post="/cv/templates/{{ template.template_id }}/remove">
-    <div class="sticky-actions">
-      <button class="danger" type="submit">Remove</button>
-      <button type="button" class="secondary" onclick="this.closest('dialog').close(); this.closest('dialog').remove();">Cancel</button>
-    </div>
-  </form>
+  <div class="sticky-actions">
+    <button class="danger" type="button" hx-delete="/cv/templates/{{ template.template_id }}">Remove</button>
+    <button type="button" class="secondary" onclick="this.closest('dialog').close(); this.closest('dialog').remove();">Cancel</button>
+  </div>
 </dialog>

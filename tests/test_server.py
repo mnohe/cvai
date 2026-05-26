@@ -10,8 +10,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from cvai_core.llm import OpenAIAPIError
 from cvai_web.server import (
-    Operation,
-    OperationManager,
+    Action,
+    ActionManager,
     JobPostingExtractor,
     TextExtractor,
     WebApp,
@@ -105,11 +105,13 @@ class ServerUtilityTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "Could not resolve"):
                 validate_public_https_url("https://example.invalid/job")
 
-    def test_operation_manager_records_success_and_failure_states(self) -> None:
-        manager = OperationManager()
-        success = Operation(id="job-success", kind="unit")
-        failure = Operation(id="job-failure", kind="unit")
-        api_failure = Operation(id="job-api", kind="unit")
+    def test_action_manager_records_success_and_failure_states(self) -> None:
+        repo = mock.Mock()
+        repo.load_data.return_value = {"actions": []}
+        manager = ActionManager(repo)
+        success = Action(id="action-success", kind="unit")
+        failure = Action(id="action-failure", kind="unit")
+        api_failure = Action(id="action-api", kind="unit")
 
         manager._run(success, lambda job: setattr(job, "result", {"ok": True}))
         manager._run(failure, lambda job: (_ for _ in ()).throw(RuntimeError("boom")))
@@ -140,7 +142,7 @@ class ServerUtilityTests(unittest.TestCase):
             "application": {"status": "draft"},
         }
         app = WebApp(repo, llm)
-        job = Operation(id="job-1", kind="text")
+        job = Action(id="action-1", kind="text")
 
         app._complete_ingestion(
             job,
@@ -194,7 +196,7 @@ class ServerUtilityTests(unittest.TestCase):
         }
         app = WebApp(repo, llm)
 
-        job = Operation(id="job-quick", kind="quick analysis")
+        job = Action(id="action-quick", kind="quick analysis")
         app._run_text_quick_analysis(job, "Build distributed systems in Go.", "https://example.test/job", {"company": "Example"})
 
         self.assertEqual(job.result["quick_analysis"]["recommendation"], "continue")
@@ -244,7 +246,7 @@ class ServerUtilityTests(unittest.TestCase):
             },
         }
         app = WebApp(repo, llm)
-        job = Operation(id="job-full", kind="full ingestion")
+        job = Action(id="action-full", kind="full ingestion")
 
         app._run_full_ingestion_from_preview(
             job,
@@ -310,9 +312,9 @@ class ServerUtilityTests(unittest.TestCase):
         app = WebApp(repo, llm)
         today = date.today().isoformat()
 
-        update_job = Operation(id="job-update", kind="update")
+        update_job = Action(id="action-update", kind="update")
         app._run_prompt_update(update_job, "example_remote_engineer", "They wrote back")
-        task_job = Operation(id="job-task", kind="task")
+        task_job = Action(id="action-task", kind="task")
         app._run_task_reassessment(task_job, "task-python")
 
         repo.record_status.assert_called_once_with(
@@ -367,7 +369,7 @@ class ServerUtilityTests(unittest.TestCase):
         }
         app = WebApp(repo, llm)
         today = date.today().isoformat()
-        job = Operation(id="job-update", kind="update")
+        job = Action(id="action-update", kind="update")
 
         app._run_prompt_update(job, "example_remote_engineer", "Update the role and notes.")
 
@@ -415,7 +417,7 @@ class ServerUtilityTests(unittest.TestCase):
         }
         app = WebApp(repo, llm)
         today = date.today().isoformat()
-        job = Operation(id="job-update", kind="update")
+        job = Action(id="action-update", kind="update")
 
         app._run_prompt_update(job, "example_remote_engineer", "Hiring manager screen booked.")
 
@@ -426,8 +428,79 @@ class ServerUtilityTests(unittest.TestCase):
             "Hiring manager screen booked.",
             artifacts=[],
         )
-        repo.record_note_event.assert_called_once_with("example_remote_engineer", today, "Update prompt: Hiring manager screen booked.")
+        repo.record_note_event.assert_called_once_with(
+            "example_remote_engineer",
+            today,
+            "Update prompt: Hiring manager screen booked.",
+        )
         self.assertEqual(job.result["paths"], {"operations": ["record_status"]})
+
+    def test_prompt_update_promotes_interview_availability_to_interviewing_and_keeps_follow_up_open(self) -> None:
+        role = SimpleNamespace(
+            company="Amazon",
+            role="Software Development Engineer, Network Capacity Services",
+            location="Dublin",
+            role_status="Submitted on 2026-05-20",
+            artifacts=[],
+        )
+        task = SimpleNamespace(
+            id="task_0019",
+            role_id="amazon_dublin_sde_network_capacity_services",
+            status="open",
+            kind="follow_up",
+            title="Follow up on Amazon interview scheduling",
+            description="Confirm interview scheduling if no slot has been confirmed after supplied availability.",
+            status_detail="",
+        )
+        repo = mock.Mock()
+        repo.get_role.return_value = role
+        repo.list_tasks.return_value = [task]
+        llm = mock.Mock()
+        llm.is_configured.return_value = True
+        llm.interpret_status_update.return_value = {
+            "clear": True,
+            "event_type": "submitted",
+            "exact_date": "2026-05-20",
+            "note": "Availability was provided.",
+            "internal_notes": [],
+        }
+        app = WebApp(repo, llm)
+        today = date.today().isoformat()
+        job = Action(id="action-update", kind="update")
+        prompt = (
+            'On May 20, availability for a new final interview loop for position '
+            '"Software Development Engineer, ML Navigators" '
+            "(which I didn't apply for, I assume internal repositioning) was requested. "
+            "I provided it also on May 20. Still waiting to hear back."
+        )
+
+        app._run_prompt_update(job, "amazon_dublin_sde_network_capacity_services", prompt)
+
+        expected_note = (
+            "Availability provided for a new final interview loop for Software Development Engineer, "
+            "ML Navigators; awaiting confirmation."
+        )
+        repo.record_status.assert_called_once_with(
+            "amazon_dublin_sde_network_capacity_services",
+            "interviewing",
+            "2026-05-20",
+            expected_note,
+            artifacts=[],
+        )
+        repo.update_task_status.assert_called_once_with("task_0019", "open", expected_note)
+        repo.append_analysis_notes.assert_called_once_with(
+            "amazon_dublin_sde_network_capacity_services",
+            [
+                "Possible internal repositioning or requisition mismatch: new final interview loop for Software Development Engineer, ML Navigators was requested."
+            ],
+        )
+        repo.record_note_event.assert_called_once_with(
+            "amazon_dublin_sde_network_capacity_services",
+            today,
+            f"Update prompt: {prompt}",
+        )
+        role_payload = llm.interpret_status_update.call_args.kwargs["role"]
+        self.assertEqual(role_payload["related_open_tasks"][0]["id"], "task_0019")
 
 
 if __name__ == "__main__":

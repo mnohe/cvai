@@ -4,7 +4,8 @@
 <section class="split">
   <article class="card">
     <h3>From URL</h3>
-    <form method="post" action="/ingestions/url" hx-post="/ingestions/url" hx-target="#operation-modal-root" hx-swap="outerHTML">
+    <form method="post" action="/roles/" hx-post="/roles/" hx-target="#operation-modal-root" hx-swap="outerHTML">
+      <input type="hidden" name="source_kind" value="url">
       <label class="checkbox-row">
         <input type="checkbox" name="quick_analysis" value="1" checked>
         Quick analysis before full ingestion
@@ -17,7 +18,8 @@
   </article>
   <article class="card">
     <h3>From pasted text</h3>
-    <form method="post" action="/ingestions/text" hx-post="/ingestions/text" hx-target="#operation-modal-root" hx-swap="outerHTML">
+    <form method="post" action="/roles/" hx-post="/roles/" hx-target="#operation-modal-root" hx-swap="outerHTML">
+      <input type="hidden" name="source_kind" value="text">
       <label class="checkbox-row">
         <input type="checkbox" name="quick_analysis" value="1" checked>
         Quick analysis before full ingestion
@@ -35,7 +37,7 @@
         <input type="text" name="role" placeholder="Optional">
       </label>
       <label>Job description text
-        <textarea name="source_text" required placeholder="Paste the role page text here"></textarea>
+        <textarea name="source_text" required rows="2" placeholder="Paste the role page text here"></textarea>
       </label>
       <button class="primary" type="submit">Start pasted-text ingestion</button>
     </form>

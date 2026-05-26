@@ -15,6 +15,10 @@ from .yaml_format import CVAIYamlDumper, dump_yaml
 # Markdown notes when maintainers intentionally refresh the source material.
 NoAliasDumper = CVAIYamlDumper
 
+# Story IDs combine situation and evidence reference. Limiting the source string
+# keeps generated slugs readable while preserving enough text to avoid collisions.
+STORY_ID_SOURCE_CHARS = 80
+
 
 def slugify(value: str) -> str:
     """Create stable IDs for rows extracted from human-readable tables."""
@@ -154,7 +158,7 @@ def build_library_data(root: Path) -> dict:
     ]
     stories = [
         {
-            "id": slugify(" ".join([row.get("Situation", ""), row.get("Evidence Ref", "")])[:80]),
+            "id": slugify(" ".join([row.get("Situation", ""), row.get("Evidence Ref", "")])[:STORY_ID_SOURCE_CHARS]),
             "situation": row.get("Situation", ""),
             "task": row.get("Task", ""),
             "action": row.get("Action", ""),

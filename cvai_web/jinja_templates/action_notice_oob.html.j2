@@ -3,16 +3,16 @@
   class="flash operation-notice{% if operation.status == 'failed' %} error{% endif %}"
   hx-swap-oob="outerHTML"
   {% if not finished %}
-    hx-get="/operations/{{ operation.id }}/notice"
+    hx-get="/actions/{{ operation.id }}/notice"
     hx-trigger="load delay:2s, every 2s"
     hx-swap="outerHTML"
   {% endif %}
 >
   {% if operation.status == "completed" %}
-    Operation <a href="/operations/{{ operation.id }}">{{ operation.id }}</a> completed.
+    Action <a href="/actions/{{ operation.id }}">{{ operation.id }}</a> completed.
   {% elif operation.status == "failed" %}
-    Operation <a href="/operations/{{ operation.id }}">{{ operation.id }}</a> failed.
+    Action <a href="/actions/{{ operation.id }}">{{ operation.id }}</a> failed.
   {% else %}
-    Operation <a href="/operations/{{ operation.id }}">{{ operation.id }}</a> is {{ operation.status }}.
+    Action <a href="/actions/{{ operation.id }}">{{ operation.id }}</a> is {{ operation.status }}.
   {% endif %}
 </div>

@@ -1,0 +1,52 @@
+<section
+  id="operation-status"
+  {% if not finished %}
+    hx-get="/actions/{{ operation.id }}/fragment"
+    hx-trigger="load delay:3s, every 3s"
+    hx-swap="outerHTML"
+  {% endif %}
+>
+  {% if fragment %}
+    {% include "action_badge_oob.html.j2" %}
+    {% include "action_status_badge_oob.html.j2" %}
+    {% include "action_summary_text_oob.html.j2" %}
+  {% endif %}
+
+  {% if operation.result and operation.result.quick_analysis %}
+    <article class="card operation-result-card">
+      <h3>Quick analysis completed</h3>
+      <p class="muted">Continue to create the role, or leave this action as a completed preview.</p>
+      {% set intake = operation.result.intake %}
+      <form method="post" action="/roles/">
+        <input type="hidden" name="source_kind" value="{{ intake.kind }}">
+        <input type="hidden" name="source_url" value="{{ intake.source_url }}">
+        <input type="hidden" name="source_text" value="{{ intake.source_text }}">
+        {% for key, value in (intake.overrides or {}).items() %}
+          <input type="hidden" name="{{ key }}" value="{{ value }}">
+        {% endfor %}
+        <button class="primary" type="submit">Continue full ingestion</button>
+      </form>
+    </article>
+  {% elif operation.result %}
+    <article class="card" style="margin-bottom:24px;">
+      <h3>Created files</h3>
+      <div class="list">
+        {% if operation.result.paths %}
+          {% for path in operation.result.paths.values() %}
+            <div class="list-item"><code>{{ path }}</code></div>
+          {% endfor %}
+        {% endif %}
+      </div>
+      {% if operation.result.canonical_slug %}
+        <div class="toolbar" style="margin-top:14px;">
+          <a class="button primary" href="/roles/{{ operation.result.canonical_slug }}">Open role</a>
+        </div>
+      {% endif %}
+    </article>
+  {% endif %}
+
+  <article class="card">
+    <h3>Action log</h3>
+    <pre>{{ display_log or "No additional log entries." }}</pre>
+  </article>
+</section>

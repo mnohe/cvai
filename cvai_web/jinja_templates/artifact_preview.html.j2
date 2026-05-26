@@ -10,6 +10,6 @@
     {{ content_html|safe }}
   </div>
   <div class="modal-actions toolbar">
-    <a class="button secondary" href="/download/file?path={{ path|urlencode }}">Download</a>
+    <a class="button secondary" href="/roles/{{ role_slug }}/files/{{ file_path|urlencode }}">Download</a>
   </div>
 </dialog>

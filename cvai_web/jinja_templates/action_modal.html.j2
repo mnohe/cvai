@@ -1,12 +1,13 @@
 <div id="operation-modal-root">
-  {% include "operation_badge_oob.html.j2" %}
+  {% include "action_badge_oob.html.j2" %}
   <dialog class="dialog operation-dialog" id="operation-modal">
     <div class="modal-header">
       <div>
         <h3>Quick analysis</h3>
       </div>
       {% if not finished %}
-        <form method="post" action="/operations/{{ operation.id }}/cancel" hx-post="/operations/{{ operation.id }}/cancel" hx-target="#operation-modal-root" hx-swap="outerHTML">
+        <form method="post" action="/actions/{{ operation.id }}" hx-patch="/actions/{{ operation.id }}" hx-target="#operation-modal-root" hx-swap="outerHTML">
+          <input type="hidden" name="status" value="cancelled">
           <button type="submit">Cancel</button>
         </form>
       {% else %}
@@ -19,7 +20,7 @@
     <div
       id="operation-modal-body"
       {% if not finished %}
-        hx-get="/operations/{{ operation.id }}/modal"
+        hx-get="/actions/{{ operation.id }}/modal"
         hx-trigger="load delay:2s, every 2s"
         hx-target="#operation-modal-root"
         hx-swap="outerHTML"
@@ -28,11 +29,11 @@
       {% if not finished %}
         <p class="muted">Analyzing the role fit...</p>
       {% elif operation.status == "cancelled" %}
-        <p>Operation cancelled.</p>
+        <p>Action cancelled.</p>
       {% elif operation.result and operation.result.quick_analysis %}
-        {% include "operation_quick_analysis.html.j2" %}
+        {% include "action_quick_analysis.html.j2" %}
       {% elif operation.status == "failed" %}
-        <div class="flash error">{{ operation.error or "Operation failed." }}</div>
+        <div class="flash error">{{ operation.error or "Action failed." }}</div>
       {% endif %}
     </div>
   </dialog>

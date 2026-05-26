@@ -24,7 +24,7 @@ else:
 from cvai_core.llm import LLMConfig, OpenAIClient
 from cvai_core.repo import Repository
 from cvai_core.yaml_format import dump_yaml
-from cvai_web.server import Operation
+from cvai_web.server import Action
 from fixtures import create_sample_data_root
 from test_cv import valid_cv
 
@@ -47,6 +47,12 @@ class ASGITestClient:
 
     def post(self, path: str, **kwargs) -> httpx.Response:
         return self.request("POST", path, **kwargs)
+
+    def patch(self, path: str, **kwargs) -> httpx.Response:
+        return self.request("PATCH", path, **kwargs)
+
+    def delete(self, path: str, **kwargs) -> httpx.Response:
+        return self.request("DELETE", path, **kwargs)
 
     def request(self, method: str, path: str, **kwargs) -> httpx.Response:
         return anyio.run(self._request, method, path, kwargs)
@@ -116,24 +122,29 @@ class FastAPIRouteTests(unittest.TestCase):
         self.assertIn("<svg", (static_root / "cvai-h.svg").read_text(encoding="utf-8"))
         self.assertIn("<svg", (static_root / "cvai-v.svg").read_text(encoding="utf-8"))
 
-    def test_operation_page_uses_htmx_status_fragment(self) -> None:
+    def test_action_page_uses_htmx_status_fragment(self) -> None:
         client = self.client()
-        operation = Operation(id="operation-test", kind="url", status="running")
-        operation.log_lines.append("[00:00:00] Started")
-        client.app.state.service.operations._operations[operation.id] = operation
+        action = Action(id="action-test", kind="url", status="running")
+        action.log_lines.append("[00:00:00] Started")
+        client.app.state.service.actions._actions[action.id] = action
 
-        page = client.get("/operations/operation-test")
-        fragment = client.get("/operations/operation-test/fragment")
+        actions = client.get("/actions")
+        page = client.get("/actions/action-test")
+        fragment = client.get("/actions/action-test/fragment")
 
+        self.assertEqual(actions.status_code, 200)
+        self.assertIn("New action", actions.text)
+        self.assertIn('name="prompt"', actions.text)
+        self.assertIn("/actions/action-test", actions.text)
         self.assertEqual(page.status_code, 200)
-        self.assertIn('hx-get="/operations/operation-test/fragment"', page.text)
+        self.assertIn('hx-get="/actions/action-test/fragment"', page.text)
         self.assertIn("Started", fragment.text)
 
     def test_missing_typst_returns_clean_pdf_error_page(self) -> None:
         client = self.client()
-        client.app.state.service.repo.ensure_generic_cv = lambda: (_ for _ in ()).throw(FileNotFoundError("Typst is not installed."))
+        client.app.state.service.repo.ensure_cv_pdf = lambda layout: (_ for _ in ()).throw(FileNotFoundError("Typst is not installed."))
 
-        response = client.get("/download/generic-cv")
+        response = client.get("/cv/", params={"layout": "demo", "mime": "application/pdf"})
 
         self.assertEqual(response.status_code, 404)
         self.assertIn("CV PDF unavailable", response.text)
@@ -141,11 +152,11 @@ class FastAPIRouteTests(unittest.TestCase):
 
     def test_typst_subprocess_failure_returns_clean_pdf_error_page(self) -> None:
         client = self.client()
-        client.app.state.service.repo.ensure_generic_cv = lambda: (_ for _ in ()).throw(
+        client.app.state.service.repo.ensure_cv_pdf = lambda layout: (_ for _ in ()).throw(
             subprocess.CalledProcessError(1, ["typst"])
         )
 
-        response = client.get("/download/generic-cv")
+        response = client.get("/cv/", params={"layout": "demo", "mime": "application/pdf"})
 
         self.assertEqual(response.status_code, 500)
         self.assertIn("Typst could not build", response.text)
@@ -153,8 +164,8 @@ class FastAPIRouteTests(unittest.TestCase):
     def test_ingest_url_rejects_missing_and_private_targets(self) -> None:
         client = self.client()
 
-        missing = client.post("/ingestions/url", data={"source_url": ""})
-        private = client.post("/ingestions/url", data={"source_url": "http://127.0.0.1/role"})
+        missing = client.post("/roles/", data={"source_kind": "url", "source_url": ""})
+        private = client.post("/roles/", params={"url": "http://127.0.0.1/role"})
 
         self.assertEqual(missing.status_code, 400)
         self.assertIn("Missing URL", missing.text)
@@ -162,7 +173,7 @@ class FastAPIRouteTests(unittest.TestCase):
         self.assertIn("Blocked URL", private.text)
 
     def test_ingest_text_rejects_missing_text(self) -> None:
-        response = self.client().post("/ingestions/text", data={"source_text": ""})
+        response = self.client().post("/roles/", data={"source_kind": "text", "source_text": ""})
 
         self.assertEqual(response.status_code, 400)
         self.assertIn("Missing text", response.text)
@@ -189,26 +200,27 @@ class FastAPIRouteTests(unittest.TestCase):
         client = self.client(llm=llm)
 
         response = client.post(
-            "/ingestions/text",
+            "/roles/",
             data={
+                "source_kind": "text",
                 "quick_analysis": "1",
                 "source_text": "Example needs a platform engineer for Python APIs.",
                 "source_url": "https://example.test/job",
             },
             follow_redirects=False,
         )
-        operation_path = response.headers["location"]
+        action_path = response.headers["location"]
         fragment = ""
         deadline = time.time() + 5
         while time.time() < deadline:
-            fragment = client.get(f"{operation_path}/fragment").text
+            fragment = client.get(f"{action_path}/fragment").text
             if "Quick analysis completed" in fragment or "failed" in fragment:
                 break
             time.sleep(0.05)
 
         self.assertEqual(response.status_code, 302)
         self.assertIn("Quick analysis", fragment)
-        self.assertIn("Return to the intake page", fragment)
+        self.assertIn("Continue full ingestion", fragment)
         self.assertFalse((client.app.state.service.repo.root / "roles" / "example_remote_platform_engineer").exists())
         llm.quick_analyze_role.assert_called_once()
         llm.generate_bundle.assert_not_called()
@@ -228,8 +240,9 @@ class FastAPIRouteTests(unittest.TestCase):
         client = self.client(llm=llm)
 
         response = client.post(
-            "/ingestions/text",
+            "/roles/",
             data={
+                "source_kind": "text",
                 "quick_analysis": "1",
                 "source_text": "Example needs a platform engineer for Python APIs.",
                 "source_url": "https://example.test/job",
@@ -243,15 +256,15 @@ class FastAPIRouteTests(unittest.TestCase):
         self.assertIn("<dialog", response.text)
         self.assertIn("Quick analysis", response.text)
         self.assertNotIn("operation-page-status", response.text)
-        self.assertNotIn("<code>operation-", response.text)
-        self.assertIn("/operations/operation-", response.text)
-        operation_match = re.search(r"/operations/(operation-[^\"]+)/modal", response.text)
-        self.assertIsNotNone(operation_match)
-        operation_path = f"/operations/{operation_match.group(1)}"
+        self.assertNotIn("<code>action-", response.text)
+        self.assertIn("/actions/action-", response.text)
+        action_match = re.search(r"/actions/(action-[^\"]+)/modal", response.text)
+        self.assertIsNotNone(action_match)
+        action_path = f"/actions/{action_match.group(1)}"
         modal = ""
         deadline = time.time() + 5
         while time.time() < deadline:
-            modal = client.get(f"{operation_path}/modal").text
+            modal = client.get(f"{action_path}/modal").text
             if "Promising fit." in modal or "failed" in modal:
                 break
             time.sleep(0.05)
@@ -260,20 +273,20 @@ class FastAPIRouteTests(unittest.TestCase):
         self.assertIn("Continue full ingestion", modal)
         self.assertIn("Promising fit.", modal)
 
-    def test_hx_operation_cancel_closes_modal_and_marks_cancelled(self) -> None:
+    def test_hx_action_cancel_closes_modal_and_marks_cancelled(self) -> None:
         client = self.client()
-        operation = Operation(id="operation-cancel", kind="quick analysis", status="running")
-        client.app.state.service.operations._operations[operation.id] = operation
+        action = Action(id="action-cancel", kind="quick analysis", status="running")
+        client.app.state.service.actions._actions[action.id] = action
 
-        response = client.post("/operations/operation-cancel/cancel", headers={"HX-Request": "true"})
+        response = client.patch("/actions/action-cancel", data={"status": "cancelled"}, headers={"HX-Request": "true"})
 
         self.assertEqual(response.status_code, 200)
         self.assertIn('<div id="operation-modal-root"></div>', response.text)
         self.assertIn('id="active-operation-count"', response.text)
-        self.assertEqual(operation.status, "cancelled")
+        self.assertEqual(action.status, "cancelled")
 
-    def test_missing_operation_modal_poll_closes_without_console_error(self) -> None:
-        response = self.client().get("/operations/operation-missing/modal")
+    def test_missing_action_modal_poll_closes_without_console_error(self) -> None:
+        response = self.client().get("/actions/action-missing/modal")
 
         self.assertEqual(response.status_code, 200)
         self.assertIn('<div id="operation-modal-root"></div>', response.text)
@@ -293,7 +306,7 @@ class FastAPIRouteTests(unittest.TestCase):
         self.assertEqual(task.status, "completed")
         self.assertEqual(task.evidence_refs, ["pp-platform"])
 
-    def test_role_update_prompt_uses_llm_operation_to_record_status(self) -> None:
+    def test_role_update_prompt_uses_llm_action_to_record_status(self) -> None:
         llm = mock.Mock()
         llm.is_configured.return_value = True
         llm.interpret_status_update.return_value = {
@@ -306,34 +319,43 @@ class FastAPIRouteTests(unittest.TestCase):
         client = self.client(llm=llm)
 
         response = client.post(
-            "/roles/ledgerly_remote_staff_backend_engineer_payments/update-prompt",
-            data={"prompt": "Rejected on 2026-05-20 with this rationale: duplicate role."},
+            "/actions",
+            data={
+                "action_type": "role_update_prompt",
+                "target_type": "role",
+                "target_id": "ledgerly_remote_staff_backend_engineer_payments",
+                "prompt": "Rejected on 2026-05-20 with this rationale: duplicate role.",
+            },
             follow_redirects=False,
         )
-        operation_path = response.headers["location"]
+        action_path = response.headers["location"]
         fragment = ""
         deadline = time.time() + 5
         while time.time() < deadline:
-            fragment = client.get(f"{operation_path}/fragment").text
+            fragment = client.get(f"{action_path}/fragment").text
             if "Applied rejected status dated 2026-05-20" in fragment or "failed" in fragment:
                 break
             time.sleep(0.05)
         role = client.app.state.service.repo.get_role("ledgerly_remote_staff_backend_engineer_payments")
+        actions = client.app.state.service.repo.load_data("actions.yaml", {"actions": []})["actions"]
 
         self.assertEqual(response.status_code, 302)
+        self.assertTrue(response.headers["location"].startswith("/actions/action-"))
         self.assertIn("Applied rejected status dated 2026-05-20", fragment)
         self.assertEqual(role.status, "rejected")
         self.assertIn("duplicate role", role.status_detail)
+        self.assertEqual(actions[-1]["action_type"], "role_update_prompt")
+        self.assertEqual(actions[-1]["status"], "completed")
         llm.interpret_status_update.assert_called_once()
 
-    def test_download_file_rejects_missing_path(self) -> None:
-        response = self.client().get("/download/file")
+    def test_role_file_route_rejects_missing_artifact(self) -> None:
+        response = self.client().get("/roles/ledgerly_remote_staff_backend_engineer_payments/files/missing.md")
 
-        self.assertEqual(response.status_code, 400)
-        self.assertIn("No repository file path", response.text)
+        self.assertEqual(response.status_code, 404)
+        self.assertIn("generated artifact does not exist", response.text)
 
-    def test_download_file_rejects_database_files(self) -> None:
-        response = self.client().get("/download/file", params={"path": "roles.yaml"})
+    def test_role_file_route_rejects_database_files(self) -> None:
+        response = self.client().get("/roles/ledgerly_remote_staff_backend_engineer_payments/files/%2E%2E/%2E%2E/roles.yaml")
 
         self.assertEqual(response.status_code, 403)
         self.assertIn("Only generated artifacts", response.text)
@@ -363,18 +385,18 @@ class FastAPIRouteTests(unittest.TestCase):
         self.assertIn("Download", valid.text)
         self.assertIn("Remove", valid.text)
         self.assertIn("alovelace-demo.pdf", valid.text)
-        self.assertIn('hx-get="/cv/templates/demo/remove-confirm"', valid.text)
+        self.assertIn('hx-get="/cv/templates/demo/modals/remove-confirm"', valid.text)
         self.assertIn('name="template_zip"', valid.text)
         self.assertIn("action=\"/cv/summary\"", valid.text)
-        self.assertIn('hx-get="/cv/contact/edit"', valid.text)
-        self.assertIn('hx-get="/cv/experience/0/edit"', valid.text)
+        self.assertIn('hx-get="/cv/contact/modals/edit"', valid.text)
+        self.assertIn('hx-get="/cv/experience/0/modals/edit"', valid.text)
         self.assertIn("<table class=\"cv-table\">", valid.text)
         self.assertIn("<td class=\"cv-table-description\">", valid.text)
         self.assertNotIn("cv-table-head", valid.text)
         self.assertNotIn("YAML</label>", valid.text)
 
-        contact_modal = client.get("/cv/contact/edit")
-        modal = client.get("/cv/experience/0/edit")
+        contact_modal = client.get("/cv/contact/modals/edit")
+        modal = client.get("/cv/experience/0/modals/edit")
         self.assertEqual(contact_modal.status_code, 200)
         self.assertIn("Edit Contact", contact_modal.text)
         self.assertIn("name=\"contact.email\"", contact_modal.text)
@@ -388,12 +410,12 @@ class FastAPIRouteTests(unittest.TestCase):
         (root / "cv" / "cv.yaml").write_text(dump_yaml(valid_cv()), encoding="utf-8")
         pdf_path = root / "cv" / "alovelace-demo.pdf"
         pdf_path.write_bytes(b"%PDF")
-        modal = client.get("/cv/templates/demo/remove-confirm")
-        removed = client.post("/cv/templates/demo/remove", headers={"HX-Request": "true"})
+        modal = client.get("/cv/templates/demo/modals/remove-confirm")
+        removed = client.delete("/cv/templates/demo", headers={"HX-Request": "true"})
 
         self.assertEqual(modal.status_code, 200)
         self.assertIn("Remove Template", modal.text)
-        self.assertIn("/cv/templates/demo/remove", modal.text)
+        self.assertIn("/cv/templates/demo", modal.text)
         self.assertEqual(removed.status_code, 204)
         self.assertEqual(removed.headers["HX-Redirect"], "/cv/")
         self.assertFalse((root / "pdf" / "templates" / "demo").exists())
@@ -411,7 +433,7 @@ class FastAPIRouteTests(unittest.TestCase):
         archive.seek(0)
 
         response = client.post(
-            "/cv/templates/upload",
+            "/cv/templates",
             files={"template_zip": ("compact.zip", archive.getvalue(), "application/zip")},
             follow_redirects=False,
         )
@@ -463,16 +485,16 @@ class FastAPIRouteTests(unittest.TestCase):
         self.assertEqual(valid.headers["HX-Redirect"], "/cv/")
         self.assertIn("Professional", saved_after_modal)
 
-    def test_cv_move_posts_without_htmx_redirect(self) -> None:
+    def test_cv_reorder_patches_without_htmx_redirect(self) -> None:
         client = self.client()
         root = client.app.state.service.repo.root
         cv = valid_cv()
         cv["languages"].append({"name": "French", "level": "Basic"})
         (root / "cv" / "cv.yaml").write_text(dump_yaml(cv), encoding="utf-8")
 
-        response = client.post(
-            "/cv/languages/1/move",
-            data={"direction": "up"},
+        response = client.patch(
+            "/cv/languages",
+            data={"items": ["1", "0"]},
             headers={"HX-Request": "true"},
         )
         updated = (root / "cv" / "cv.yaml").read_text(encoding="utf-8")

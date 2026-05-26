@@ -37,6 +37,7 @@ ROOT_FILES = {
     "role_states.yaml": {"role_states": []},
     "tasks.yaml": {"tasks": []},
     "events.yaml": {"events": []},
+    "actions.yaml": {"actions": []},
 }
 ROOT_DIRECTORIES = ("roles", "cv", "context", "library", "pdf", "pdf/templates")
 PROJECTION_FILES = {
@@ -54,6 +55,12 @@ PROJECTION_FILES = {
         "cover_letter_blocks": [],
     },
 }
+
+# Validation output is often shown in terminals and startup logs. Cap the list
+# so one malformed file cannot bury the first actionable errors.
+MAX_FORMATTED_VALIDATION_ISSUES = 50
+
+
 @dataclass(frozen=True)
 class ValidationIssue:
     # A validation issue points at the closest YAML path we can name. Tests assert
@@ -468,8 +475,8 @@ def validate_data_root(root: Path) -> list[ValidationIssue]:
 def format_issues(issues: list[ValidationIssue]) -> str:
     if not issues:
         return "schema validation passed"
-    shown = "\n".join(str(issue) for issue in issues[:50])
-    remaining = len(issues) - 50
+    shown = "\n".join(str(issue) for issue in issues[:MAX_FORMATTED_VALIDATION_ISSUES])
+    remaining = len(issues) - MAX_FORMATTED_VALIDATION_ISSUES
     if remaining > 0:
         shown += f"\n... and {remaining} more issue(s)"
     return shown

@@ -7,14 +7,14 @@
 {% endmacro %}
 
 {% macro move_form(section, index, direction, label) %}
-  <form method="post" action="/cv/{{ section }}/{{ index }}/move" hx-post="/cv/{{ section }}/{{ index }}/move" hx-swap="none" data-move-form>
+  <form method="post" action="/cv/{{ section }}" hx-patch="/cv/{{ section }}" hx-swap="none" data-move-form>
     <input type="hidden" name="direction" value="{{ direction }}">
     <button type="submit" class="move-button" aria-label="Move {{ direction }}" title="Move {{ direction }}">{{ label }}</button>
   </form>
 {% endmacro %}
 
 {% macro item_row(section, index, title, description="", movable=False) %}
-  <tr data-cv-row data-section="{{ section }}" data-index="{{ index }}">
+  <tr data-cv-row data-section="{{ section }}" data-index="{{ index }}" data-item-id="{{ index }}">
     <td>
       <div class="cv-title-cell">
         {% if movable %}
@@ -29,10 +29,8 @@
     <td class="cv-table-description">{{ description }}</td>
     <td>
       <div class="row-actions cv-table-actions">
-        <button type="button" hx-get="/cv/{{ section }}/{{ index }}/edit" hx-target="#modal-root" hx-swap="innerHTML" data-edit-button>Edit</button>
-        <form method="post" action="/cv/{{ section }}/{{ index }}/delete" hx-post="/cv/{{ section }}/{{ index }}/delete" hx-confirm="Remove this CV entry?">
-          <button type="submit" class="danger subtle-danger">Remove</button>
-        </form>
+        <button type="button" hx-get="/cv/{{ section }}/{{ index }}/modals/edit" hx-target="#modal-root" hx-swap="innerHTML" data-edit-button>Edit</button>
+        <button type="button" class="danger subtle-danger" hx-delete="/cv/{{ section }}/{{ index }}" hx-confirm="Remove this CV entry?">Remove</button>
       </div>
     </td>
   </tr>
@@ -42,7 +40,7 @@
   <section class="card">
     <div class="section-heading toolbar">
       <h2>{{ heading }}</h2>
-      <button type="button" hx-get="/cv/{{ section }}/new" hx-target="#modal-root" hx-swap="innerHTML">{{ add_label }}</button>
+      <button type="button" hx-get="/cv/{{ section }}/modals/new" hx-target="#modal-root" hx-swap="innerHTML">{{ add_label }}</button>
     </div>
     <table class="cv-table">
       <tbody>
@@ -75,7 +73,7 @@
     <article class="card">
       <div class="section-heading toolbar">
         <h3>{{ cv.contact.name }} {{ cv.contact.surname }}</h3>
-        <button type="button" hx-get="/cv/contact/edit" hx-target="#modal-root" hx-swap="innerHTML">Edit contact</button>
+        <button type="button" hx-get="/cv/contact/modals/edit" hx-target="#modal-root" hx-swap="innerHTML">Edit contact</button>
       </div>
       <div class="muted">{{ cv.contact.email }}</div>
       {% if cv.contact.linkedin %}
@@ -90,7 +88,7 @@
     <article class="card">
       <div class="section-heading toolbar">
         <h3>PDF downloads</h3>
-        <form method="post" action="/cv/templates/upload" enctype="multipart/form-data" class="inline-upload-form">
+        <form method="post" action="/cv/templates" enctype="multipart/form-data" class="inline-upload-form">
           <label class="button secondary">Add template
             <input class="visually-hidden" type="file" name="template_zip" accept=".zip,application/zip" onchange="this.form.submit()">
           </label>
@@ -104,8 +102,8 @@
               <div class="muted">{{ template.filename }}{% if template.cached %} · cached{% endif %}</div>
             </div>
             <div class="row-actions">
-              <a href="/download/cv/{{ template.id }}">Download</a>
-              <button type="button" class="danger subtle-danger" hx-get="/cv/templates/{{ template.id }}/remove-confirm" hx-target="#modal-root" hx-swap="innerHTML">Remove</button>
+              <a href="/cv/?layout={{ template.id|urlencode }}&mime=application/pdf">Download</a>
+              <button type="button" class="danger subtle-danger" hx-get="/cv/templates/{{ template.id }}/modals/remove-confirm" hx-target="#modal-root" hx-swap="innerHTML">Remove</button>
             </div>
           </div>
         {% else %}
@@ -118,9 +116,8 @@
   <form id="cv-summary" class="cv-form" method="post" action="/cv/summary">
     <section class="card">
       <h2>Summary</h2>
-      <label>Profile summary
       </label>
-      <textarea name="summary" required>{{ cv.summary }}</textarea>
+      <textarea name="summary" rows="2" required>{{ cv.summary }}</textarea>
       <div class="sticky-actions">
         <button class="primary" type="submit">Save summary</button>
       </div>
@@ -155,7 +152,7 @@
   <section class="card">
     <div class="section-heading toolbar">
       <h2>Portfolio</h2>
-      <button type="button" hx-get="/cv/projects/new" hx-target="#modal-root" hx-swap="innerHTML">Add portfolio item</button>
+      <button type="button" hx-get="/cv/projects/modals/new" hx-target="#modal-root" hx-swap="innerHTML">Add portfolio item</button>
     </div>
     <form class="cv-inline-form" method="post" action="/cv/projects-url">
       {{ field("projects.url", "Portfolio URL", cv.projects.url, "url", False) }}

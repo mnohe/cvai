@@ -414,7 +414,6 @@ input, textarea, select {
   color: var(--text);
 }
 textarea {
-  min-height: 220px;
   resize: vertical;
 }
 .split {
@@ -809,8 +808,7 @@ textarea {
   bottom: 0;
   display: flex;
   justify-content: flex-end;
-  padding: 14px 0;
-  background: linear-gradient(to top, var(--bg) 75%, rgba(244, 246, 251, 0));
+  margin-top: .5em;
 }
 .cv-editor-card textarea {
   min-height: 260px;

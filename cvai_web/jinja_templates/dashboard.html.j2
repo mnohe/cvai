@@ -23,11 +23,11 @@
       <div class="row-actions">
         <a href="/roles/{{ role_record.canonical_slug }}">Details</a>
         <button
-          type="button"
-          data-title="{{ role_record.company }} · {{ role_record.role }}"
-          data-action="/roles/{{ role_record.canonical_slug }}/update-prompt"
-          onclick="openRoleUpdateDialog(this.dataset.title, this.dataset.action)"
-        >Update</button>
+	          type="button"
+	          data-title="{{ role_record.company }} · {{ role_record.role }}"
+	          data-target-id="{{ role_record.canonical_slug }}"
+	          onclick="openRoleUpdateDialog(this.dataset.title, this.dataset.targetId)"
+	        >Update</button>
       </div>
     </article>
   {% else %}
@@ -42,22 +42,24 @@
       <button type="submit">Close</button>
     </div>
   </form>
-  <form id="role-update-form" method="post" action="" hx-target="#operation-notice-root" hx-swap="outerHTML">
-    <label>Update prompt
-      <textarea name="prompt" required placeholder="Rejected on 2026-05-16 with this rationale: ..."></textarea>
+	  <form id="role-update-form" method="post" action="/actions" hx-post="/actions" hx-target="#operation-notice-root" hx-swap="outerHTML">
+	    <input type="hidden" name="action_type" value="role_update_prompt">
+	    <input type="hidden" name="target_type" value="role">
+	    <input type="hidden" name="target_id" value="">
+	    <label>Update prompt
+	      <textarea name="prompt" required rows="2" placeholder="Rejected on 2026-05-16 with this rationale: ..."></textarea>
     </label>
     <button class="primary" type="submit">Apply update</button>
   </form>
 </dialog>
 <script>
-  function openRoleUpdateDialog(title, action) {
-    const dialog = document.getElementById("role-update-dialog");
-    document.getElementById("role-update-title").textContent = title;
-    const form = document.getElementById("role-update-form");
-    form.action = action;
-    form.setAttribute("hx-post", action);
-    dialog.showModal();
-  }
+	  function openRoleUpdateDialog(title, targetId) {
+	    const dialog = document.getElementById("role-update-dialog");
+	    document.getElementById("role-update-title").textContent = title;
+	    const form = document.getElementById("role-update-form");
+	    form.querySelector('input[name="target_id"]').value = targetId;
+	    dialog.showModal();
+	  }
 </script>
 
 {% endblock %}

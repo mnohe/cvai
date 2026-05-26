@@ -98,10 +98,10 @@
       </div>
       {{ boolean_select("projects.items." ~ index ~ ".visible", "Show this portfolio item in generated CVs", item.visible is not defined or item.visible) }}
       <label>Summary
-        <textarea name="projects.items.{{ index }}.summary" required>{{ item.summary }}</textarea>
+        <textarea name="projects.items.{{ index }}.summary" rows="2" required>{{ item.summary }}</textarea>
       </label>
       <label>Description
-        <textarea name="projects.items.{{ index }}.description" required>{{ item.description }}</textarea>
+        <textarea name="projects.items.{{ index }}.description" rows="2" required>{{ item.description }}</textarea>
       </label>
       {{ text_list("projects.items." ~ index ~ ".keywords", item.keywords, "Keywords") }}
       <div class="nested-list">

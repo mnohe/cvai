@@ -1,0 +1,124 @@
+actions:
+- id: action-demo-completed-role-update
+  kind: role update
+  status: completed
+  log: |-
+    [2026-05-21T09:15:00+00:00] Interpreting update prompt for Ledgerly / Staff Backend Engineer.
+    [2026-05-21T09:15:04+00:00] Applied rejected status dated 2026-05-21.
+  log_lines:
+  - '[2026-05-21T09:15:00+00:00] Interpreting update prompt for Ledgerly / Staff Backend
+    Engineer.'
+  - '[2026-05-21T09:15:04+00:00] Applied rejected status dated 2026-05-21.'
+  result:
+    canonical_slug: ledgerly_remote_staff_backend_engineer_payments
+    paths:
+      role_state: roles/ledgerly_remote_staff_backend_engineer_payments/state.yaml
+  error: null
+  action_type: role_update_prompt
+  target_type: role
+  target_id: ledgerly_remote_staff_backend_engineer_payments
+  prompt: Rejected on 2026-05-21 after the payments team paused hiring.
+  input: {}
+  created_at: '2026-05-21T09:15:00+00:00'
+  updated_at: '2026-05-21T09:15:04+00:00'
+  completed_at: '2026-05-21T09:15:04+00:00'
+- id: action-demo-completed-quick-analysis
+  kind: quick analysis
+  status: completed
+  log: |-
+    [2026-05-22T14:03:00+00:00] Running quick fit analysis for pasted text.
+    [2026-05-22T14:03:08+00:00] Quick analysis completed. Continue or close this preview from the action page.
+  log_lines:
+  - '[2026-05-22T14:03:00+00:00] Running quick fit analysis for pasted text.'
+  - '[2026-05-22T14:03:08+00:00] Quick analysis completed. Continue or close this
+    preview from the action page.'
+  result:
+    quick_analysis:
+      summary: Strong fit for a platform engineering role focused on reliability,
+        Kubernetes, and production operations. The main open question is whether the
+        role needs direct ownership of customer-facing product delivery.
+      fit_level: strong
+      key_matching_abilities:
+      - Kubernetes platform operations and incident response.
+      - AWS-backed distributed systems and service reliability.
+      - Cross-team technical leadership with documented delivery outcomes.
+      important_gaps:
+      - requirement: Direct ownership of frontend product delivery.
+        category: inferred_requirement
+        fulfillment: unknown
+        estimated_effort: Clarify in recruiter screen.
+      recommendation: continue
+      rationale: Existing CV evidence covers the core backend, platform, and reliability
+        expectations.
+    intake:
+      kind: text
+      source_url: https://example.test/jobs/platform-engineer
+      source_text: Demo platform engineering posting with Kubernetes, AWS, observability,
+        and incident response responsibilities.
+      overrides:
+        company: Example Cloud
+        location: Remote
+        role: Senior Platform Engineer
+  error: null
+  action_type: quick_role_assessment
+  target_type: ''
+  target_id: ''
+  prompt: ''
+  input:
+    source_kind: text
+    source_url: https://example.test/jobs/platform-engineer
+    overrides:
+      company: Example Cloud
+      location: Remote
+      role: Senior Platform Engineer
+  created_at: '2026-05-22T14:03:00+00:00'
+  updated_at: '2026-05-22T14:03:08+00:00'
+  completed_at: '2026-05-22T14:03:08+00:00'
+- id: action-demo-failed-empty-json
+  kind: quick analysis
+  status: failed
+  log: |-
+    [2026-05-23T11:40:00+00:00] Fetching role page: https://example.test/jobs/uncooperative-board
+    [2026-05-23T11:40:02+00:00] Fetched 8420 characters of visible page text.
+    [2026-05-23T11:40:20+00:00] The LLM API returned an empty response instead of the requested JSON. finish_reason='length'; usage={'completion_tokens_details': {'reasoning_tokens': 6000}}; content_preview=''
+  log_lines:
+  - '[2026-05-23T11:40:00+00:00] Fetching role page: https://example.test/jobs/uncooperative-board'
+  - '[2026-05-23T11:40:02+00:00] Fetched 8420 characters of visible page text.'
+  - '[2026-05-23T11:40:20+00:00] The LLM API returned an empty response instead of
+    the requested JSON. finish_reason=''length''; usage={''completion_tokens_details'':
+    {''reasoning_tokens'': 6000}}; content_preview='''''
+  result: null
+  error: The LLM API returned an empty response instead of the requested JSON.
+  action_type: quick_role_assessment
+  target_type: ''
+  target_id: ''
+  prompt: ''
+  input:
+    source_kind: url
+    source_url: https://example.test/jobs/uncooperative-board
+  created_at: '2026-05-23T11:40:00+00:00'
+  updated_at: '2026-05-23T11:40:20+00:00'
+  completed_at: '2026-05-23T11:40:20+00:00'
+- id: action-demo-cancelled-preview
+  kind: quick analysis
+  status: cancelled
+  log: |-
+    [2026-05-24T08:10:00+00:00] Fetching role page: https://example.test/jobs/paused-role
+    [2026-05-24T08:10:03+00:00] Fetched 3120 characters of visible page text.
+    [2026-05-24T08:10:05+00:00] Action cancelled by user.
+  log_lines:
+  - '[2026-05-24T08:10:00+00:00] Fetching role page: https://example.test/jobs/paused-role'
+  - '[2026-05-24T08:10:03+00:00] Fetched 3120 characters of visible page text.'
+  - '[2026-05-24T08:10:05+00:00] Action cancelled by user.'
+  result: null
+  error: null
+  action_type: quick_role_assessment
+  target_type: ''
+  target_id: ''
+  prompt: ''
+  input:
+    source_kind: url
+    source_url: https://example.test/jobs/paused-role
+  created_at: '2026-05-24T08:10:00+00:00'
+  updated_at: '2026-05-24T08:10:05+00:00'
+  completed_at: '2026-05-24T08:10:05+00:00'

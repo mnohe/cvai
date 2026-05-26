@@ -139,7 +139,7 @@ class FakeLLM:
 class LiveServer:
     # LiveServer starts the ASGI app exactly like production does, but on a random
     # localhost port. Tests talk to it through HTTP so redirects, cookies, forms,
-    # background operations, and template rendering all cross the real network boundary.
+    # background actions, and template rendering all cross the real network boundary.
     def __init__(self, repo: Repository, llm: FakeLLM | None = None) -> None:
         self.port = self._free_port()
         app = create_fastapi_app(repo=repo, llm=llm or FakeLLM())
@@ -179,7 +179,7 @@ class LiveServer:
 class IntegrationTests(unittest.TestCase):
     def data_root(self) -> Path:
         # Each integration test gets a fresh, initialized data directory so writes made by
-        # forms and background operations can be asserted without affecting fixtures.
+        # forms and background actions can be asserted without affecting fixtures.
         temp_dir = tempfile.TemporaryDirectory()
         self.addCleanup(temp_dir.cleanup)
         root = create_sample_data_root(Path(temp_dir.name))
@@ -203,11 +203,16 @@ class IntegrationTests(unittest.TestCase):
                 data={"status": "completed", "detail": "pp-e2e-platform"},
             )
             status_update = client.post(
-                "/roles/ledgerly_remote_staff_backend_engineer_payments/update-prompt",
-                data={"prompt": "Rejected on 2026-05-20 with this rationale: Integration duplicate."},
+                "/actions",
+                data={
+                    "action_type": "role_update_prompt",
+                    "target_type": "role",
+                    "target_id": "ledgerly_remote_staff_backend_engineer_payments",
+                    "prompt": "Rejected on 2026-05-20 with this rationale: Integration duplicate.",
+                },
             )
-            status_fragment = self._poll_operation_fragment(client, status_update.headers["location"])
-            restricted_download = client.get("/download/file", params={"path": "roles.yaml"})
+            status_fragment = self._poll_action_fragment(client, status_update.headers["location"])
+            restricted_download = client.get("/roles/ledgerly_remote_staff_backend_engineer_payments/files/%2E%2E/%2E%2E/roles.yaml")
 
             updated_cv = client.get("/cv/")
             updated_task = client.get("/tasks/task_control_plane_case_study")
@@ -223,14 +228,14 @@ class IntegrationTests(unittest.TestCase):
         self.assertEqual(task_update.headers["location"], "/tasks/task_control_plane_case_study")
         self.assertIn("Completed", updated_task.text)
         self.assertIn("pp-e2e-platform", updated_task.text)
-        self.assertTrue(status_update.headers["location"].startswith("/operations/"))
+        self.assertTrue(status_update.headers["location"].startswith("/actions/"))
         self.assertIn("Applied rejected status dated 2026-05-20", status_fragment)
         self.assertIn("Rejected", updated_role.text)
         self.assertIn("Integration duplicate", updated_role.text)
         self.assertIn("Update prompt: Rejected on 2026-05-20 with this rationale: Integration duplicate.", updated_role.text)
         self.assertEqual(restricted_download.status_code, 403)
 
-    def test_hx_operation_launch_stays_on_page_and_updates_notice(self) -> None:
+    def test_hx_action_launch_stays_on_page_and_updates_notice(self) -> None:
         root = self.data_root()
         fake_llm = FakeLLM()
         with LiveServer(Repository(root), llm=fake_llm) as server, httpx.Client(
@@ -239,23 +244,28 @@ class IntegrationTests(unittest.TestCase):
             timeout=10,
         ) as client:
             response = client.post(
-                "/roles/ledgerly_remote_staff_backend_engineer_payments/update-prompt",
-                data={"prompt": "Rejected on 2026-05-20 with this rationale: Integration duplicate."},
+                "/actions",
+                data={
+                    "action_type": "role_update_prompt",
+                    "target_type": "role",
+                    "target_id": "ledgerly_remote_staff_backend_engineer_payments",
+                    "prompt": "Rejected on 2026-05-20 with this rationale: Integration duplicate.",
+                },
                 headers={"HX-Request": "true"},
             )
-            operation_match = re.search(r'href="(/operations/operation-[^"]+)"', response.text)
-            self.assertIsNotNone(operation_match)
-            operation_path = operation_match.group(1)
-            notice = self._poll_operation_notice(client, operation_path)
-            operation_page = client.get(operation_path)
+            action_match = re.search(r'href="(/actions/action-[^"]+)"', response.text)
+            self.assertIsNotNone(action_match)
+            action_path = action_match.group(1)
+            notice = self._poll_action_notice(client, action_path)
+            action_page = client.get(action_path)
             updated_role = client.get("/roles/ledgerly_remote_staff_backend_engineer_payments")
 
         self.assertEqual(response.status_code, 200)
         self.assertNotIn("location", response.headers)
         self.assertIn('id="operation-notice-root"', response.text)
         self.assertIn("completed", notice)
-        self.assertIn("COMPLETED", operation_page.text)
-        self.assertIn("finished with status completed", operation_page.text)
+        self.assertIn("COMPLETED", action_page.text)
+        self.assertIn("finished with status completed", action_page.text)
         self.assertIn("Update prompt: Rejected on 2026-05-20 with this rationale: Integration duplicate.", updated_role.text)
 
     def test_hx_quick_analysis_result_appears_in_ingestion_modal(self) -> None:
@@ -267,18 +277,19 @@ class IntegrationTests(unittest.TestCase):
             timeout=10,
         ) as client:
             response = client.post(
-                "/ingestions/text",
+                "/roles/",
                 data={
+                    "source_kind": "text",
                     "quick_analysis": "1",
                     "source_text": "FakeCorp needs a Staff Engineer to build Python platform services.",
                     "source_url": "https://example.test/fakecorp-staff-engineer",
                 },
                 headers={"HX-Request": "true"},
             )
-            operation_match = re.search(r"/operations/(operation-[^\"]+)/modal", response.text)
-            self.assertIsNotNone(operation_match)
-            operation_path = f"/operations/{operation_match.group(1)}"
-            modal = self._poll_operation_modal(client, operation_path, markers=("Quick analysis", "failed"))
+            action_match = re.search(r"/actions/(action-[^\"]+)/modal", response.text)
+            self.assertIsNotNone(action_match)
+            action_path = f"/actions/{action_match.group(1)}"
+            modal = self._poll_action_modal(client, action_path, markers=("Quick analysis", "failed"))
 
         self.assertEqual(response.status_code, 200)
         self.assertNotIn("location", response.headers)
@@ -289,7 +300,7 @@ class IntegrationTests(unittest.TestCase):
         self.assertIn("Continue full ingestion", modal)
         self.assertIn("Abandon", modal)
 
-    def test_text_ingestion_runs_background_operation_and_creates_role(self) -> None:
+    def test_text_ingestion_runs_background_action_and_creates_role(self) -> None:
         root = self.data_root()
         fake_llm = FakeLLM()
         with LiveServer(Repository(root), llm=fake_llm) as server, httpx.Client(
@@ -298,16 +309,17 @@ class IntegrationTests(unittest.TestCase):
             timeout=10,
         ) as client:
             response = client.post(
-                "/ingestions/text",
+                "/roles/",
                 data={
+                    "source_kind": "text",
                     "source_text": "FakeCorp needs a Staff Engineer to build Python platform services.",
                     "source_url": "https://example.test/fakecorp-staff-engineer",
                 },
             )
             self.assertEqual(response.status_code, 302)
-            operation_path = response.headers["location"]
+            action_path = response.headers["location"]
 
-            fragment = self._poll_operation_fragment(client, operation_path)
+            fragment = self._poll_action_fragment(client, action_path)
             role_page = client.get("/roles/fakecorp_remote_staff_engineer")
 
         self.assertEqual(len(fake_llm.generated_bundles), 1)
@@ -327,29 +339,25 @@ class IntegrationTests(unittest.TestCase):
             timeout=10,
         ) as client:
             response = client.post(
-                "/ingestions/text",
+                "/roles/",
                 data={
+                    "source_kind": "text",
                     "quick_analysis": "1",
                     "source_text": "FakeCorp needs a Staff Engineer to build Python platform services.",
                     "source_url": "https://example.test/fakecorp-staff-engineer",
                 },
             )
             self.assertEqual(response.status_code, 302)
-            operation_path = response.headers["location"]
+            action_path = response.headers["location"]
 
-            fragment = self._poll_operation_fragment(client, operation_path, markers=("Quick analysis completed", "failed"))
-            abandon = client.post(f"{operation_path}/abandon")
-            abandoned_fragment = self._poll_operation_fragment(
-                client,
-                operation_path,
-                markers=("Quick analysis abandoned", "failed"),
-            )
+            fragment = self._poll_action_fragment(client, action_path, markers=("Quick analysis completed", "failed"))
+            action_page = client.get(action_path)
 
         self.assertEqual(len(fake_llm.quick_analyses), 1)
         self.assertEqual(len(fake_llm.generated_bundles), 0)
         self.assertIn("Quick analysis completed", fragment)
-        self.assertEqual(abandon.status_code, 302)
-        self.assertIn("Quick analysis abandoned", abandoned_fragment)
+        self.assertEqual(action_page.status_code, 200)
+        self.assertIn("Quick analysis", action_page.text)
         self.assertFalse((root / "roles" / "fakecorp_remote_staff_engineer").exists())
 
     def test_quick_text_ingestion_can_continue_to_full_ingestion(self) -> None:
@@ -361,25 +369,33 @@ class IntegrationTests(unittest.TestCase):
             timeout=10,
         ) as client:
             response = client.post(
-                "/ingestions/text",
+                "/roles/",
                 data={
+                    "source_kind": "text",
                     "quick_analysis": "1",
                     "source_text": "FakeCorp needs a Staff Engineer to build Python platform services.",
                     "source_url": "https://example.test/fakecorp-staff-engineer",
                 },
             )
             self.assertEqual(response.status_code, 302)
-            preview_operation_path = response.headers["location"]
+            preview_action_path = response.headers["location"]
 
-            preview_fragment = self._poll_operation_fragment(
+            preview_fragment = self._poll_action_fragment(
                 client,
-                preview_operation_path,
+                preview_action_path,
                 markers=("Quick analysis completed", "failed"),
             )
-            continue_response = client.post(f"{preview_operation_path}/continue-ingestion")
+            continue_response = client.post(
+                "/roles/",
+                data={
+                    "source_kind": "text",
+                    "source_text": "FakeCorp needs a Staff Engineer to build Python platform services.",
+                    "source_url": "https://example.test/fakecorp-staff-engineer",
+                },
+            )
             self.assertEqual(continue_response.status_code, 302)
-            full_operation_path = continue_response.headers["location"]
-            full_fragment = self._poll_operation_fragment(client, full_operation_path)
+            full_action_path = continue_response.headers["location"]
+            full_fragment = self._poll_action_fragment(client, full_action_path)
             role_page = client.get("/roles/fakecorp_remote_staff_engineer")
 
         self.assertEqual(len(fake_llm.quick_analyses), 1)
@@ -391,12 +407,12 @@ class IntegrationTests(unittest.TestCase):
         self.assertIn("FakeCorp", role_page.text)
         self.assertTrue((root / "roles" / "fakecorp_remote_staff_engineer" / "analysis.yaml").exists())
 
-    def _poll_operation_fragment(self, client: httpx.Client, operation_path: str, markers: tuple[str, ...] | None = None) -> str:
-        # Background operations complete quickly with FakeLLM, but polling keeps the test
+    def _poll_action_fragment(self, client: httpx.Client, action_path: str, markers: tuple[str, ...] | None = None) -> str:
+        # Background actions complete quickly with FakeLLM, but polling keeps the test
         # faithful to the browser flow and catches regressions in the fragment URL.
         markers = markers or ("Ingestion completed", "Applied ", "failed")
         deadline = time.time() + 10
-        fragment_path = f"{operation_path}/fragment"
+        fragment_path = f"{action_path}/fragment"
         latest = ""
         while time.time() < deadline:
             response = client.get(fragment_path)
@@ -404,31 +420,31 @@ class IntegrationTests(unittest.TestCase):
             if any(marker in latest for marker in markers):
                 return latest
             time.sleep(0.1)
-        self.fail(f"Background operation did not finish. Last fragment: {latest}")
+        self.fail(f"Background action did not finish. Last fragment: {latest}")
 
-    def _poll_operation_notice(self, client: httpx.Client, operation_path: str, markers: tuple[str, ...] | None = None) -> str:
+    def _poll_action_notice(self, client: httpx.Client, action_path: str, markers: tuple[str, ...] | None = None) -> str:
         markers = markers or ("completed", "failed")
         deadline = time.time() + 10
         latest = ""
         while time.time() < deadline:
-            response = client.get(f"{operation_path}/notice")
+            response = client.get(f"{action_path}/notice")
             latest = response.text
             if any(marker in latest for marker in markers):
                 return latest
             time.sleep(0.1)
-        self.fail(f"Background operation notice did not finish. Last notice: {latest}")
+        self.fail(f"Background action notice did not finish. Last notice: {latest}")
 
-    def _poll_operation_modal(self, client: httpx.Client, operation_path: str, markers: tuple[str, ...] | None = None) -> str:
+    def _poll_action_modal(self, client: httpx.Client, action_path: str, markers: tuple[str, ...] | None = None) -> str:
         markers = markers or ("completed", "failed")
         deadline = time.time() + 10
         latest = ""
         while time.time() < deadline:
-            response = client.get(f"{operation_path}/modal")
+            response = client.get(f"{action_path}/modal")
             latest = response.text
             if any(marker in latest for marker in markers):
                 return latest
             time.sleep(0.1)
-        self.fail(f"Background operation modal did not finish. Last modal: {latest}")
+        self.fail(f"Background action modal did not finish. Last modal: {latest}")
 
     def cv_form_data(self, *, summary: str) -> dict[str, str]:
         return {

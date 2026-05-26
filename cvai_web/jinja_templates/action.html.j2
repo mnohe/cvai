@@ -1,0 +1,19 @@
+{% extends "base.html.j2" %}
+
+{% block body %}
+<section class="hero">
+  <div>
+    <div class="hero-title-row">
+      <h1>Action</h1>
+      {% include "action_status_badge.html.j2" %}
+    </div>
+    <p class="operation-id"><code>{{ operation.id }}</code></p>
+    {% include "action_summary_text.html.j2" %}
+    {% if operation.status == "failed" and operation.error %}
+      <div class="flash error">{{ operation.error }}</div>
+    {% endif %}
+  </div>
+</section>
+
+{% include "action_fragment.html.j2" %}
+{% endblock %}

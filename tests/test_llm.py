@@ -101,6 +101,28 @@ class OpenAIClientErrorTests(unittest.TestCase):
         self.assertEqual(result, {"ok": True})
         request = urlopen.call_args.args[0]
         self.assertEqual(request.full_url, "https://llm.example/v1/chat/completions")
+        payload = json.loads(request.data.decode("utf-8"))
+        self.assertNotIn("reasoning_effort", payload)
+
+    def test_json_chat_sets_low_reasoning_effort_for_openai_reasoning_models(self) -> None:
+        client = OpenAIClient(LLMConfig(api_key="test", model="gpt-5", base_url="https://api.openai.com/v1"))
+
+        class FakeResponse:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_args):
+                return None
+
+            def read(self):
+                return json.dumps({"choices": [{"message": {"content": "{\"ok\": true}"}}]}).encode("utf-8")
+
+        with mock.patch("cvai_core.llm.urllib.request.urlopen", return_value=FakeResponse()) as urlopen:
+            client._json_chat("Return JSON.", {}, 10)
+
+        request = urlopen.call_args.args[0]
+        payload = json.loads(request.data.decode("utf-8"))
+        self.assertEqual(payload["reasoning_effort"], "low")
 
     def test_json_chat_wraps_http_and_url_errors(self) -> None:
         client = OpenAIClient(LLMConfig(api_key="test", model="gpt-5", base_url="https://llm.example/v1"))
@@ -148,7 +170,19 @@ class OpenAIClientErrorTests(unittest.TestCase):
             "cvai_core.llm.urllib.request.urlopen",
             return_value=FakeResponse({"choices": [{"message": {"content": "not-json"}}]}),
         ):
-            with self.assertRaises(json.JSONDecodeError):
+            with self.assertRaisesRegex(RuntimeError, "not valid JSON"):
+                client._json_chat("Return JSON.", {}, 10)
+
+        with mock.patch(
+            "cvai_core.llm.urllib.request.urlopen",
+            return_value=FakeResponse(
+                {
+                    "choices": [{"finish_reason": "length", "message": {"content": ""}}],
+                    "usage": {"completion_tokens_details": {"reasoning_tokens": 10}},
+                }
+            ),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "max_completion_tokens"):
                 client._json_chat("Return JSON.", {}, 10)
 
 

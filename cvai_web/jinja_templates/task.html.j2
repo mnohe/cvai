@@ -24,7 +24,7 @@
         </select>
       </label>
       <label>Evidence or note
-        <textarea name="detail" placeholder="Evidence that closes the gap, or why this will not be done.">{{ task.status_detail }}</textarea>
+        <textarea name="detail" rows="2" placeholder="Evidence that closes the gap, or why this will not be done.">{{ task.status_detail }}</textarea>
       </label>
       <button class="action" type="submit">Update task</button>
     </form>
@@ -34,7 +34,10 @@
   <article class="card">
     <div class="toolbar" style="justify-content:space-between;align-items:center;margin-bottom:10px;">
       <h3 style="margin:0;">Acceptance criteria</h3>
-      <form method="post" action="/tasks/{{ task.id }}/reassess" hx-post="/tasks/{{ task.id }}/reassess" hx-target="#operation-notice-root" hx-swap="outerHTML" style="margin:0;">
+      <form method="post" action="/actions" hx-post="/actions" hx-target="#operation-notice-root" hx-swap="outerHTML" style="margin:0;">
+        <input type="hidden" name="action_type" value="task_assessment">
+        <input type="hidden" name="target_type" value="task">
+        <input type="hidden" name="target_id" value="{{ task.id }}">
         <button type="submit">Reassess</button>
       </form>
     </div>

@@ -34,6 +34,14 @@ STATUS_LABELS = {
     "inactive": "Inactive",
 }
 
+# Role cards need a compact rationale; mirror summaries may contain more bullets,
+# but only the first few belong in the persisted one-line state summary.
+ROLE_STATE_RATIONALE_BULLETS = 2
+
+# Cached CV PDF filenames use an initial plus surname, which keeps generated
+# filenames compact while avoiding a bare template name.
+CV_FILENAME_INITIAL_CHARS = 1
+
 
 @dataclass
 class RoleEvent:
@@ -429,7 +437,7 @@ class Repository:
             "status_artifacts": [],
             "verdict": generated["mirror_summary"]["verdict"],
             "verdict_label": verdict_label(generated["mirror_summary"]["verdict"]),
-            "rationale": " ".join(generated["mirror_summary"]["bullets"][:2]),
+            "rationale": " ".join(generated["mirror_summary"]["bullets"][:ROLE_STATE_RATIONALE_BULLETS]),
         }
         self.write_data(f"{role_dir}/role.yaml", role_data)
         self.write_data(f"{role_dir}/state.yaml", state_data)
@@ -698,7 +706,7 @@ class Repository:
             contact = {}
         first_name = str(contact.get("name") or "").strip()
         last_name = str(contact.get("surname") or "").strip()
-        initial = slugify(first_name[:1] or "cv")
+        initial = slugify(first_name[:CV_FILENAME_INITIAL_CHARS] or "cv")
         surname = slugify(last_name or "cv")
         template_slug = slugify(template)
         return f"{initial}{surname}-{template_slug}.pdf"

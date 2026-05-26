@@ -31,15 +31,20 @@
   {% if quick.rationale %}
     <p>{{ quick.rationale }}</p>
   {% endif %}
-  {% if not operation.result.abandoned %}
-    <div class="toolbar" style="margin-top:14px;">
-      <form method="post" action="/operations/{{ operation.id }}/continue-ingestion" hx-post="/operations/{{ operation.id }}/continue-ingestion" hx-target="#operation-modal-root" hx-swap="outerHTML">
-        <button class="primary" type="submit">Continue full ingestion</button>
-      </form>
-      <form method="post" action="/operations/{{ operation.id }}/abandon" hx-post="/operations/{{ operation.id }}/abandon" hx-target="#operation-modal-root" hx-swap="outerHTML">
-        <button type="submit">Abandon</button>
-      </form>
-    </div>
+	  {% if not operation.result.abandoned %}
+	    <div class="toolbar" style="margin-top:14px;">
+	      {% set intake = operation.result.intake %}
+	      <form method="post" action="/roles/" hx-post="/roles/" hx-target="#operation-modal-root" hx-swap="outerHTML">
+	        <input type="hidden" name="source_kind" value="{{ intake.kind }}">
+	        <input type="hidden" name="source_url" value="{{ intake.source_url }}">
+	        <input type="hidden" name="source_text" value="{{ intake.source_text }}">
+	        {% for key, value in (intake.overrides or {}).items() %}
+	          <input type="hidden" name="{{ key }}" value="{{ value }}">
+	        {% endfor %}
+	        <button class="primary" type="submit">Continue full ingestion</button>
+	      </form>
+	      <button type="button" onclick="this.closest('dialog').close(); this.closest('dialog').remove();">Abandon</button>
+	    </div>
   {% else %}
     <div class="flash">Quick analysis abandoned. No role files were written.</div>
   {% endif %}

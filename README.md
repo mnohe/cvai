@@ -86,6 +86,8 @@ Set these values in the environment or in a `.env` file inside `CVAI_DATA`:
 - `LLM_API_KEY`: API token for LLM-backed workflows.
 - `LLM_MODEL`: model name.
 - `LLM_BASE_URL`: OpenAI-compatible API base URL.
+- `LLM_REASONING_EFFORT`: optional reasoning effort override for providers
+  that support it. OpenAI GPT-5/o-series models default to `low`.
 
 ## Docker Compose
 
@@ -104,6 +106,7 @@ services:
       LLM_API_KEY: "${LLM_API_KEY}"
       LLM_MODEL: "${LLM_MODEL:-gpt-5.1}"
       LLM_BASE_URL: "${LLM_BASE_URL:-https://api.openai.com/v1}"
+      LLM_REASONING_EFFORT: "${LLM_REASONING_EFFORT:-}"
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
@@ -124,10 +127,9 @@ Set `LLM_API_KEY` in a `.env` file beside the compose file or export it in your 
 
 **Run exactly one replica.** Do not set `replicas` above 1 without additional infrastructure changes.
 
-Two properties of the current design require a single-pod deployment:
+One property of the current design requires a single-pod deployment:
 
-1. **In-memory operation state.** Background ingestion and reassessment operations are tracked in a process-local dict. A browser polling `/operations/{id}/fragment` will receive a 404 if the request is routed to a different pod than the one that started the operation.
-2. **Filesystem write coordination.** Role bundles and status updates are written as YAML files under `CVAI_DATA`. Concurrent writes from two pods to the same file are not coordinated and will race.
+1. **Filesystem write coordination.** Role bundles, action records, and status updates are written as YAML files under `CVAI_DATA`. Concurrent writes from two pods to the same file are not coordinated and will race.
 
 A minimal deployment for a home-lab cluster:
 

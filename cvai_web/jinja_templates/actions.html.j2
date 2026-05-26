@@ -3,7 +3,16 @@
 {% block body %}
 <section class="grid">
   <article class="card">
-    <h3>Operations</h3>
+    <h3>New action</h3>
+    <form method="post" action="/actions" hx-post="/actions" hx-target="#operation-notice-root" hx-swap="outerHTML">
+      <textarea name="prompt" required rows="2" placeholder="E.g. 'Rejected for the Ledgerly role after final interview', 'Close all stale submitted roles'..."></textarea>
+      <div class="sticky-actions">
+        <button class="primary" type="submit">Run action</button>
+      </div>
+    </form>
+  </article>
+  <article class="card">
+    <h3>Actions</h3>
     <div class="list">
       {% for operation in operations %}
         <div class="list-item">
@@ -14,12 +23,12 @@
             </div>
             <div class="toolbar">
               <span class="pill">{{ operation.status }}</span>
-              <a href="/operations/{{ operation.id }}">Open</a>
+              <a href="/actions/{{ operation.id }}">Details</a>
             </div>
           </div>
         </div>
       {% else %}
-        <div class="list-item muted">No operations have been launched in this session.</div>
+        <div class="list-item muted">No actions have been recorded yet.</div>
       {% endfor %}
     </div>
   </article>

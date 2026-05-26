@@ -47,7 +47,7 @@
 
 ---
 
-## Edit and download the generic CV
+## Edit and download the CV
 
 **Actor**: user
 
@@ -58,9 +58,10 @@
 5. Add, remove, or reorder repeatable entries with the editor controls.
 6. Submit the form. The server validates the full CV structure before writing and removes the cached PDF so it can be rebuilt.
 7. Click the PDF download link in the CV section.
-8. If `CVAI_DATA/cv/cv.pdf` already exists, the app serves it directly.
-9. If the PDF is missing, the app triggers the Typst renderer with the configured data layout and serves the result.
-10. If Typst is not installed, the app returns a clear error rather than a 500.
+8. The link requests `GET /cv/?layout=<layout>&mime=application/pdf`.
+9. If the cached layout-specific PDF already exists, the app serves it directly.
+10. If the PDF is missing, the app triggers the Typst renderer with the requested data layout and serves the result.
+11. If Typst is not installed, the app returns a clear error rather than a 500.
 
 **LLM**: not used.
 
@@ -72,16 +73,16 @@
 
 **Precondition**: an LLM provider is configured (`LLM_API_KEY`, `LLM_MODEL`, and `LLM_BASE_URL` are set).
 
-1. Click Ingest Role and submit the URL intake form (`POST /ingestions/url`).
+1. Click Ingest Role and submit the URL intake form (`POST /roles/` with `source_kind=url`).
 2. The app validates the URL scheme (`https` only) and checks the resolved IP is not in a private range.
-3. A background operation starts; the current page shows an operation notice, linked to an operation detail page, until completion or failure.
+3. A durable action starts; the current page shows an action notice, linked to an action detail page, until completion or failure.
 4. Background task:
    - Fetches the URL and extracts visible text.
    - Calls the LLM to extract `company`, `role`, and `location`.
-   - If metadata is not clearly recoverable, the operation fails with a message directing the user to paste-text intake.
+   - If metadata is not clearly recoverable, the action fails with a message directing the user to paste-text intake.
    - Calls the LLM to generate the full artifact bundle.
    - Writes `roles/<role_id>/` and updates `roles.yaml` and `applications.yaml`.
-5. On success, the operation page links to the new role's detail page.
+5. On success, the action page links to the new role's detail page.
 
 **LLM**: role extraction, bundle generation.
 
@@ -93,11 +94,11 @@
 
 **Precondition**: an LLM provider is configured.
 
-1. Click Ingest Role and submit the pasted-text intake form (`POST /ingestions/text`) with the job description text and an optional source URL, company, location, and role title.
+1. Click Ingest Role and submit the pasted-text intake form (`POST /roles/` with `source_kind=text`) with the job description text and an optional source URL, company, location, and role title.
 2. Manual override fields (company, location, role) are passed to the LLM as hints and take precedence when provided.
-3. A background operation starts; the current page shows an operation notice.
+3. A durable action starts; the current page shows an action notice.
 4. Background task proceeds the same as URL ingestion from step 4c onward.
-5. On success, the operation page links to the new role's detail page.
+5. On success, the action page links to the new role's detail page.
 
 **LLM**: role extraction (non-strict mode), bundle generation.
 
@@ -123,8 +124,8 @@
 
 1. On the dashboard, click Update on a role row to open the update dialog.
 2. Enter a free-form prompt, for example: `"Rejected on 2026-05-16, recruiter said they went with someone with more Go experience."`
-3. Submit the form (`POST /roles/<role_id>/update-prompt`).
-4. A background operation starts, the current page shows an operation notice, and the LLM interprets the prompt.
+3. Submit the form (`POST /actions` with `action_type=role_update_prompt` and a role target).
+4. A durable action starts, the current page shows an action notice, and the LLM interprets the prompt.
 5. The LLM returns structured status fields and any internal notes; the repository write path applies them.
 
 **LLM**: status prompt interpretation.
@@ -154,12 +155,12 @@ Two paths are available:
 
 1. Edit the CV through `/cv/`, or update `CVAI_DATA/cv/cv.yaml` directly if you are working outside the web UI.
 2. Run the PDF renderer or click the CV page's PDF download link.
-3. The data-owned Typst templates render the YAML and write `CVAI_DATA/cv/cv.pdf`.
+3. The data-owned Typst templates render the YAML and write a layout-specific PDF under `CVAI_DATA/cv/`.
 
 **Via web UI (on demand)**:
 
 1. Open `/cv/`.
-2. If `CVAI_DATA/cv/cv.pdf` is absent, `cvai` triggers the Typst renderer and serves the result.
+2. If the requested layout-specific PDF is absent, `cvai` triggers the Typst renderer and serves the result.
 3. Subsequent downloads serve the cached PDF until `cv.yaml` changes and the file is deleted or rebuilt.
 
 **LLM**: not used.
@@ -185,7 +186,8 @@ Two paths are available:
 
 1. Set `LLM_API_KEY`, `LLM_MODEL`, and `LLM_BASE_URL`.
 2. To use a third-party OpenAI-compatible endpoint (e.g. Mistral or a local gateway), set `LLM_BASE_URL` to that endpoint's base URL and set `LLM_MODEL` to a model it supports.
-3. Restart `cvai`. The client is loaded once at startup; no reload is needed for model or key changes if the variables are set before the process starts.
+3. Optionally set `LLM_REASONING_EFFORT` if the provider supports reasoning-effort controls.
+4. Restart `cvai`. The client is loaded once at startup; no reload is needed for model or key changes if the variables are set before the process starts.
 
 **LLM**: not used during configuration; the provider is exercised only when an intake or prompt update is submitted.
 
@@ -197,7 +199,7 @@ Two paths are available:
 
 1. Open the task detail page (`GET /tasks/<task_id>`).
 2. Click Reassess.
-3. The app starts a background operation and sends the task, current CV YAML, and role requirements that reference the task to the LLM.
+3. The app starts a durable action and sends the task, current CV YAML, and role requirements that reference the task to the LLM.
 4. The LLM returns a structured result with `status`, `detail`, and optional `evidence_refs`.
 5. The app writes the updated task state to `tasks.yaml`.
 6. The task page shows the new status and evidence detail.

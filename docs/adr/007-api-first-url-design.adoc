@@ -1,0 +1,47 @@
+= ADR-007: API-first URL design
+
+Status: Accepted +
+Date: 2026-05-25
+
+== Context
+
+CVAI is currently a server-rendered web application, but many workflows map
+cleanly onto resources that could later emit HTML or JSON depending on the
+request.
+Some existing routes are named after UI actions or implementation functions,
+such as `remove`, `reassess`, `download`, and `continue-ingestion`.
+
+Keeping route names resource-oriented makes the interface easier to reason
+about, reduces coupling between URL shape and UI widgets, and leaves room for
+automation or API clients later.
+
+== Decision
+
+Design web routes API-first and UI-later:
+
+* URLs should represent browseable resources wherever practical.
+* Routes that represent resources should be able to return JSON in the future
+  when requested, even if they initially return only HTML or redirects.
+* HTML-only routes are acceptable for explicit UI fragments, such as modal
+  bodies. These should be named as UI resources, for example
+  `.../modals/edit`, and may reject non-HTML requests.
+* A concept should not get its own URL unless it is a page, resource, or
+  durable subresource. For example, `roles`, `cv`, and `actions` are
+  resources; a transient implementation step such as `ingestions` should be
+  modeled through the resource it creates or affects.
+* LLM-driven writes should be modeled as explicit resource changes or action
+  records, not as safe `GET` requests.
+
+== Consequences
+
+Renaming existing routes will require coordinated updates to FastAPI handlers,
+templates, tests, and user documentation.
+
+Some UI controls will map to resources indirectly. For example, a button that
+reorders CV entries may send a partial update to the CV section order, rather
+than posting to a `move` URL.
+
+Actions are the public resource for LLM-backed work. They represent the user's
+durable request, current status, log, result, and error if one occurred.
+Internal background jobs execute actions, but jobs are not exposed as public
+resources or navigation destinations.
