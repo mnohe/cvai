@@ -236,6 +236,7 @@ class ActionManager:
         self.repo = repo
         self._actions: dict[str, Action] = {}
         self._operations = self._actions
+        self._threads: dict[str, threading.Thread] = {}
         self._lock = threading.Lock()
         self._load()
 
@@ -265,13 +266,15 @@ class ActionManager:
             self._actions[action_id] = action
             self.save()
         thread = threading.Thread(target=self._run, args=(action, worker), daemon=True)
+        with self._lock:
+            self._threads[action_id] = thread
         thread.start()
         return action
 
     def _run(self, action: Action, worker: Callable[[Action], None]) -> None:
-        action.status = "running"
-        action.touch()
         try:
+            action.status = "running"
+            action.touch()
             worker(action)
             if action.status != "cancelled":
                 action.status = "completed"
@@ -291,6 +294,8 @@ class ActionManager:
             if action.status in {"completed", "failed", "cancelled"} and not action.completed_at:
                 action.completed_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
             action.touch()
+            with self._lock:
+                self._threads.pop(action.id, None)
 
     def get(self, action_id: str) -> Action | None:
         return self._actions.get(action_id)
@@ -309,6 +314,18 @@ class ActionManager:
 
     def active_count(self) -> int:
         return sum(1 for action in self._actions.values() if action.status in {"queued", "running"})
+
+    def wait_for_idle(self, timeout: float | None = None) -> None:
+        """Wait for currently running background operations to finish.
+
+        Production code normally lets action threads finish asynchronously while
+        the UI polls. Tests use this before deleting temporary data roots so a
+        final action persistence write cannot race directory cleanup.
+        """
+        with self._lock:
+            threads = list(self._threads.values())
+        for thread in threads:
+            thread.join(timeout=timeout)
 
     def save(self) -> None:
         payload = {"actions": [action.as_dict() for action in self._actions.values()]}

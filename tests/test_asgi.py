@@ -76,6 +76,7 @@ class FastAPIRouteTests(unittest.TestCase):
             repo=Repository(self.data_root()),
             llm=llm or OpenAIClient(LLMConfig(api_key="", model="test", base_url="https://example.test/v1")),
         )
+        self.addCleanup(app.state.service.actions.wait_for_idle, 5)
         return ASGITestClient(app)
 
     def test_dashboard_route_uses_fastapi(self) -> None:
