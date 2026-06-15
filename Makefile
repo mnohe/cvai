@@ -3,12 +3,15 @@ MAKEFLAGS += --no-print-directory
 FUNCTIONS_DIR := functions
 WEB_DIR := web
 
-.PHONY: emulate test-functions build-functions deploy-functions lint test-e2e setup
+.PHONY: emulate dev-web test-functions build-functions build-web deploy-functions lint test-e2e setup
 
 # Start Firebase emulators (auth, firestore, storage, hosting).
 # Run the Go backend separately: cd functions && go run ./cmd/...
 emulate:
 	firebase emulators:start --project demo-cvai --import=emulator-data --export-on-exit=emulator-data
+
+dev-web:
+	cd $(WEB_DIR) && npm run dev
 
 # Run Go unit and integration tests against the emulators.
 # Requires Firebase emulators to be running (make emulate in another terminal).
@@ -20,7 +23,10 @@ test-functions:
 		go test -race ./...
 
 build-functions:
-	cd $(FUNCTIONS_DIR) && go build ./cmd/...
+	cd $(FUNCTIONS_DIR) && go build -o /tmp/cvai-functions ./cmd/...
+
+build-web:
+	cd $(WEB_DIR) && npm run build
 
 # Deploy the Go backend as a Cloud Run service.
 deploy-functions:
@@ -35,9 +41,9 @@ deploy-functions:
 lint:
 	cd $(FUNCTIONS_DIR) && go vet ./...
 
-# Run Playwright E2E tests. Requires emulators and web dev server running.
+# Run Playwright E2E tests. Requires the Firebase Auth emulator to be running.
 test-e2e:
-	cd $(WEB_DIR) && npx playwright test
+	cd $(WEB_DIR) && npm run test:e2e
 
 # Generate go.sum and tidy module graph. Run once after first checkout.
 setup:

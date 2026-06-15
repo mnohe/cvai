@@ -21,7 +21,12 @@ jobs:
         with:
           go-version: '1.23'
           cache: true
-          cache-dependency-path: functions/go.sum
+          cache-dependency-path: functions/go.mod
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
 
       - name: Install Firebase CLI
         run: npm install -g firebase-tools
@@ -34,14 +39,15 @@ jobs:
           firebase emulators:exec \
             --only auth,firestore \
             --project demo-cvai \
-            'go test -race ./...'
+            'cd functions && go test -race ./...'
+        working-directory: .
         env:
           FIRESTORE_EMULATOR_HOST: localhost:8080
           FIREBASE_AUTH_EMULATOR_HOST: localhost:9099
           FIREBASE_PROJECT_ID: demo-cvai
 
       - name: Build
-        run: go build ./cmd/...
+        run: go build -o /tmp/cvai-functions ./cmd/...
 
       - name: Docker smoke test
         run: |
@@ -63,26 +69,45 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
-          cache-dependency-path: web/package-lock.json
+          cache-dependency-path: ./web/package-lock.json
 
       - run: npm ci
       - run: npm run build
 
-  # E2E job — activated in Stage 15 when the web app scaffold is added.
-  # e2e:
-  #   name: E2E (Playwright)
-  #   runs-on: ubuntu-latest
-  #   needs: [functions, web]
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - name: Install Firebase CLI
-  #       run: npm install -g firebase-tools
-  #     - name: Start emulators + serve web app + run Playwright
-  #       run: |
-  #         firebase emulators:exec \
-  #           --only auth,firestore,hosting \
-  #           --project demo-cvai \
-  #           'npx playwright test'
-  #       working-directory: web
+  e2e:
+    name: E2E (Playwright)
+    runs-on: ubuntu-latest
+    needs: [functions, web]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: ./web/package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools
+
+      - name: Install web dependencies
+        run: npm ci
+        working-directory: web
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+        working-directory: web
+
+      - name: Run Playwright
+        run: |
+          firebase emulators:exec \
+            --only auth,firestore \
+            --project demo-cvai \
+            'npm --prefix web run test:e2e'
