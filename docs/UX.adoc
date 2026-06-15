@@ -1,0 +1,373 @@
+= CVAI UX Strategy
+:toc:
+:toc-placement!:
+:toclevels: 2
+
+toc::[]
+
+---
+
+== Design philosophy
+
+CVAI is a tool for a high-stakes, time-pressured activity — job searching.
+The UX must feel like a trusted analyst sitting next to the user, not an admin panel.
+
+Three principles drive every decision:
+
+. *Verdict first.* The AI's judgement (CLEAR FIT / FIT / PARTIAL / NO FIT) is the most important output.
+It appears at the top of every role view, in large type, before any supporting detail.
+. *Act, don't browse.* Every screen surfaces the one thing the user should do next.
+Gaps become tasks with one click. Statuses change inline. Nothing is buried in sub-menus.
+. *Quiet confidence.* The visual language is clean and restrained.
+Colour is used only to signal meaning (verdict, status, action), never decoration.
+
+---
+
+== Design system
+
+=== Colour palette
+
+Derived directly from the logo mark:
+
+[cols="1,1,3", options="header"]
+|===
+| Token | Hex | Usage
+
+| `--navy` | `#0b3954` | Sidebar background; primary text; active nav
+| `--steel` | `#bfd7ea` | Sidebar secondary text; logo A/I letterforms; steel accent details
+| `--coral` | `#ff5a5f` | Primary CTA button only; logo diamond on the I
+| `--bg` | `#f4f8fb` | Page/app background
+| `--surface` | `#ffffff` | Card and panel surfaces
+| `--ghost-bg` | `#eef3f7` | Ghost/secondary button fill (hex-shaped, no border)
+| `--border` | `#dce8f2` | All borders and dividers — 1 px, no box shadows anywhere
+| `--text-1` | `#0b3954` | Body text (same as navy)
+| `--text-2` | `#4a6b7c` | Secondary / label text
+|===
+
+=== Verdict colours
+
+Verdict labels use their own semantic colours, separate from the brand palette:
+
+[cols="1,1,2", options="header"]
+|===
+| Label | Hex | Context
+
+| CLEAR FIT | `#0e7c3e` | Strong match; hex-shaped block with diamond left accent on role detail
+| FIT | `#1565c0` | Solid match with minor gaps; blue text
+| PARTIAL | `#b45309` | Significant gaps present; amber text
+| NO FIT | `#b91c1c` | Hard blockers present; red text
+| Analysing… | `--text-2` | In-flight LLM assessment; shown with steel progress bar
+|===
+
+=== Typography
+
+System font stack: `-apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif`
+
+No custom font dependency at launch. Inter is the design target and can be swapped in once the
+product is stable.
+
+[cols="1,1,1", options="header"]
+|===
+| Role | Size | Weight
+
+| Verdict label | 20–22 px | 700
+| Card title / section heading | 16 px | 600
+| Body text | 13–16 px | 400–500
+| Labels (uppercase) | 10–12 px | 600, letter-spacing 0.08 em
+| Badges | 10–11 px | 600
+|===
+
+=== Shape language
+
+The geometric logo — specifically the 2:1 tall coral diamond on the I — informs every shape in the UI.
+The proportions are invariant: all diamonds and rhombuses are 2 units tall by 1 unit wide.
+
+*No rounded corners anywhere.* A global reset of `border-radius: 0` applies to every element.
+Circular or pill shapes are replaced by diamonds or sharp rectangles as described below.
+
+*`ThinkButton` — LLM / credit-consuming actions only.*
+Only actions that invoke the LLM (and therefore consume a credit) use the hex silhouette.
+All other buttons — status selectors, artifact links, navigation — are plain sharp rectangles.
+This lets shape communicate action type: pointed = AI action, rectangular = UI action.
+The ✨ is injected by the component itself via CSS `::after { content: '\00a0✨'; }` —
+it must not appear in the label string passed by the caller.
+`<CreditsBadge>` also renders ✨ to visually link the cost indicator to the actions that consume it.
+The component is named `ThinkButton` so the name describes the semantic — it triggers inference — and survives a future style change.
+
+The hex shape uses a `mask-image: conic-gradient` technique.
+The angle `atan(1/2) = 26.565°` is derived from the logo's 2:1 diamond, so the button caps are geometrically identical to the coral diamond in the logo's I-dot.
+Cap width = button height ÷ 4. Buttons must be solid-fill — borders cannot follow the mask edge.
+
+```css
+.btn-hex {
+  --a: 26.565deg;   /* atan(1/2) — matches logo 2:1 diamond */
+  border: 0;
+  padding: 0 1.5em;
+  height: 32px;     /* 30px mobile */
+  mask-image:
+    conic-gradient(at left  50%, transparent 0 var(--a), black 0 calc(180deg - var(--a)), transparent 0),
+    conic-gradient(at right 50%, transparent 0 calc(180deg + var(--a)), black 0 calc(360deg - var(--a)), transparent 0);
+  mask-composite: intersect;
+}
+.btn-primary { background: var(--coral);   color: #fff; }  /* primary LLM action */
+.btn-ghost   { background: var(--ghost-bg); color: var(--text-1); } /* secondary LLM action */
+```
+
+*Verdict block.* The CLEAR FIT / FIT / etc. block is a rectangle.
+A 4 px left border in the verdict colour acts as the accent — thicker than the 1.5 px
+perimeter border, visually distinct without a decorative element.
+
+```css
+.verdict {
+  border: 1.5px solid var(--verdict-bdr);
+  border-left: 4px solid var(--verdict-color);
+}
+```
+
+*Panels and cards* are plain sharp rectangles — no decorative corners or accents.
+The content (verdict colour, bullet colour) carries all the meaning.
+
+*Rhombus bullets.* List markers (strengths, gaps, any `<ul>`) use a small 2:1 diamond shape
+via an empty `<span>` with `clip-path`. Green for positive items, coral for negative.
+
+```css
+.rh { width: 6px; height: 12px; flex-shrink: 0; margin-top: 2px;
+      clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); }
+.rh-ok  { background: var(--clear); }
+.rh-bad { background: var(--coral); }
+```
+
+*Small diamond indicators.* Status dots, nav indicators, and timeline markers
+are all 2:1 rhombuses using the same `clip-path` pattern scaled to context
+(nav: 7 × 14 px; timeline: 6 × 12 px; status dot: 6 × 12 px).
+
+*Avatar.* The user avatar is a 2:1 rhombus (18 × 36 px) using the same clip-path.
+
+*Status pill* is a sharp rectangle (no rounding).
+
+=== Colour themes
+
+Two themes are defined. The browser switches automatically via `prefers-color-scheme`.
+No manual toggle is provided at launch.
+
+All colours are CSS custom properties on `:root`. Dark-mode overrides live in a single
+`@media (prefers-color-scheme: dark)` block; semantic tokens (`--clear`, `--coral`, `--steel`)
+stay the same across both themes unless contrast requires adjustment.
+
+[cols="1,1,1", options="header"]
+|===
+| Token | Light | Dark
+
+| `--bg` | `#f4f8fb` | `#0a1929`
+| `--surface` | `#ffffff` | `#0f2336`
+| `--sidebar` | `#0b3954` | `#071622`
+| `--border` | `#dce8f2` | `#1a3348`
+| `--ghost-bg` | `#eef3f7` | `#162d42`
+| `--text-1` | `#0b3954` | `#e2eef8`
+| `--text-2` | `#4a6b7c` | `#7baac7`
+| `--clear` | `#0e7c3e` | `#34d399`
+| `--clear-bg` | `#f0fdf4` | `#052316`
+| `--clear-bdr` | `#bbf7d0` | `#064e2a`
+|===
+
+The mobile top-nav logo uses `currentColor` on the C/V paths with a `--cv-color` token
+(`#0b3954` light, `#ffffff` dark) so the mark reads on both the white light nav and the
+dark surface dark nav. The sidebar logo always uses `fill="white"` since the sidebar is
+always dark.
+
+=== Credits visibility
+
+The remaining credit balance is not shown in the persistent chrome (sidebar, top nav).
+It is revealed only when the user opens their account panel — triggered by clicking the
+user avatar / name in the sidebar footer (desktop) or the avatar diamond in the top nav (mobile).
+
+This keeps the main task screen focused on the work, not the billing state.
+The `<ThinkButton>` component's ✨ prefix is the only in-context signal that an action has a cost.
+
+=== Logo mark
+
+The brand mark is the geometric CVAI monogram. It is self-sufficient without a wordmark text.
+
+* On dark backgrounds (navy sidebar): C and V letterform paths are rendered `fill="white"`. A and I remain steel blue (`#bfd7ea`). The I-dot diamond is coral (`#ff5a5f`).
+* On light backgrounds (white top nav on mobile web): C and V are navy (`#0b3954`).
+
+The wordmark text "CVAI" is not shown alongside the mark — the mark spells the name.
+
+---
+
+== Key screens
+
+=== Desktop — Role detail (900 × 600 reference layout)
+
+Mockup: `mockups/cvai-desktop.html`
+
+The hero screen of the product. Demonstrates the full information hierarchy for an assessed role.
+
+[cols="1,3", options="header"]
+|===
+| Region | Content
+
+| Left sidebar (168 px, `--sidebar`) | Logo mark (white C/V on dark); nav (Dashboard, Roles, CV, Tasks, Account); user avatar + name (opens account panel incl. credit balance)
+| Top bar | Breadcrumb ← Roles / Company · Role title; status pill (sharp rectangle with diamond dot); ✨ Reassess ghost `ThinkButton`; ✨ Create gap tasks coral `ThinkButton`
+| Verdict block | Hex-shaped, diamond left accent, CLEAR FIT label at 22 px, sub-text, recommendation
+| Strengths / Gaps columns | Two panels side by side; checkmarks (green) and × marks (coral); gap footer with effort estimate
+| Requirements coverage table | Requirement / Coverage badge (✓ met, ~ partial, ✗ open) / Evidence reference
+| Artifact links | Ghost buttons: Suitability report, Role matrix, View source posting
+| Timeline | Chronological events with status-change tags
+|===
+
+=== Mobile web — Role detail at 390 px
+
+Mockup: `mockups/cvai-mobile-web.html`
+
+The same role detail content at a narrow phone-browser width.
+This is a *responsive website*, not a native app: white top bar, no bottom nav, no FAB.
+
+[cols="1,3", options="header"]
+|===
+| Region | Content
+
+| Top nav | Hamburger ☰ (left); centred logo mark (C/V in `--cv-color`, adapts to theme); steel diamond avatar (right, opens account panel)
+| Breadcrumb row | ← Roles / Company · Role title
+| Role header | Title; company · location meta; sharp-rectangle status pill + hex action buttons inline
+| Verdict block | Full-width rectangle with 2:1 rhombus jewel on left edge, identical logic to desktop
+| Strengths panel | Full width (stacked, not side-by-side)
+| Gaps panel | Full width
+| Requirements table | Full width; horizontally scrollable if needed
+| Artifact links | Full-width sharp-rectangle buttons (plain link style, not hex)
+|===
+
+=== Legacy mobile app mockup — Role list
+
+Mockup: `mockups/cvai-mobile.html` (reference / archived)
+
+Native-app style role list with dark header, tab bar, FAB, and bottom nav.
+No mobile app is planned at launch — this is retained as a design reference only.
+
+---
+
+== Interaction patterns
+
+=== Progress feedback (Analysing state)
+
+When an LLM action is in flight, the card/page shows "Analysing…" with a steel progress bar.
+The SPA subscribes to the Firestore Action document via `onSnapshot`; no polling.
+On `complete`, the card updates in-place without a page reload.
+See `GA_IMPL.adoc §Cross-cutting patterns — Action subscription pattern`.
+
+=== Status transitions
+
+The status pill in the top bar is an inline dropdown (fully rounded, not hex).
+Changing status writes directly to the Role document in Firestore — no save button.
+Available transitions: Interested → Applied → Screening → Interview → Offer → Accepted / Closed.
+
+=== Gap tasks
+
+"+ Create gap tasks" deducts a credit and runs the gap-to-task LLM function.
+The button becomes disabled while the action is in flight and re-enables on completion.
+Generated tasks appear in the Tasks section and are linked back to the originating role.
+
+=== Empty states
+
+* No roles yet: navy illustration + "Add your first role" CTA
+* No CV uploaded: banner above role list prompting CV upload before first analysis
+* Analysing (first role): full-page progress state, not a card, to set expectations
+
+---
+
+== Profile completion meter
+
+The completion meter tracks how much of the candidate profile has been filled in.
+It is a prerequisite gate: analytics features (Quick Analysis, Generate Bundle) are disabled until the profile reaches the green threshold (≥ 2/5).
+
+=== Segments
+
+[cols="1,1,3", options="header"]
+|===
+| # | Segment | Satisfied when
+
+| 1 | Personal data | `candidate.cv.personal` has at least a name and one contact field
+| 2 | Work experience | `candidate.cv.experience` has at least one entry
+| 3 | Story | `candidate.storyBank` has at least one entry
+| 4 | Education | `candidate.cv.education` has at least one entry
+| 5 | Portfolio evidence | `candidate.evidenceLibrary` has at least one entry
+|===
+
+=== Status colours
+
+[cols="1,1", options="header"]
+|===
+| Filled segments | State
+
+| 0 | Red — no analytics, no role analysis
+| 1 | Amber — profile started, analytics still locked
+| ≥ 2 | Green — analytics unlocked
+| 5 | Hidden — meter disappears; profile is complete
+|===
+
+=== Placement
+
+The meter sits in the sidebar footer on desktop, immediately to the left of the user's display name.
+On mobile it appears inside the account panel (opened from the avatar diamond in the top nav), not in the persistent chrome.
+
+Desktop sidebar footer (incomplete profile, 2/5 green):
+
+----
+  A. User  ◆ ◆ ◇ ◇ ◇  
+  auser@example.com
+----
+
+The meter is five 2:1 rhombuses in a row, using the same `clip-path` as every other diamond in the
+design system (`polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)`).
+Each pip is 6 × 12 px with 3 px horizontal gap. Filled pips use the status colour; empty pips use `--border`.
+
+[source,css]
+----
+.meter-pip {
+  width: 6px; height: 12px;
+  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+}
+.meter-pip--filled { background: var(--meter-color); }
+.meter-pip--empty  { background: var(--border); }
+----
+
+`--meter-color` maps to the status: red (`#b91c1c`) at 0/5, amber (`#b45309`) at 1/5, green (`var(--clear)`) at ≥ 2/5.
+
+When the profile is 5/5 the component renders `null` — no placeholder, no space.
+
+=== Interaction
+
+Clicking the meter (desktop) or tapping it (mobile account panel) navigates to `/cv` with the
+profile completion panel expanded, showing each segment's label, status, and a direct link to where
+it can be satisfied.
+
+=== Analytics gate
+
+`<ThinkButton>` for Quick Analysis and Generate Bundle renders as disabled with a tooltip —
+"Complete your profile first (2 of 5 required)" — when the meter is below green.
+The button is never hidden, only disabled; the user can see what they are working toward.
+
+---
+
+== SPA component inventory
+
+Components are Vite + React 19 + TypeScript + Tailwind.
+
+[cols="1,2,1", options="header"]
+|===
+| Component | Description | Milestone
+
+| `<SidebarNav>` | Desktop persistent sidebar with logo mark (white C/V on navy), nav, credits, user | M1
+| `<TopNav>` | Mobile-web white top bar: hamburger, centred logo, credits pill | M1
+| `<ProfileCompletionMeter>` | Row of five 2:1 rhombus pips; same clip-path as all other diamonds; red/amber/green by filled count; hidden at 5/5; click navigates to `/cv` completion panel; drives analytics gate | M1
+| `<VerdictBlock>` | Rectangle with 4 px left border in verdict colour; 1.5 px perimeter border in verdict tint | M3
+| `<ThinkButton>` | LLM/credit-consuming actions only; always prefixed with ✨; conic-gradient mask, 26.565° caps; variant="primary" (coral) or variant="ghost" (ghost-bg); disabled with tooltip when profile below green threshold | M1
+| `<StrengthGapPanel>` | Strengths or gaps panel; two-column on desktop, stacked on mobile | M3
+| `<RequirementsTable>` | Coverage table with badge cells (✓ met / ~ partial / ✗ open) | M3
+| `<RoleCard>` | Role list card with verdict label, status badge, and meta line | M3
+| `<StatusPill>` | Inline status dropdown for role lifecycle; sharp rectangle with 2:1 diamond dot indicator | M3
+| `<ActionProgress>` | "Analysing…" state with steel progress bar; Firestore onSnapshot wired | M1
+| `<CreditsBadge>` | Credit balance shown only inside the account panel (not in persistent chrome); re-reads on each credit event | M1
+| `<TabFilterBar>` | Horizontal scrollable filter tabs (role list) | M3
+| `<Timeline>` | Vertical event list with date, dot, and status tag | M3
+|===

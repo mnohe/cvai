@@ -70,7 +70,9 @@ RUN ARCH=$(dpkg --print-architecture) && \
 ARG FIREBASE_TOOLS_VERSION=15.20.0
 ARG CLAUDE_CODE_VERSION=2.1.177
 ARG CODEX_VERSION=0.139.0
+ARG TYPESCRIPT_VERSION=5.9.3
 RUN npm install -g \
     "firebase-tools@${FIREBASE_TOOLS_VERSION}" \
     "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}" \
-    "@openai/codex@${CODEX_VERSION}"
+    "@openai/codex@${CODEX_VERSION}" \
+    "typescript@${TYPESCRIPT_VERSION}"
