@@ -64,6 +64,7 @@ test.describe("UC-AUTH-003", () => {
     await signIn(page, "Google", "postsignout.user@example.test");
     await page.getByRole("button", { name: "Open account panel" }).click();
     await page.getByRole("button", { name: "Sign out" }).click();
+    await expect(page).toHaveURL(/\/login$/);
     await page.goto("/dashboard");
     await expect(page).toHaveURL(/\/login$/);
   });
