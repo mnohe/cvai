@@ -32,6 +32,7 @@ web/test-results/
 
 # Build outputs
 web/dist/
+.cache/
 
 # IDE
 .DS_Store
