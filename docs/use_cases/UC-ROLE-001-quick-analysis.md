@@ -28,7 +28,7 @@ sequenceDiagram
     participant LLM
 
     User->>SPA: Click "Add role", enter URL or paste text
-    SPA->>Backend: POST /quick-analysis {url} or {text}
+    SPA->>Backend: POST /roles?mode=preview {url} or {text}
 
     alt URL provided
         Backend->>Backend: SSRF-validate URL

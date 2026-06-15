@@ -19,7 +19,7 @@ triggers the user to reassess.
 
 ## Flow
 
-Same as [UC-ROLE-003](UC-ROLE-003-generate-bundle.md) with one difference:
+`PUT /roles/{roleId}/bundle` — same goroutine as [UC-ROLE-003](UC-ROLE-003-generate-bundle.md) with one difference:
 the goroutine skips LLM Call 1 (job extraction) and uses the existing `bundle.job`
 struct directly. Calls 2 (Analysis) and 3 (Artifacts) run as normal.
 

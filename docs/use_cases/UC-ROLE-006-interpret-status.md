@@ -25,7 +25,7 @@ sequenceDiagram
     participant LLM
 
     User->>SPA: Click "Interpret update", type free-form prompt
-    SPA->>Backend: POST /interpret-status {roleId, prompt}
+    SPA->>Backend: POST /roles/{roleId}/events {prompt}
     Backend->>Firestore: DeductCredit(uid)
     Backend->>Firestore: Create Action {status: pending}
     Backend-->>SPA: 202 {actionId}

@@ -28,7 +28,7 @@ sequenceDiagram
     participant LLM
 
     User->>SPA: Click ✨ Generate analysis on role detail page
-    SPA->>Backend: POST /generate-bundle {roleId}
+    SPA->>Backend: POST /roles/{roleId}/bundle
     Backend->>Firestore: Guard: reject 409 if Action in progress for this roleId
     Backend->>Firestore: DeductCredit(uid)
     Backend->>Firestore: Create Action {status: pending}

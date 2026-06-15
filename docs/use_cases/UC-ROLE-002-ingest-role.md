@@ -26,6 +26,7 @@ sequenceDiagram
     participant Firestore
 
     User->>SPA: Submit role (URL or pasted text; optional company/title overrides)
+    SPA->>Backend: POST /roles {url? or sourceText? (forwarded from preview)}
 
     alt URL path (no prior Quick Analysis)
         Backend->>Backend: SSRF-validate URL

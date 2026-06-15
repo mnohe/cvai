@@ -25,7 +25,7 @@ sequenceDiagram
     participant LLM
 
     User->>SPA: Click ✨ Reassess on a completed gap task
-    SPA->>Backend: POST /reassess-gap-task {taskId}
+    SPA->>Backend: POST /tasks/{taskId}/reassessments
     Backend->>Firestore: DeductCredit(uid)
     Backend->>Firestore: Create Action {status: pending}
     Backend-->>SPA: 202 {actionId}

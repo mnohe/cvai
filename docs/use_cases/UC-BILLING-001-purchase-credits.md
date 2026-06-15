@@ -35,7 +35,7 @@ sequenceDiagram
     participant Firestore
 
     User->>SPA: Open account panel, click "Buy credits", select pack
-    SPA->>Backend: POST /billing/checkout {packId}
+    SPA->>Backend: POST /billing/credits {packId}
     Backend->>Stripe: Create Checkout Session (uid + packId in metadata)
     Stripe-->>Backend: {sessionId, url}
     Backend-->>SPA: {url}

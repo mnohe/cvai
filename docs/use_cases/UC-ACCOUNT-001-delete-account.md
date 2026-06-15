@@ -36,6 +36,10 @@ sequenceDiagram
     Firebase Auth-->>SPA: Fresh token (auth_time ≤ 5 min ago)
     SPA->>Backend: DELETE /account (Authorization: Bearer <fresh token>)
     Backend->>Backend: RequireRecentAuth(300) — verify auth_time claim
+    Backend-->>SPA: 202 {confirmToken} (short-lived, single-use)
+    SPA-->>User: Show confirmation code; prompt to re-enter
+    User->>SPA: Type confirmation code
+    SPA->>Backend: DELETE /account (X-Confirm-Token: <confirmToken>)
     Backend->>Firestore: Delete all subcollections under users/{uid}/
     Backend->>Cloud Storage: Delete all objects under users/{uid}/
     Backend->>Firebase Auth: Delete auth record for uid
@@ -59,5 +63,6 @@ sequenceDiagram
 |---|---|---|
 | Delete account cascade deletes all user data | `e2e/account.spec.ts` | `UC-ACCOUNT-001 cascade delete` |
 | Old auth_time token rejected by backend | `e2e/account.spec.ts` | `UC-ACCOUNT-001 stale token rejected` |
+| Invalid confirm token rejected | `e2e/account.spec.ts` | `UC-ACCOUNT-001 invalid confirm token rejected` |
 | Tombstone written with no PII | `e2e/account.spec.ts` | `UC-ACCOUNT-001 tombstone written` |
 | Post-deletion redirect to landing page | `e2e/account.spec.ts` | `UC-ACCOUNT-001 redirect after delete` |

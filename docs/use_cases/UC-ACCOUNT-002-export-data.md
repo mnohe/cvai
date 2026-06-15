@@ -27,7 +27,7 @@ sequenceDiagram
     participant Cloud Storage
 
     User->>SPA: Click "Export my data" in account settings
-    SPA->>Backend: POST /account/export
+    SPA->>Backend: POST /account/exports
     Backend->>Firestore: Collect all documents under users/{uid}/ (all subcollections)
     Backend->>Cloud Storage: List all objects under users/{uid}/
     Backend->>Backend: Package as ZIP (directory structure mirrors collection paths)
