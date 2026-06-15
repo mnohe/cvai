@@ -1,4 +1,4 @@
-import { doc, getDoc } from "firebase/firestore";
+import { doc, onSnapshot } from "firebase/firestore";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/components/AuthProvider";
@@ -26,14 +26,9 @@ export function ProfileCompletionMeter({
       return;
     }
 
-    let cancelled = false;
-
-    void getDoc(doc(db, "users", user.uid, "candidate", "profile"))
-      .then((snapshot) => {
-        if (cancelled) {
-          return;
-        }
-
+    return onSnapshot(
+      doc(db, "users", user.uid, "candidate", "profile"),
+      (snapshot) => {
         setCompletion(
           getProfileCompletion(
             snapshot.exists()
@@ -41,16 +36,9 @@ export function ProfileCompletionMeter({
               : undefined,
           ),
         );
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setCompletion(getProfileCompletion());
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
+      },
+      () => setCompletion(getProfileCompletion()),
+    );
   }, [user]);
 
   const tone = useMemo(() => {

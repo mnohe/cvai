@@ -26,12 +26,13 @@ export function ThinkButton({
   return (
     <button
       {...props}
-      className={`btn-hex ${variant === "primary" ? "btn-primary" : "btn-ghost"} ${props.className ?? ""}`}
+      className={`think-button ${variant === "primary" ? "think-button-primary" : "think-button-ghost"} ${props.className ?? ""}`}
       disabled={isDisabled}
       title={title}
       type={props.type ?? "button"}
     >
-      {children}
+      <span className="think-button-label">{children}</span>
+      <span className="think-button-marker" aria-hidden="true" />
     </button>
   );
 }

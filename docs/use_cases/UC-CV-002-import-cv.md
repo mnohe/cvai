@@ -27,7 +27,7 @@ sequenceDiagram
     participant Firestore
     participant LLM
 
-    User->>SPA: Click ✨ Import from PDF, select file (PDF ≤ 10 MB)
+    User->>SPA: Click Import from PDF, select file (PDF ≤ 10 MB)
     SPA->>Backend: PUT /cv (Content-Type: application/pdf)
     Backend->>Firestore: DeductCredit(uid) — transactional; fails if balance = 0
     Backend->>Firestore: Create Action {status: pending}

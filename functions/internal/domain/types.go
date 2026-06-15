@@ -120,6 +120,7 @@ type Candidate struct {
 type CV struct {
 	Summary        string          `firestore:"summary"`
 	Contact        Contact         `firestore:"contact"`
+	Skills         []string        `firestore:"skills,omitempty"`
 	Languages      []Language      `firestore:"languages"`
 	Certifications []Certification `firestore:"certifications"`
 	Education      []Education     `firestore:"education"`

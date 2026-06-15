@@ -5,8 +5,9 @@ const baseURL = `http://localhost:${e2ePort}`;
 
 export default defineConfig({
   testDir: "./e2e",
-  fullyParallel: true,
+  fullyParallel: false,
   retries: process.env.CI ? 2 : 0,
+  workers: 1,
   reporter: [
     ["list"],
     ["html", { open: "never" }],

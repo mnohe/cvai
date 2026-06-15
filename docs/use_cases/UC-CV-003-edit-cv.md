@@ -19,7 +19,7 @@ Languages, Projects.
 
 ## Flow
 
-1. User opens `/cv`. If a CV exists, the section editor is shown with current values.
+1. User opens `/profile/cv`. If a CV exists, the section editor is shown with current values.
 2. User edits a section (inline form — no separate edit mode).
 3. On save, SPA writes the updated section directly to `users/{uid}/candidate` via
    the Firestore client SDK.

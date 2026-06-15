@@ -10,7 +10,7 @@
 
 ## Context
 
-`/cv` is the user's first meaningful destination after signing up. When no CV exists the
+`/profile/cv` is the user's first meaningful destination after signing up. When no CV exists the
 page offers two starting points: filling in sections manually, or importing from a PDF
 (which is a separate, credit-consuming use case — see [UC-CV-002](UC-CV-002-import-cv.md)).
 
@@ -27,7 +27,7 @@ When a CV already exists, the page shows the populated editor instead (see
 │  │                                                    │  │
 │  │  You haven't added a CV yet.                      │  │
 │  │                                                    │  │
-│  │  [ Start from scratch ]   [✨ Import from PDF ]   │  │
+│  │  [ Start from scratch ]   [ Import from PDF ◆ ]  │  │
 │  │    (plain button)            (ThinkButton)         │  │
 │  │                                                    │  │
 │  └────────────────────────────────────────────────────┘  │
@@ -35,7 +35,7 @@ When a CV already exists, the page shows the populated editor instead (see
 ```
 
 **Start from scratch** opens the section editor with all sections empty.  
-**✨ Import from PDF** opens the PDF upload modal; costs one credit (UC-CV-002).
+**Import from PDF** opens the PDF upload modal; the right-edge diamond marks it as a credit-consuming action (UC-CV-002).
 
 ## Flow: start from scratch
 
@@ -76,8 +76,8 @@ and gate behaviour.
 
 | Scenario | File | Describe block |
 |---|---|---|
-| `/cv` with no CV shows empty state with both entry points | `e2e/cv.spec.ts` | `UC-CV-001 empty state renders` |
+| `/profile/cv` with no CV shows empty state with both entry points | `e2e/cv.spec.ts` | `UC-CV-001 empty state renders` |
 | "Start from scratch" renders section editor at 0 % completeness | `e2e/cv.spec.ts` | `UC-CV-001 start from scratch` |
-| "✨ Import from PDF" opens upload modal | `e2e/cv.spec.ts` | `UC-CV-001 import entry point` |
+| "Import from PDF" opens upload modal | `e2e/cv.spec.ts` | `UC-CV-001 import entry point` |
 | Analytics ThinkButton is disabled below 2/5 completion | `e2e/cv.spec.ts` | `UC-CV-001 analytics gate below threshold` |
 | Analytics ThinkButton enables after personal data + experience saved | `e2e/cv.spec.ts` | `UC-CV-001 analytics gate unlocks at 2/5` |

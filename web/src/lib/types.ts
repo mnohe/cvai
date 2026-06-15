@@ -282,6 +282,7 @@ export interface Candidate {
 export interface CV {
   summary: string;
   contact: Contact;
+  skills?: string[];
   languages: Language[];
   certifications: Certification[];
   education: Education[];

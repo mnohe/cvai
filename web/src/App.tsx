@@ -17,7 +17,6 @@ export default function App() {
           <Route path="/roles" element={<PlaceholderPage name="roles" />} />
           <Route path="/profile" element={<Navigate to="/profile/cv" replace />} />
           <Route path="/profile/:section" element={<ProfilePage />} />
-          <Route path="/cv" element={<Navigate to="/profile/cv" replace />} />
           <Route path="/tasks" element={<PlaceholderPage name="tasks" />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/account" element={<Navigate to="/settings" replace />} />

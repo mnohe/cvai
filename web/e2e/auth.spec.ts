@@ -10,7 +10,7 @@ test.describe("UC-AUTH-001", () => {
   test("redirect to cv after signup", async ({ page }) => {
     await signIn(page, "Google", "signup.user@example.test");
     await expect(page).toHaveURL(/\/profile\/cv$/);
-    await expect(page.getByRole("heading", { name: "CV" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "CV" })).toHaveClass(/active/);
   });
 });
 

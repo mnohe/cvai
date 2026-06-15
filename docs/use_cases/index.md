@@ -42,6 +42,7 @@ E2E tests reference use cases by ID in their `describe` block names, making cove
 | [UC-CV-004](UC-CV-004-export-cv-pdf.md) | Export CV as PDF | M1 | No | — |
 | [UC-CV-005](UC-CV-005-evidence-library.md) | Manage evidence library | M2 | No | — |
 | [UC-CV-006](UC-CV-006-story-bank.md) | Manage story bank | M2 | No | — |
+| [UC-CV-007](UC-CV-007-manual-onboarding.md) | Complete CV manually | M1 | No | — |
 
 ## Roles
 

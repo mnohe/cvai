@@ -33,15 +33,28 @@ Derived directly from the logo mark:
 |===
 | Token | Hex | Usage
 
-| `--navy` | `#0b3954` | Sidebar background; primary text; active nav
-| `--steel` | `#bfd7ea` | Sidebar secondary text; logo A/I letterforms; steel accent details
-| `--coral` | `#ff5a5f` | Primary CTA button only; logo diamond on the I
+| `--navy` | `#0b3954` | Base brand colour
+| `--steel` | `#bfd7ea` | Base brand colour
+| `--coral` | `#ff5a5f` | Base brand colour; logo diamond on the I
 | `--bg` | `#f4f8fb` | Page/app background
 | `--surface` | `#ffffff` | Card and panel surfaces
-| `--ghost-bg` | `#eef3f7` | Ghost/secondary button fill (hex-shaped, no border)
+| `--ghost-bg` | `#eef3f7` | Ghost/secondary button fill
 | `--border` | `#dce8f2` | All borders and dividers — 1 px, no box shadows anywhere
 | `--text-1` | `#0b3954` | Body text (same as navy)
 | `--text-2` | `#4a6b7c` | Secondary / label text
+|===
+
+Component CSS uses semantic aliases over the base palette tokens. For example:
+
+[cols="1,2", options="header"]
+|===
+| Semantic token | Usage
+
+| `--primary-action-bg` | Primary non-AI buttons
+| `--secondary-action-bg` | Secondary / ghost buttons
+| `--ai-action-marker-bg` | ThinkButton credit diamond only
+| `--section-tab-bg-active` | Active Profile tab background
+| `--section-panel-top-border` | Top border of the panel controlled by Profile tabs
 |===
 
 === Verdict colours
@@ -86,31 +99,24 @@ The proportions are invariant: all diamonds and rhombuses are 2 units tall by 1 
 Circular or pill shapes are replaced by diamonds or sharp rectangles as described below.
 
 *`ThinkButton` — LLM / credit-consuming actions only.*
-Only actions that invoke the LLM (and therefore consume a credit) use the hex silhouette.
-All other buttons — status selectors, artifact links, navigation — are plain sharp rectangles.
-This lets shape communicate action type: pointed = AI action, rectangular = UI action.
-The ✨ is injected by the component itself via CSS `::after { content: '\00a0✨'; }` —
-it must not appear in the label string passed by the caller.
-`<CreditsBadge>` also renders ✨ to visually link the cost indicator to the actions that consume it.
+Only actions that invoke the LLM (and therefore consume a credit) use the `ThinkButton` component.
+The button itself is a normal sharp rectangle, matching the rest of the action system.
+Its distinguishing mark is a coral diamond attached to the right edge, rendered by the component;
+the diamond is the only in-button signal that the action uses AI or credits.
+`<CreditsBadge>` uses the same diamond marker to visually link credit balance to credit-consuming actions.
 The component is named `ThinkButton` so the name describes the semantic — it triggers inference — and survives a future style change.
 
-The hex shape uses a `mask-image: conic-gradient` technique.
-The angle `atan(1/2) = 26.565°` is derived from the logo's 2:1 diamond, so the button caps are geometrically identical to the coral diamond in the logo's I-dot.
-Cap width = button height ÷ 4. Buttons must be solid-fill — borders cannot follow the mask edge.
-
 ```css
-.btn-hex {
-  --a: 26.565deg;   /* atan(1/2) — matches logo 2:1 diamond */
+.think-button {
   border: 0;
-  padding: 0 1.5em;
-  height: 32px;     /* 30px mobile */
-  mask-image:
-    conic-gradient(at left  50%, transparent 0 var(--a), black 0 calc(180deg - var(--a)), transparent 0),
-    conic-gradient(at right 50%, transparent 0 calc(180deg + var(--a)), black 0 calc(360deg - var(--a)), transparent 0);
-  mask-composite: intersect;
+  height: 32px;
 }
-.btn-primary { background: var(--coral);   color: #fff; }  /* primary LLM action */
-.btn-ghost   { background: var(--ghost-bg); color: var(--text-1); } /* secondary LLM action */
+.think-button-marker {
+  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+  background: var(--ai-action-marker-bg);
+}
+.think-button-primary { background: var(--primary-action-bg);   color: var(--primary-action-text); }
+.think-button-ghost   { background: var(--secondary-action-bg); color: var(--secondary-action-text); }
 ```
 
 *Verdict block.* The CLEAR FIT / FIT / etc. block is a rectangle.
@@ -128,18 +134,22 @@ perimeter border, visually distinct without a decorative element.
 The content (verdict colour, bullet colour) carries all the meaning.
 
 *Rhombus bullets.* List markers (strengths, gaps, any `<ul>`) use a small 2:1 diamond shape
-via an empty `<span>` with `clip-path`. Green for positive items, coral for negative.
+via an empty `<span>` with `clip-path`. Green for positive items, danger red for negative.
 
 ```css
 .rh { width: 6px; height: 12px; flex-shrink: 0; margin-top: 2px;
       clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); }
 .rh-ok  { background: var(--clear); }
-.rh-bad { background: var(--coral); }
+.rh-bad { background: var(--danger); }
 ```
 
 *Small diamond indicators.* Status dots, nav indicators, and timeline markers
 are all 2:1 rhombuses using the same `clip-path` pattern scaled to context
 (nav: 7 × 14 px; timeline: 6 × 12 px; status dot: 6 × 12 px).
+
+*Profile section tabs.* Profile tabs are flat section selectors, not buttons.
+They have no border, shadow, or motion. Hover uses a pale version of the active tab background.
+The active tab background and the top border of the panel below both use `--section-tab-bg-active`.
 
 *Avatar.* The user avatar is a 2:1 rhombus (18 × 36 px) using the same clip-path.
 
@@ -182,7 +192,7 @@ It is revealed only when the user opens their account panel — triggered by cli
 user avatar / name in the sidebar footer (desktop) or the avatar diamond in the top nav (mobile).
 
 This keeps the main task screen focused on the work, not the billing state.
-The `<ThinkButton>` component's ✨ prefix is the only in-context signal that an action has a cost.
+The `<ThinkButton>` component's right-edge diamond is the only in-context signal that an action has a cost.
 
 === Logo mark
 
@@ -208,9 +218,9 @@ The hero screen of the product. Demonstrates the full information hierarchy for 
 | Region | Content
 
 | Left sidebar (168 px, `--sidebar`) | Logo mark (white C/V on dark); nav (Dashboard, Roles, CV, Tasks, Account); user avatar + name (opens account panel incl. credit balance)
-| Top bar | Breadcrumb ← Roles / Company · Role title; status pill (sharp rectangle with diamond dot); ✨ Reassess ghost `ThinkButton`; ✨ Create gap tasks coral `ThinkButton`
+| Top bar | Breadcrumb ← Roles / Company · Role title; status pill (sharp rectangle with diamond dot); Reassess ghost `ThinkButton`; Create gap tasks primary `ThinkButton`
 | Verdict block | Hex-shaped, diamond left accent, CLEAR FIT label at 22 px, sub-text, recommendation
-| Strengths / Gaps columns | Two panels side by side; checkmarks (green) and × marks (coral); gap footer with effort estimate
+| Strengths / Gaps columns | Two panels side by side; checkmarks (green) and × marks (danger red); gap footer with effort estimate
 | Requirements coverage table | Requirement / Coverage badge (✓ met, ~ partial, ✗ open) / Evidence reference
 | Artifact links | Ghost buttons: Suitability report, Role matrix, View source posting
 | Timeline | Chronological events with status-change tags
@@ -229,7 +239,7 @@ This is a *responsive website*, not a native app: white top bar, no bottom nav, 
 
 | Top nav | Hamburger ☰ (left); centred logo mark (C/V in `--cv-color`, adapts to theme); steel diamond avatar (right, opens account panel)
 | Breadcrumb row | ← Roles / Company · Role title
-| Role header | Title; company · location meta; sharp-rectangle status pill + hex action buttons inline
+| Role header | Title; company · location meta; sharp-rectangle status pill + ThinkButton actions inline
 | Verdict block | Full-width rectangle with 2:1 rhombus jewel on left edge, identical logic to desktop
 | Strengths panel | Full width (stacked, not side-by-side)
 | Gaps panel | Full width
@@ -337,7 +347,7 @@ When the profile is 5/5 the component renders `null` — no placeholder, no spac
 
 === Interaction
 
-Clicking the meter (desktop) or tapping it (mobile account panel) navigates to `/cv` with the
+Clicking the meter (desktop) or tapping it (mobile account panel) navigates to `/profile/cv` with the
 profile completion panel expanded, showing each segment's label, status, and a direct link to where
 it can be satisfied.
 
@@ -359,9 +369,9 @@ Components are Vite + React 19 + TypeScript + Tailwind.
 
 | `<SidebarNav>` | Desktop persistent sidebar with logo mark (white C/V on navy), nav, credits, user | M1
 | `<TopNav>` | Mobile-web white top bar: hamburger, centred logo, credits pill | M1
-| `<ProfileCompletionMeter>` | Row of five 2:1 rhombus pips; same clip-path as all other diamonds; red/amber/green by filled count; hidden at 5/5; click navigates to `/cv` completion panel; drives analytics gate | M1
+| `<ProfileCompletionMeter>` | Row of five 2:1 rhombus pips; same clip-path as all other diamonds; red/amber/green by filled count; hidden at 5/5; click navigates to `/profile/cv` completion panel; drives analytics gate | M1
 | `<VerdictBlock>` | Rectangle with 4 px left border in verdict colour; 1.5 px perimeter border in verdict tint | M3
-| `<ThinkButton>` | LLM/credit-consuming actions only; always prefixed with ✨; conic-gradient mask, 26.565° caps; variant="primary" (coral) or variant="ghost" (ghost-bg); disabled with tooltip when profile below green threshold | M1
+| `<ThinkButton>` | LLM/credit-consuming actions only; normal sharp button with a coral right-edge diamond marker; variant="primary" (navy) or variant="ghost" (ghost-bg); disabled with tooltip when profile below green threshold | M1
 | `<StrengthGapPanel>` | Strengths or gaps panel; two-column on desktop, stacked on mobile | M3
 | `<RequirementsTable>` | Coverage table with badge cells (✓ met / ~ partial / ✗ open) | M3
 | `<RoleCard>` | Role list card with verdict label, status badge, and meta line | M3
