@@ -1,26 +1,110 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"github.com/mnohe/cvai/functions/internal/auth"
+	"github.com/mnohe/cvai/functions/internal/handlers"
+	"github.com/mnohe/cvai/functions/internal/repo"
+	fsrepo "github.com/mnohe/cvai/functions/internal/repo/firestore"
 )
 
 func main() {
+	ctx := context.Background()
+
+	authMW, err := auth.New(ctx)
+	if err != nil {
+		log.Fatalf("auth middleware: %v", err)
+	}
+
+	fsClient, err := fsrepo.NewClient(ctx)
+	if err != nil {
+		log.Fatalf("firestore client: %v", err)
+	}
+	defer fsClient.Close()
+
+	var accounts repo.AccountRepository = fsrepo.NewAccountRepo(fsClient)
+	accountHandler := handlers.NewAccountHandler(accounts)
+
+	// Two mux instances enforce auth coverage at the structural level.
+	// Any route not registered on either mux returns 404 — not a silent auth bypass.
+	authMux := http.NewServeMux()
+	publicMux := http.NewServeMux()
+
+	// Public routes — no auth required.
+	publicMux.Handle("GET /healthz", auth.PublicHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Deep Firestore probe added in Stage 9.
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	})))
+	publicMux.Handle("POST /webhooks/stripe", auth.PublicHandler(stub501("StripeWebhook")))
+
+	// Authenticated routes — RequireAuth is applied to the entire authMux below.
+	authMux.HandleFunc("GET /account", accountHandler.GetAccount)
+	authMux.Handle("POST /cv/imports", stub501("ImportCV"))
+	authMux.Handle("POST /analyses/quick", stub501("QuickAnalysis"))
+	authMux.Handle("POST /roles", stub501("IngestRole"))
+	authMux.Handle("POST /roles/{roleId}/bundle", stub501("GenerateBundle"))
+	authMux.Handle("POST /roles/{roleId}/bundle/reassess", stub501("ReassessRole"))
+	authMux.Handle("POST /roles/{roleId}/events", stub501("RecordRoleEvent"))
+	authMux.Handle("POST /roles/{roleId}/gap-tasks", stub501("CreateGapTasks"))
+	authMux.Handle("POST /tasks/{taskId}/reassess", stub501("ReassessGapTask"))
+	authMux.Handle("POST /billing/checkout", stub501("CreateCheckoutSession"))
+	authMux.Handle("POST /account/export", stub501("ExportUserData"))
+	// DELETE /account also requires RequireRecentAuth(300) — chained inside the auth mux.
+	authMux.Handle("DELETE /account", authMW.RequireRecentAuth(300)(stub501("DeleteAccount")))
+
+	// Root handler: check public mux first, then apply RequireAuth to the auth mux.
+	root := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, pattern := publicMux.Handler(r)
+		if pattern != "" {
+			publicMux.ServeHTTP(w, r)
+			return
+		}
+		authMW.RequireAuth(authMux).ServeHTTP(w, r)
+	})
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
-	})
-
-	log.Printf("listening on :%s", port)
-	if err := http.ListenAndServe(":"+port, mux); err != nil {
-		log.Fatalf("server error: %v", err)
+	srv := &http.Server{
+		Addr:    ":" + port,
+		Handler: root,
 	}
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGTERM, syscall.SIGINT)
+
+	go func() {
+		log.Printf("listening on :%s", port)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("server error: %v", err)
+		}
+	}()
+
+	<-quit
+	log.Println("shutting down (30 s drain)")
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		log.Printf("shutdown error: %v", err)
+	}
+}
+
+// stub501 returns a handler responding 501 Not Implemented.
+func stub501(name string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotImplemented)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": name + " not implemented"})
+	})
 }
