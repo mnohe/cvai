@@ -52,10 +52,23 @@ jobs:
       - name: Docker smoke test
         run: |
           docker build -t cvai-ci .
-          docker run --rm -d --name cvai-ci -p 8080:8080 cvai-ci
-          sleep 2
-          curl --fail http://localhost:8080/healthz
+          docker run --rm -d --name cvai-ci \
+            -p 8080:8080 \
+            -e FIREBASE_PROJECT_ID=demo-cvai \
+            -e FIRESTORE_EMULATOR_HOST=127.0.0.1:8081 \
+            -e FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099 \
+            cvai-ci
+          for i in {1..20}; do
+            if curl --fail http://localhost:8080/healthz; then
+              docker stop cvai-ci
+              exit 0
+            fi
+            docker logs cvai-ci
+            sleep 1
+          done
+          docker logs cvai-ci
           docker stop cvai-ci
+          exit 1
 
   web:
     name: Web (Node)
