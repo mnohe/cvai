@@ -5,6 +5,7 @@ Thanks for helping build CVAI. This document describes the supported local workf
 ## Ground Rules
 
 - Read the relevant docs before editing behavior: `docs/ARCHITECTURE.md`, `docs/DOMAIN.md`, `docs/UX.adoc`, and the use cases under `docs/use_cases/`.
+- Follow the coding conventions in `docs/CODING_GUIDELINES.md`.
 - Keep changes scoped to the issue or feature at hand.
 - Do not rewrite unrelated files or revert work you did not make.
 - Prefer existing project patterns over new abstractions.

@@ -42,6 +42,7 @@ Makefile                Common contributor commands
 - [Architecture](docs/ARCHITECTURE.md)
 - [Domain model](docs/DOMAIN.md)
 - [UX strategy](docs/UX.adoc)
+- [Coding guidelines](docs/CODING_GUIDELINES.md)
 - [Use cases](docs/use_cases/index.md)
 
 For contributor setup and local development commands, see [CONTRIBUTING.md](CONTRIBUTING.md).
