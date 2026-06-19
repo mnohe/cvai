@@ -17,7 +17,7 @@ import (
 	"github.com/mnohe/cvai/functions/internal/auth"
 	"github.com/mnohe/cvai/functions/internal/domain"
 	"github.com/mnohe/cvai/functions/internal/llm"
-	"github.com/mnohe/cvai/llm/prompts"
+	"github.com/mnohe/cvai/functions/internal/llm/prompts"
 	"github.com/mnohe/cvai/functions/internal/repo"
 )
 

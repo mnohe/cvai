@@ -2,10 +2,6 @@ module github.com/mnohe/cvai/functions
 
 go 1.23
 
-require github.com/mnohe/cvai/llm v0.0.0
-
-replace github.com/mnohe/cvai/llm => ../llm
-
 require (
 	cloud.google.com/go/firestore v1.17.0
 	firebase.google.com/go/v4 v4.14.1
