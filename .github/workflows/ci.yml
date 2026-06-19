@@ -39,12 +39,19 @@ jobs:
           firebase emulators:exec \
             --only auth,firestore \
             --project demo-cvai \
-            'cd functions && go test -race ./...'
+            'cd functions && go test -race -coverprofile=coverage.out -covermode=atomic ./...'
         working-directory: .
         env:
           FIRESTORE_EMULATOR_HOST: localhost:8080
           FIREBASE_AUTH_EMULATOR_HOST: localhost:9099
           FIREBASE_PROJECT_ID: demo-cvai
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./functions/coverage.out
+          flags: functions
+          token: ${{ secrets.CODECOV_TOKEN }}
 
       - name: Build
         run: go build -o /tmp/cvai-functions ./cmd/...

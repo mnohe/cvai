@@ -1,5 +1,9 @@
 # CVAI
 
+[![CI](https://github.com/mnohe/cvai/actions/workflows/ci.yml/badge.svg)](https://github.com/mnohe/cvai/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/mnohe/cvai/branch/main/graph/badge.svg)](https://codecov.io/gh/mnohe/cvai)
+[![Go Report Card](https://goreportcard.com/badge/github.com/mnohe/cvai/functions)](https://goreportcard.com/report/github.com/mnohe/cvai/functions)
+
 CVAI is an AI-assisted job application management system. It helps a job seeker build a structured CV, track roles, generate role-specific analysis and application bundles, manage gap tasks, and keep application work in one focused workspace.
 
 The hosted product is available at https://seekvit.com/.
