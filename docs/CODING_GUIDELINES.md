@@ -70,7 +70,7 @@ rawCV, err = llm.NormalizeStructuredOutput(rawCV)
   Firestore clients.
 - Return wrapped errors at package boundaries when context helps diagnosis.
 - Do not log prompt content, CV text, job descriptions, tokens, or other sensitive user data.
-- Preserve the LLM-backed Action lifecycle: validate preflight inputs before credit deduction; deduct credit; create Action; return immediately; run model work in a goroutine; complete or fail the Action; and refund on goroutine failure, unless the error can be clearly tied to wrong user input.
+- Preserve the LLM-backed Action lifecycle: validate preflight inputs before credit deduction; reserve credit by deducting it transactionally; create Action; return immediately; run model work in a goroutine; complete or fail the Action; and refund only for program, provider, persistence, or infrastructure failures, not for errors clearly tied to user input after the paid workflow starts.
 
 ## TypeScript and React
 
@@ -81,9 +81,12 @@ rawCV, err = llm.NormalizeStructuredOutput(rawCV)
 
 ## Tests
 
-- Add focused tests for behavior changes.
+- Add focused tests for behaviour changes.
 - Prefer mock or in-process HTTP tests for provider clients; CI must not call real LLM providers.
 - E2E tests should reference use-case IDs in their describe names.
+- Pure-function utilities in `web/src/lib/` must have Vitest unit tests. The web project has no test runner configured yet; add one before writing the first test.
+- LLM golden and eval tests live under `eval/`. They are opt-in (`make test-eval`) and must not block CI, because they may require a live API key or produce non-deterministic output. Fixtures go in `eval/fixtures/`.
+- API contract validation between the frontend and backend is schema-based: `schemas/cv.schema.json` is the source of truth. A separate contract test suite is not needed; validate the schema itself at build time rather than duplicating its assertions in tests.
 
 ## Before repository-wide edits
 

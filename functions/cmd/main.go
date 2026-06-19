@@ -12,6 +12,7 @@ import (
 
 	"github.com/mnohe/cvai/functions/internal/auth"
 	"github.com/mnohe/cvai/functions/internal/handlers"
+	"github.com/mnohe/cvai/functions/internal/llm"
 	"github.com/mnohe/cvai/functions/internal/repo"
 	fsrepo "github.com/mnohe/cvai/functions/internal/repo/firestore"
 )
@@ -31,7 +32,14 @@ func main() {
 	defer fsClient.Close()
 
 	var accounts repo.AccountRepository = fsrepo.NewAccountRepo(fsClient)
+	var actions repo.ActionRepository = fsrepo.NewActionRepo(fsClient)
+	var candidates repo.CandidateRepository = fsrepo.NewCandidateRepo(fsClient)
 	accountHandler := handlers.NewAccountHandler(accounts)
+	llmClient, err := newLLMClient()
+	if err != nil {
+		log.Fatalf("llm client: %v", err)
+	}
+	importHandler := handlers.NewImportCVHandler(accounts, actions, candidates, llmClient)
 
 	// Two mux instances enforce auth coverage at the structural level.
 	// Any route not registered on either mux returns 404 — not a silent auth bypass.
@@ -48,7 +56,7 @@ func main() {
 
 	// Authenticated routes — RequireAuth is applied to the entire authMux below.
 	authMux.HandleFunc("GET /account", accountHandler.GetAccount)
-	authMux.Handle("POST /cv/imports", stub501("ImportCV"))
+	authMux.HandleFunc("POST /cv/imports", importHandler.ImportCV)
 	authMux.Handle("POST /analyses/quick", stub501("QuickAnalysis"))
 	authMux.Handle("POST /roles", stub501("IngestRole"))
 	authMux.Handle("POST /roles/{roleId}/bundle", stub501("GenerateBundle"))
@@ -98,6 +106,53 @@ func main() {
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		log.Printf("shutdown error: %v", err)
 	}
+}
+
+func newLLMClient() (llm.Completer, error) {
+	provider := envOrDefault("LLM_PROVIDER", llm.ProviderAnthropic)
+	apiKey := os.Getenv("LLM_API_KEY")
+	model := os.Getenv("LLM_MODEL")
+	baseURL := os.Getenv("LLM_BASE_URL")
+	if provider == llm.ProviderAnthropic {
+		apiKey = envOrDefaultValue(apiKey, os.Getenv("ANTHROPIC_API_KEY"))
+		model = envOrDefaultValue(model, os.Getenv("ANTHROPIC_MODEL"))
+		baseURL = envOrDefaultValue(baseURL, os.Getenv("ANTHROPIC_BASE_URL"))
+	}
+	if provider == llm.ProviderOpenAI {
+		apiKey = envOrDefaultValue(apiKey, os.Getenv("OPENAI_API_KEY"))
+		model = envOrDefaultValue(model, os.Getenv("OPENAI_MODEL"))
+	}
+	if model == "" {
+		if provider == llm.ProviderAnthropic {
+			model = "claude-3-5-sonnet-20241022"
+		} else {
+			model = "gpt-5.5"
+		}
+	}
+	timeout := 60 * time.Second
+	return llm.NewCompleter(llm.Config{
+		Provider:   provider,
+		APIKey:     apiKey,
+		Model:      model,
+		MaxTokens:  4096,
+		Timeout:    timeout,
+		MaxRetries: 2,
+		BaseURL:    baseURL,
+	})
+}
+
+func envOrDefault(key string, fallback string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return fallback
+}
+
+func envOrDefaultValue(value string, fallback string) string {
+	if value != "" {
+		return value
+	}
+	return fallback
 }
 
 // stub501 returns a handler responding 501 Not Implemented.

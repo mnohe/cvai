@@ -44,7 +44,7 @@ graph TD
 | Backend runtime | Go — Cloud Run Gen 2 | Statically compiled; cold start <200 ms; scales to zero |
 | Database | Firestore | Document model maps to domain aggregates; `onSnapshot` replaces polling |
 | Auth | Firebase Auth | Managed OAuth (Google, GitHub); ID token verification in middleware; no session state |
-| LLM | OpenAI API | Direct HTTP client (no SDK); function calling for structured output; streaming for status interpretation. Model configured via `OPENAI_MODEL` — use the current flagship non-reasoning model at deploy time. |
+| LLM | Provider-configurable API dialect (`anthropic` or `openai`) | Direct HTTP client (no SDK); structured output for extraction. Provider, model, and compatible OpenAI host are configured via `LLM_PROVIDER`, `LLM_MODEL`, and `LLM_BASE_URL`. |
 | Billing | Stripe Checkout | Hosted payment page; webhook-driven credit fulfilment; idempotent session tracking |
 | Frontend | Vite + React 19 + Tailwind | SPA served from Firebase Hosting; every request carries `Authorization: Bearer <idToken>` |
 | PDF export | Browser `window.print()` | Zero backend cost; A4 CSS print layout; no server-side renderer needed |
@@ -150,6 +150,14 @@ Interface constraints enforced structurally (not by convention):
 
 ## Async action pattern
 
+Every LLM-backed endpoint treats a credit deduction as a reservation for costly
+model work. The reservation happens before the provider call to prevent
+concurrent overspend: a user with one credit must not be able to start several
+paid Actions at the same time. The credit is kept when the program completes
+successfully, and also when the Action fails for a clearly user-caused input
+problem after the paid workflow has started. The credit is refunded when the
+program, provider, persistence layer, or infrastructure fails.
+
 Every LLM-backed endpoint follows this lifecycle without exception:
 
 ```mermaid
@@ -161,7 +169,7 @@ sequenceDiagram
     participant OpenAI
 
     Client->>Handler: POST /import-cv (or any LLM endpoint)
-    Handler->>Firestore: DeductCredit (transaction)
+    Handler->>Firestore: DeductCredit (transactional reservation)
     Handler->>Firestore: Write Action {status: pending}
     Handler-->>Client: 202 {actionId}
 
@@ -174,8 +182,10 @@ sequenceDiagram
     alt success
         Goroutine->>Firestore: Write results
         Goroutine->>Firestore: Update Action {status: complete}
-    else failure
+    else system/provider/program failure
         Goroutine->>Firestore: RefundCredit (best-effort)
+        Goroutine->>Firestore: Update Action {status: failed, reason}
+    else clearly user-caused input failure
         Goroutine->>Firestore: Update Action {status: failed, reason}
     end
 
@@ -183,6 +193,18 @@ sequenceDiagram
     Firestore-->>Client: real-time update on complete/failed
     Client->>Firestore: re-read affected resource
 ```
+
+Preflight validation must run before credit deduction, so malformed requests that
+can be rejected synchronously never reserve a credit. Examples: missing upload,
+wrong content type, oversized upload, and insufficient credits. After deduction,
+do not refund for failures that can be confidently tied to user input, such as
+an unreadable or unsupported document. Do refund for provider 5xx, timeout,
+rate-limit exhaustion, provider auth/configuration problems, malformed provider
+responses, schema mismatches, save failures, and other program-caused errors.
+
+Charging only after successful completion is intentionally avoided: it permits
+concurrent overspend and creates harder-to-reconcile cases where external model
+cost is incurred but the later credit charge fails.
 
 The LLM timeout ceiling is 60 s. Blocking the HTTP handler on an LLM call would exhaust Cloud Run concurrency.
 
@@ -288,8 +310,14 @@ See `docs/ops.adoc` (Stage 22) for alert configuration commands.
 | `GOOGLE_APPLICATION_CREDENTIALS` | Service account key path for Firebase Admin SDK | Functions (production) |
 | `FIRESTORE_EMULATOR_HOST` | e.g. `localhost:8080` | CI, local dev |
 | `FIREBASE_AUTH_EMULATOR_HOST` | e.g. `localhost:9099` | CI, local dev |
-| `OPENAI_API_KEY` | OpenAI API key | Functions (production), live eval |
-| `OPENAI_MODEL` | Current flagship non-reasoning model (e.g. `gpt-4o`). Set to the latest at deploy time; do not hard-code. | Functions |
+| `LLM_PROVIDER` | `anthropic` or `openai`; defaults to `anthropic` for Stage 5 compatibility | Functions |
+| `LLM_API_KEY` | Provider API key | Functions (production), live eval |
+| `LLM_MODEL` | Provider model ID | Functions |
+| `LLM_BASE_URL` | Optional OpenAI-compatible HTTPS base URL; defaults to `https://api.openai.com/v1` for `LLM_PROVIDER=openai` | Functions |
+| `ANTHROPIC_API_KEY` | Anthropic API key fallback when `LLM_API_KEY` is unset | Functions (production), live eval |
+| `ANTHROPIC_MODEL` | Anthropic model fallback when `LLM_MODEL` is unset | Functions |
+| `OPENAI_API_KEY` | OpenAI API key fallback when `LLM_API_KEY` is unset | Functions (production), live eval |
+| `OPENAI_MODEL` | OpenAI model fallback when `LLM_MODEL` is unset | Functions |
 | `STRIPE_SECRET_KEY` | Stripe API key | Functions |
 | `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret | Functions |
 | `VITE_FIREBASE_API_KEY` | Firebase JS SDK config | Web SPA |

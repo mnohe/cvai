@@ -30,6 +30,126 @@ test.describe("UC-CV-001 import entry point", () => {
   });
 });
 
+test.describe("UC-CV-002 import CV from PDF", () => {
+  test("progress shown and CV populated on success", async ({ page }) => {
+    await signIn(page, "cv.import.success@example.test");
+    const session = await currentSession(page);
+    await page.route("**/api/cv/imports", async (route) => {
+      await route.fulfill({
+        status: 202,
+        contentType: "application/json",
+        body: JSON.stringify({ actionId: "import-success" }),
+      });
+    });
+
+    await page.getByRole("button", { name: /Import from PDF/ }).click();
+    await choosePDF(page, "%PDF-1.7\nsuccess");
+    await page.getByRole("button", { name: "Start import" }).click();
+    await writeFirestore(session, "actions", "import-success", {
+      id: "import-success",
+      type: "import_cv",
+      status: "running",
+      progress: { step: "analysing", message: "Analysing PDF", percent: 40 },
+      created_at: new Date(),
+      updated_at: new Date(),
+    });
+
+    await expect(page.getByRole("progressbar", { name: "CV import progress" })).toBeVisible();
+
+    await writeCandidate(session, importedCandidate());
+    await writeFirestore(session, "actions", "import-success", {
+      id: "import-success",
+      type: "import_cv",
+      status: "complete",
+      progress: { step: "complete", message: "Import complete", percent: 100 },
+      result: { resource: "candidate.cv" },
+      created_at: new Date(),
+      updated_at: new Date(),
+      completed_at: new Date(),
+    });
+
+    await expect(page.getByRole("dialog", { name: "Import CV from PDF" })).toHaveCount(0);
+    await expect(page.getByLabel("First name")).toHaveValue("Ada");
+  });
+
+  test("error shown on LLM failure and credit refunded", async ({ page }) => {
+    await signIn(page, "cv.import.failure@example.test");
+    const session = await currentSession(page);
+    await writeFirestore(session, "account", "profile", {
+      uid: session.uid,
+      credit_balance: 0,
+      has_ever_purchased: false,
+      created_at: new Date(),
+      updated_at: new Date(),
+    });
+    await page.route("**/api/cv/imports", async (route) => {
+      await route.fulfill({
+        status: 202,
+        contentType: "application/json",
+        body: JSON.stringify({ actionId: "import-failed" }),
+      });
+    });
+
+    await page.getByRole("button", { name: /Import from PDF/ }).click();
+    await choosePDF(page, "%PDF-1.7\nfailure");
+    await page.getByRole("button", { name: "Start import" }).click();
+    await writeFirestore(session, "account", "profile", {
+      uid: session.uid,
+      credit_balance: 1,
+      has_ever_purchased: false,
+      created_at: new Date(),
+      updated_at: new Date(),
+    });
+    await writeFirestore(session, "actions", "import-failed", {
+      id: "import-failed",
+      type: "import_cv",
+      status: "failed",
+      progress: { step: "failed", message: "We could not read this PDF. Your credit has been refunded." },
+      error: "We could not read this PDF. Your credit has been refunded.",
+      created_at: new Date(),
+      updated_at: new Date(),
+      completed_at: new Date(),
+    });
+
+    await expect(page.getByText("Your credit has been refunded.")).toBeVisible();
+    const creditBalance = await readAccountCredit(session);
+    expect(creditBalance).toBe(1);
+  });
+
+  test("oversized PDF rejected before API call", async ({ page }) => {
+    let called = false;
+    await page.route("**/api/cv/imports", async (route) => {
+      called = true;
+      await route.abort();
+    });
+
+    await signIn(page, "cv.import.oversized@example.test");
+    await page.getByRole("button", { name: /Import from PDF/ }).click();
+    await choosePDF(page, "%PDF-1.7\n".padEnd(10 * 1024 * 1024 + 1, "x"));
+    await page.getByRole("button", { name: "Start import" }).click();
+
+    await expect(page.getByText("PDF must be 10 MB or smaller.")).toBeVisible();
+    expect(called).toBe(false);
+  });
+
+  test("blocked at zero credits", async ({ page }) => {
+    await page.route("**/api/cv/imports", async (route) => {
+      await route.fulfill({
+        status: 402,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "not enough credits" }),
+      });
+    });
+
+    await signIn(page, "cv.import.zero@example.test");
+    await page.getByRole("button", { name: /Import from PDF/ }).click();
+    await choosePDF(page, "%PDF-1.7\nzero");
+    await page.getByRole("button", { name: "Start import" }).click();
+
+    await expect(page.getByText("You need at least 1 credit to import a CV.")).toBeVisible();
+  });
+});
+
 test.describe("UC-CV-003 direct firestore write", () => {
   test("editing personal details saves without a backend call", async ({ page }) => {
     const apiCalls: string[] = [];
@@ -234,4 +354,93 @@ async function saveVisibleSection(page: Page) {
 function uniqueEmail(email: string) {
   const [name, domain] = email.split("@");
   return `${name}+${Date.now()}-${Math.random().toString(16).slice(2)}@${domain}`;
+}
+
+async function choosePDF(page: Page, content: string) {
+  await page.setInputFiles("input[type='file']", {
+    name: "cv.pdf",
+    mimeType: "application/pdf",
+    buffer: Buffer.from(content),
+  });
+}
+
+async function currentSession(page: Page): Promise<{ uid: string; token: string }> {
+  const session = await page.evaluate(async () => {
+    const firebase = await (0, eval)('import("/src/lib/firebase.ts")');
+    const user = firebase.auth.currentUser;
+    return user ? { uid: user.uid, token: await user.getIdToken() } : null;
+  });
+  if (!session) throw new Error("No current Firebase user");
+  return session;
+}
+
+async function writeFirestore(session: { uid: string; token: string }, collectionName: string, docId: string, data: Record<string, unknown>) {
+  const response = await fetch(`http://localhost:8080/v1/projects/demo-cvai/databases/(default)/documents/users/${session.uid}/${collectionName}/${docId}`, {
+    method: "PATCH",
+    headers: { "Authorization": `Bearer ${session.token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ fields: toFirestoreFields(data) }),
+  });
+  if (!response.ok) {
+    throw new Error(`Firestore write failed ${response.status}: ${await response.text()}`);
+  }
+}
+
+async function writeCandidate(session: { uid: string; token: string }, candidate: Record<string, unknown>) {
+  await writeFirestore(session, "candidate", "profile", candidate);
+}
+
+async function readAccountCredit(session: { uid: string; token: string }): Promise<number> {
+  const response = await fetch(`http://localhost:8080/v1/projects/demo-cvai/databases/(default)/documents/users/${session.uid}/account/profile`, {
+    headers: { "Authorization": `Bearer ${session.token}` },
+  });
+  if (!response.ok) throw new Error(`Firestore read failed ${response.status}: ${await response.text()}`);
+  const body = await response.json();
+  return Number(body.fields.credit_balance.integerValue);
+}
+
+function importedCandidate() {
+  return {
+    cv: {
+      summary: "Analytical engineer.",
+      contact: {
+        name: "Ada",
+        surname: "Lovelace",
+        phone: { prefix: "+44", number: "123456" },
+        email: "ada@example.test",
+        linkedin: "https://linkedin.example/ada",
+      },
+      skills: ["Go"],
+      languages: [{ name: "English", level: "Native" }],
+      certifications: [],
+      education: [{ name: "Mathematics", type: "Degree", issuer: "University", year: 2020 }],
+      experience: [
+        {
+          company: "Engines Ltd",
+          positions: [{ id: "p1", roles: ["Engineer"], start: "2021", location: "London", tasks: ["Built systems"] }],
+        },
+      ],
+      projects: { items: [] },
+    },
+    context: { version: 1, constraints: {}, preferences: {} },
+    created_at: new Date(),
+    updated_at: new Date(),
+  };
+}
+
+function toFirestoreFields(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value) || value instanceof Date) {
+    throw new Error("top-level Firestore value must be an object");
+  }
+  return Object.fromEntries(Object.entries(value).map(([key, child]) => [key, toFirestoreValue(child)]));
+}
+
+function toFirestoreValue(value: unknown): Record<string, unknown> {
+  if (value instanceof Date) return { timestampValue: value.toISOString() };
+  if (typeof value === "string") return { stringValue: value };
+  if (typeof value === "number" && Number.isInteger(value)) return { integerValue: value };
+  if (typeof value === "number") return { doubleValue: value };
+  if (typeof value === "boolean") return { booleanValue: value };
+  if (Array.isArray(value)) return { arrayValue: { values: value.map(toFirestoreValue) } };
+  if (value && typeof value === "object") return { mapValue: { fields: toFirestoreFields(value) } };
+  return { nullValue: null };
 }
