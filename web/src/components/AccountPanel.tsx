@@ -121,7 +121,7 @@ function getProviderNames(providerIds: string[]) {
   return providerIds.map((providerId) => {
     if (providerId === "google.com") return "Google";
     if (providerId === "github.com") return "GitHub";
-    if (providerId === "password") return "Google";
+    if (providerId === "password") return "Email / password";
     return providerId;
   });
 }

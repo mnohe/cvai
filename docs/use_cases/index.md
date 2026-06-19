@@ -7,9 +7,9 @@ E2E tests reference use cases by ID in their `describe` block names, making cove
 ## Actors
 
 - **User** — a job seeker authenticated via Google or GitHub through Firebase Auth.
-- **LLM** — Anthropic Claude (model configured via `ANTHROPIC_MODEL`). Involved only in
-  use cases marked **LLM: Yes**. Every LLM-backed operation except Quick Analysis costs
-  one credit and runs asynchronously via the Action pattern.
+- **LLM** — provider configured via `LLM_PROVIDER` and `LLM_MODEL`. Involved only in
+  use cases marked **LLM: Yes**. Every LLM-backed operation except Quick Analysis costs one reserved credit and runs asynchronously via the Action pattern. The reservation is refunded for program, provider, or infrastructure failures, but not for clearly
+  user-caused input failures after the paid workflow starts.
 - **Stripe** — payment adapter for credit acquisition ([UC-BILLING-001](UC-BILLING-001-purchase-credits.md) only).
 
 ## Auth

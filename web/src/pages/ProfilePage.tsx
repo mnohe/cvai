@@ -2,15 +2,14 @@ import { doc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
 import {
   useEffect,
   useMemo,
-  useRef,
   useState,
   type FormEvent,
   type ReactNode,
 } from "react";
 import { NavLink, useParams, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/components/AuthProvider";
+import { ImportCVModal } from "@/components/ImportCVModal";
 import { ThinkButton } from "@/components/ThinkButton";
-import { apiFetch } from "@/lib/api";
 import {
   emptyCandidateContext,
   getCVCompleteness,
@@ -23,6 +22,7 @@ import {
   hasText,
   joinLines,
   makeExperience,
+  makePosition,
   normaliseCV,
   splitLines,
 } from "@/lib/cv";
@@ -162,6 +162,10 @@ function CVProfile({ completionOpen }: { completionOpen: boolean }) {
     setSaveMessage("Saved");
   }
 
+  useEffect(() => {
+    setSaveMessage(null);
+  }, [activeSection]);
+
   if (!snapshotReady) {
     return <div className="empty-panel">Loading CV...</div>;
   }
@@ -291,7 +295,14 @@ function CVProfile({ completionOpen }: { completionOpen: boolean }) {
         </div>
       )}
 
-      {importOpen && <ImportCVModal onClose={() => setImportOpen(false)} />}
+      {importOpen && (
+        <ImportCVModal
+          onClose={() => setImportOpen(false)}
+          onImported={() => {
+            setStarted(true);
+          }}
+        />
+      )}
     </>
   );
 }
@@ -411,7 +422,7 @@ function ExperienceForm({ cv, onSave }: { cv: CV; onSave: (cv: CV) => void }) {
 
   useEffect(() => {
     const next = cv.experience[0] ?? makeExperience();
-    const position = next.positions[0] ?? firstPosition;
+    const position = next.positions[0] ?? makePosition();
     setCompany(next.company);
     setRoles(joinLines(position.roles));
     setStart(position.start);
@@ -455,9 +466,9 @@ function ExperienceForm({ cv, onSave }: { cv: CV; onSave: (cv: CV) => void }) {
 }
 
 function EducationForm({ cv, onSave }: { cv: CV; onSave: (cv: CV) => void }) {
-  const initial = cv.education[0] ?? { name: "", type: "", issuer: "", year: 0 };
+  const initial = cv.education[0] ?? emptyEducation();
   const [draft, setDraft] = useState<Education>(initial);
-  useEffect(() => setDraft(cv.education[0] ?? initial), [cv.education]);
+  useEffect(() => setDraft(cv.education[0] ?? emptyEducation()), [cv.education]);
 
   return (
     <FormShell onSubmit={() => onSave({ ...cv, education: [draft, ...cv.education.slice(1)] })}>
@@ -480,10 +491,31 @@ function SkillsForm({ cv, onSave }: { cv: CV; onSave: (cv: CV) => void }) {
   );
 }
 
+function emptyEducation(): Education {
+  return { name: "", type: "", issuer: "", year: 0 };
+}
+
+function emptyCertification(): Certification {
+  return { name: "", id: "", issuer: "", year: 0 };
+}
+
+function emptyLanguage(): Language {
+  return { name: "", level: "" };
+}
+
+function emptyProjectItem() {
+  return {
+    name: "",
+    summary: "",
+    url: "",
+    description: "",
+  };
+}
+
 function CertificationsForm({ cv, onSave }: { cv: CV; onSave: (cv: CV) => void }) {
-  const initial = cv.certifications[0] ?? { name: "", id: "", issuer: "", year: 0 };
+  const initial = cv.certifications[0] ?? emptyCertification();
   const [draft, setDraft] = useState<Certification>(initial);
-  useEffect(() => setDraft(cv.certifications[0] ?? initial), [cv.certifications]);
+  useEffect(() => setDraft(cv.certifications[0] ?? emptyCertification()), [cv.certifications]);
 
   return (
     <FormShell onSubmit={() => onSave({ ...cv, certifications: [draft, ...cv.certifications.slice(1)] })}>
@@ -496,9 +528,9 @@ function CertificationsForm({ cv, onSave }: { cv: CV; onSave: (cv: CV) => void }
 }
 
 function LanguagesForm({ cv, onSave }: { cv: CV; onSave: (cv: CV) => void }) {
-  const initial = cv.languages[0] ?? { name: "", level: "" };
+  const initial = cv.languages[0] ?? emptyLanguage();
   const [draft, setDraft] = useState<Language>(initial);
-  useEffect(() => setDraft(cv.languages[0] ?? initial), [cv.languages]);
+  useEffect(() => setDraft(cv.languages[0] ?? emptyLanguage()), [cv.languages]);
 
   return (
     <FormShell onSubmit={() => onSave({ ...cv, languages: [draft, ...cv.languages.slice(1)] })}>
@@ -509,17 +541,12 @@ function LanguagesForm({ cv, onSave }: { cv: CV; onSave: (cv: CV) => void }) {
 }
 
 function ProjectsForm({ cv, onSave }: { cv: CV; onSave: (cv: CV) => void }) {
-  const initial = cv.projects.items[0] ?? {
-    name: "",
-    summary: "",
-    url: "",
-    description: "",
-  };
+  const initial = cv.projects.items[0] ?? emptyProjectItem();
   const [portfolioURL, setPortfolioURL] = useState(cv.projects.url ?? "");
   const [draft, setDraft] = useState(initial);
   useEffect(() => {
     setPortfolioURL(cv.projects.url ?? "");
-    setDraft(cv.projects.items[0] ?? initial);
+    setDraft(cv.projects.items[0] ?? emptyProjectItem());
   }, [cv.projects]);
 
   return (
@@ -602,54 +629,5 @@ function Textarea({
       <span>{label}</span>
       <textarea value={value} rows={rows} onChange={(event) => onChange(event.target.value)} />
     </label>
-  );
-}
-
-function ImportCVModal({ onClose }: { onClose: () => void }) {
-  const [message, setMessage] = useState<string | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  async function upload() {
-    const file = inputRef.current?.files?.[0];
-    if (!file) {
-      setMessage("Choose a PDF first.");
-      return;
-    }
-
-    const body = new FormData();
-    body.append("pdf", file);
-
-    try {
-      await apiFetch("/cv/imports", { method: "POST", body });
-      setMessage("Import started.");
-    } catch {
-      setMessage("Import is not available yet.");
-    }
-  }
-
-  return (
-    <div className="modal-backdrop" role="presentation">
-      <section className="modal-card" role="dialog" aria-modal="true" aria-label="Import CV from PDF">
-        <div className="panel-row">
-          <div>
-            <h2>Import from PDF</h2>
-            <p className="muted">Upload a PDF CV when imports are enabled.</p>
-          </div>
-          <button type="button" className="icon-button" aria-label="Close import modal" onClick={onClose}>
-            ×
-          </button>
-        </div>
-        <input ref={inputRef} type="file" accept="application/pdf" />
-        {message && <p className="muted">{message}</p>}
-        <div className="panel-actions">
-          <ThinkButton completionScore={2} onClick={() => void upload()}>
-            Start import
-          </ThinkButton>
-          <button type="button" className="secondary-button" onClick={onClose}>
-            Cancel
-          </button>
-        </div>
-      </section>
-    </div>
   );
 }

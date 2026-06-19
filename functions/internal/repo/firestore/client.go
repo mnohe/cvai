@@ -11,6 +11,7 @@ import (
 const (
 	collUsers     = "users"
 	collAccount   = "account"
+	collActions   = "actions"
 	collCandidate = "candidate"
 	docProfile    = "profile"
 )
@@ -25,6 +26,18 @@ func accountDoc(client *firestore.Client, uid string) *firestore.DocumentRef {
 // Path: users/{uid}/candidate/profile
 func candidateDoc(client *firestore.Client, uid string) *firestore.DocumentRef {
 	return client.Collection(collUsers).Doc(uid).Collection(collCandidate).Doc(docProfile)
+}
+
+// actionDoc returns the document ref for a user action.
+// Path: users/{uid}/actions/{actionID}
+func actionDoc(client *firestore.Client, uid string, actionID string) *firestore.DocumentRef {
+	return client.Collection(collUsers).Doc(uid).Collection(collActions).Doc(actionID)
+}
+
+// actionsColl returns the collection ref for a user's actions.
+// Path: users/{uid}/actions
+func actionsColl(client *firestore.Client, uid string) *firestore.CollectionRef {
+	return client.Collection(collUsers).Doc(uid).Collection(collActions)
 }
 
 // NewClient creates a Firestore client.

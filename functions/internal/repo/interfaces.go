@@ -33,3 +33,12 @@ type CandidateRepository interface {
 	// GetCandidate returns the full candidate document. Returns nil, nil if not found.
 	GetCandidate(ctx context.Context, uid string) (*domain.Candidate, error)
 }
+
+// ActionRepository manages asynchronous LLM-backed action documents.
+type ActionRepository interface {
+	Create(ctx context.Context, uid string, action domain.Action) (string, error)
+	Update(ctx context.Context, uid string, actionID string, progress domain.ActionProgress) error
+	Complete(ctx context.Context, uid string, actionID string, result map[string]interface{}) error
+	Fail(ctx context.Context, uid string, actionID string, failureReason string) error
+	Get(ctx context.Context, uid string, actionID string) (*domain.Action, error)
+}

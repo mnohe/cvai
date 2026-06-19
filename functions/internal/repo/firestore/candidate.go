@@ -3,6 +3,7 @@ package firestore
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"cloud.google.com/go/firestore"
 	"google.golang.org/grpc/codes"
@@ -54,9 +55,24 @@ func (r *CandidateRepo) GetCV(ctx context.Context, uid string) (*domain.CV, erro
 // It does not overwrite fields outside the cv subtree.
 func (r *CandidateRepo) WriteCV(ctx context.Context, uid string, cv domain.CV) error {
 	ref := candidateDoc(r.client, uid)
-	_, err := ref.Set(ctx, map[string]any{"cv": cv}, firestore.MergeAll)
-	if err != nil {
-		return fmt.Errorf("write cv: %w", err)
-	}
-	return nil
+	now := time.Now()
+	return r.client.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
+		updates := map[string]any{
+			"cv":         cv,
+			"updated_at": now,
+		}
+		_, err := tx.Get(ref)
+		if err != nil {
+			if status.Code(err) != codes.NotFound {
+				return fmt.Errorf("get candidate for write cv: %w", err)
+			}
+			updates["created_at"] = now
+			updates["context"] = domain.CandidateContext{
+				Version:     1,
+				Constraints: domain.ContextConstraints{},
+				Preferences: domain.ContextPreferences{},
+			}
+		}
+		return tx.Set(ref, updates, firestore.MergeAll)
+	})
 }
