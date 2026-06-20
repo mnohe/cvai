@@ -58,7 +58,7 @@ export function ProfileCompletionMeter({
       className={`profile-meter ${tone} ${compact ? "profile-meter-compact" : ""}`}
       onClick={(event) => {
         event.stopPropagation();
-        navigate("/profile/cv?completion=open");
+        navigate("/profile/cv", { state: { openCompletionPanel: Date.now() } });
       }}
     >
       {compact ? (

@@ -3,7 +3,9 @@ package auth
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -31,7 +33,16 @@ type Middleware struct {
 // New creates an auth Middleware backed by Firebase Auth.
 // It detects FIREBASE_AUTH_EMULATOR_HOST automatically via the Firebase SDK.
 func New(ctx context.Context) (*Middleware, error) {
-	app, err := firebase.NewApp(ctx, nil)
+	projectID := os.Getenv("FIREBASE_PROJECT_ID")
+	authEmulatorHost := os.Getenv("FIREBASE_AUTH_EMULATOR_HOST")
+	log.Printf(
+		"auth_middleware_init project_id_set=%t auth_emulator_host_set=%t auth_emulator_host=%s",
+		projectID != "",
+		authEmulatorHost != "",
+		authEmulatorHost,
+	)
+	config := &firebase.Config{ProjectID: projectID}
+	app, err := firebase.NewApp(ctx, config)
 	if err != nil {
 		return nil, err
 	}
@@ -114,9 +125,36 @@ func (m *Middleware) extractToken(r *http.Request) (*firebaseauth.Token, *authEr
 	}
 	tok, err := m.verifier.VerifyIDToken(r.Context(), parts[1])
 	if err != nil {
+		log.Printf(
+			"auth_token_verify_failed method=%s path=%s reason=%s",
+			r.Method,
+			r.URL.Path,
+			sanitizeVerifyError(err),
+		)
 		return nil, &authErr{http.StatusForbidden, "invalid token"}
 	}
 	return tok, nil
+}
+
+func sanitizeVerifyError(err error) string {
+	if err == nil {
+		return "unknown"
+	}
+	msg := strings.ToLower(err.Error())
+	switch {
+	case strings.Contains(msg, "project"):
+		return "project_mismatch_or_missing"
+	case strings.Contains(msg, "expired"):
+		return "expired"
+	case strings.Contains(msg, "issuer"):
+		return "issuer_mismatch"
+	case strings.Contains(msg, "audience"):
+		return "audience_mismatch"
+	case strings.Contains(msg, "emulator"):
+		return "emulator_unreachable_or_mismatch"
+	default:
+		return "invalid"
+	}
 }
 
 func writeError(w http.ResponseWriter, status int, msg string) {

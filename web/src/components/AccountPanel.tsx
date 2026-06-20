@@ -3,15 +3,16 @@ import { doc, onSnapshot } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/components/AuthProvider";
-import { ProfileCompletionMeter } from "@/components/ProfileCompletionMeter";
 import { auth, db } from "@/lib/firebase";
 import { apiFetch } from "@/lib/api";
-import type { Account } from "@/lib/types";
+import { getCVCompleteness, normaliseCV } from "@/lib/cv";
+import type { Account, Candidate } from "@/lib/types";
 
 export function AccountPanel({ onClose }: { onClose: () => void }) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [creditBalance, setCreditBalance] = useState<number | null>(null);
+  const [candidate, setCandidate] = useState<Partial<Candidate> | null>(null);
 
   useEffect(() => {
     if (!user) {
@@ -41,11 +42,29 @@ export function AccountPanel({ onClose }: { onClose: () => void }) {
     return unsub;
   }, [user]);
 
+  useEffect(() => {
+    if (!user) {
+      setCandidate(null);
+      return;
+    }
+
+    return onSnapshot(
+      doc(db, "users", user.uid, "candidate", "profile"),
+      (snapshot) => {
+        setCandidate(snapshot.exists() ? ({ id: user.uid, ...snapshot.data() } as Partial<Candidate>) : null);
+      },
+      () => {
+        setCandidate(null);
+      },
+    );
+  }, [user]);
+
   if (!user) {
     return null;
   }
 
   const providerNames = getProviderNames(user.providerData.map((p) => p.providerId));
+  const cvCompleteness = getCVCompleteness(normaliseCV(candidate));
 
   return (
     <div className="account-panel">
@@ -66,9 +85,34 @@ export function AccountPanel({ onClose }: { onClose: () => void }) {
           </button>
         </div>
 
-        <div className="panel-section md:hidden">
+        <div className="panel-section">
           <p className="label">Profile</p>
-          <ProfileCompletionMeter />
+          <a
+            className="account-cv-completeness"
+            href="/profile/cv"
+            onClick={(event) => {
+              event.preventDefault();
+              onClose();
+              navigate("/profile/cv", { state: { openCompletionPanel: Date.now() } });
+            }}
+          >
+            <div className="cv-completeness-copy">
+              <strong>{cvCompleteness.percent}%</strong>
+              <span className="muted">
+                {cvCompleteness.complete} of {cvCompleteness.total} section signals
+              </span>
+            </div>
+            <div
+              className="cv-progress"
+              role="progressbar"
+              aria-label="CV completeness"
+              aria-valuenow={cvCompleteness.percent}
+              aria-valuemin={0}
+              aria-valuemax={100}
+            >
+              <span style={{ width: `${cvCompleteness.percent}%` }} />
+            </div>
+          </a>
         </div>
 
         <div className="panel-section">

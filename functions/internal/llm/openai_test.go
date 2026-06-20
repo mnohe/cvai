@@ -3,6 +3,7 @@ package llm
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"strings"
 	"testing"
@@ -38,6 +39,28 @@ func TestOpenAICompleteUsesResponsesAPIAndStrictSchema(t *testing.T) {
 		{Type: "document", Source: &BlockSource{Type: "base64", MediaType: "application/pdf", Data: "abc"}},
 		{Type: "text", Text: "extract"},
 	}}}, json.RawMessage(`{"type":"object","properties":{"summary":{"type":"string"}},"required":["summary"],"additionalProperties":false}`))
+	if err != nil {
+		t.Fatalf("Complete: %v", err)
+	}
+	if string(raw) != `{"summary":"ok"}` {
+		t.Fatalf("raw = %s", raw)
+	}
+}
+
+func TestOpenAICompleteDoesNotCancelContextBeforeReadingBody(t *testing.T) {
+	transport := roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     make(http.Header),
+			Body: &slowBody{
+				ctx:  r.Context(),
+				body: `{"status":"completed","output":[{"type":"message","content":[{"type":"output_text","text":"{\"summary\":\"ok\"}"}]}],"usage":{"input_tokens":3,"output_tokens":5}}`,
+			},
+		}, nil
+	})
+
+	client := &OpenAIClient{APIKey: "test-key", Model: "test-model", BaseURL: "https://api.compat.test/v1", Timeout: time.Second, MaxRetries: 1, HTTPClient: &http.Client{Transport: transport}}
+	raw, err := client.Complete(context.Background(), "system", []Message{{Role: "user", Content: []ContentBlock{{Type: "text", Text: "hello"}}}}, json.RawMessage(`{"type":"object","properties":{"summary":{"type":"string"}},"required":["summary"],"additionalProperties":false}`))
 	if err != nil {
 		t.Fatalf("Complete: %v", err)
 	}
@@ -84,3 +107,26 @@ func TestNewCompleterRejectsUnknownProvider(t *testing.T) {
 		t.Fatal("expected error")
 	}
 }
+
+type slowBody struct {
+	ctx  context.Context
+	body string
+	done bool
+}
+
+func (b *slowBody) Read(p []byte) (int, error) {
+	if err := b.ctx.Err(); err != nil {
+		return 0, err
+	}
+	if b.done {
+		return 0, io.EOF
+	}
+	time.Sleep(10 * time.Millisecond)
+	if err := b.ctx.Err(); err != nil {
+		return 0, err
+	}
+	b.done = true
+	return copy(p, b.body), nil
+}
+
+func (b *slowBody) Close() error { return nil }

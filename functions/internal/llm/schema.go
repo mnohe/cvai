@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"sort"
+	"strings"
 )
 
 // DeriveOpenAIStrictSchema adapts the canonical CV JSON Schema for OpenAI's
@@ -19,7 +20,11 @@ func DeriveOpenAIStrictSchema(schema json.RawMessage) (json.RawMessage, error) {
 	if err := json.Unmarshal(schema, &root); err != nil {
 		return nil, err
 	}
-	derived, ok := deriveStrictNode(root).(map[string]any)
+	inlined, err := inlineLocalRefs(root, rootDefs(root), map[string]bool{})
+	if err != nil {
+		return nil, err
+	}
+	derived, ok := deriveStrictNode(inlined).(map[string]any)
 	if !ok {
 		return nil, errors.New("schema root is not an object")
 	}
@@ -50,6 +55,10 @@ func NormalizeStructuredOutput(raw json.RawMessage) (json.RawMessage, error) {
 func deriveStrictNode(value any) any {
 	switch node := value.(type) {
 	case map[string]any:
+		if ref, ok := node["$ref"].(string); ok {
+			out := map[string]any{"$ref": ref}
+			return out
+		}
 		out := make(map[string]any, len(node))
 		for key, child := range node {
 			if skipOpenAISchemaKey(key) {
@@ -102,10 +111,64 @@ func deriveStrictNode(value any) any {
 
 func skipOpenAISchemaKey(key string) bool {
 	switch key {
-	case "$schema", "$id", "$comment", "title", "description", "default", "format", "pattern", "minLength", "maxLength", "minimum", "maximum", "minItems", "maxItems":
+	case "$schema", "$id", "$comment", "$defs", "title", "description", "default", "format", "pattern", "minLength", "maxLength", "minimum", "maximum", "minItems", "maxItems":
 		return true
 	default:
 		return false
+	}
+}
+
+func rootDefs(root map[string]any) map[string]any {
+	defs, _ := root["$defs"].(map[string]any)
+	return defs
+}
+
+func inlineLocalRefs(value any, defs map[string]any, seen map[string]bool) (any, error) {
+	switch node := value.(type) {
+	case map[string]any:
+		if ref, ok := node["$ref"].(string); ok {
+			name, ok := strings.CutPrefix(ref, "#/$defs/")
+			if !ok {
+				return value, nil
+			}
+			target, ok := defs[name]
+			if !ok {
+				return nil, errors.New("schema ref target is missing: " + ref)
+			}
+			if seen[name] {
+				return nil, errors.New("schema ref cycle detected: " + ref)
+			}
+			nextSeen := make(map[string]bool, len(seen)+1)
+			for key, value := range seen {
+				nextSeen[key] = value
+			}
+			nextSeen[name] = true
+			return inlineLocalRefs(target, defs, nextSeen)
+		}
+		out := make(map[string]any, len(node))
+		for key, child := range node {
+			if key == "$defs" {
+				continue
+			}
+			next, err := inlineLocalRefs(child, defs, seen)
+			if err != nil {
+				return nil, err
+			}
+			out[key] = next
+		}
+		return out, nil
+	case []any:
+		out := make([]any, 0, len(node))
+		for _, child := range node {
+			next, err := inlineLocalRefs(child, defs, seen)
+			if err != nil {
+				return nil, err
+			}
+			out = append(out, next)
+		}
+		return out, nil
+	default:
+		return value, nil
 	}
 }
 

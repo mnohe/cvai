@@ -59,7 +59,7 @@ test-e2e:
 	cd $(WEB_DIR) && npm run test:e2e
 
 docker-smoke:
-	cd $(FUNCTIONS_DIR) && docker build -t cvai-ci .
+	docker build -f $(FUNCTIONS_DIR)/Dockerfile -t cvai-ci .
 	docker rm -f cvai-ci >/dev/null 2>&1 || true
 	docker run -d --name cvai-ci \
 		-p 18080:8080 \

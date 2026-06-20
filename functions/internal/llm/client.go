@@ -11,7 +11,13 @@ import (
 	"math"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/trace"
 )
 
 const defaultAnthropicBaseURL = "https://api.anthropic.com/v1/messages"
@@ -21,6 +27,31 @@ const (
 	ProviderOpenAI    = "openai"
 
 	structuredOutputToolName = "structured_output"
+)
+
+var (
+	llmMeter  = otel.Meter("github.com/mnohe/cvai/functions/llm")
+	llmTracer = otel.Tracer("github.com/mnohe/cvai/functions/llm")
+
+	llmRequestDuration, _ = llmMeter.Int64Histogram(
+		"llm_request_duration_ms",
+		metric.WithDescription("Duration of LLM provider requests."),
+		metric.WithUnit("ms"),
+	)
+	llmInputTokens, _ = llmMeter.Int64Histogram(
+		"llm_input_tokens",
+		metric.WithDescription("Input tokens consumed by LLM provider requests."),
+		metric.WithUnit("{token}"),
+	)
+	llmOutputTokens, _ = llmMeter.Int64Histogram(
+		"llm_output_tokens",
+		metric.WithDescription("Output tokens emitted by LLM provider requests."),
+		metric.WithUnit("{token}"),
+	)
+	llmRequests, _ = llmMeter.Int64Counter(
+		"llm_requests_total",
+		metric.WithDescription("Count of LLM provider requests by provider, model, status, and failure class."),
+	)
 )
 
 // Completer is the provider-neutral interface used by LLM-backed handlers.
@@ -44,9 +75,13 @@ type Config struct {
 type StatusError struct {
 	Provider string
 	Status   int
+	Detail   string
 }
 
 func (e StatusError) Error() string {
+	if e.Detail != "" {
+		return fmt.Sprintf("%s status %d (%s)", e.Provider, e.Status, e.Detail)
+	}
 	return fmt.Sprintf("%s status %d", e.Provider, e.Status)
 }
 
@@ -162,14 +197,18 @@ func (c *Client) Complete(ctx context.Context, systemPrompt string, messages []M
 		return nil, fmt.Errorf("marshal llm request: %w", err)
 	}
 
-	start := time.Now()
+	ctx, start, span := startLLMTelemetry(ctx, ProviderAnthropic, c.Model)
+	defer span.End()
 	var lastErr error
 	for attempt := 0; attempt <= c.maxRetries(); attempt++ {
-		resp, err := c.do(ctx, payload)
+		reqCtx, cancel := requestContext(ctx, c.Timeout)
+		resp, err := c.do(reqCtx, payload)
 		if err != nil {
+			cancel()
 			lastErr = err
 			if attempt < c.maxRetries() {
 				if err := sleepContext(ctx, c.backoff(attempt+1, nil)); err != nil {
+					recordLLMFailure(ctx, ProviderAnthropic, c.Model, start, span, classifyLLMFailure(err))
 					return nil, err
 				}
 				continue
@@ -179,44 +218,171 @@ func (c *Client) Complete(ctx context.Context, systemPrompt string, messages []M
 		responseBody, readErr := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
 		if readErr != nil {
 			_ = resp.Body.Close()
+			cancel()
+			recordLLMFailure(ctx, ProviderAnthropic, c.Model, start, span, classifyLLMFailure(readErr))
 			return nil, fmt.Errorf("read llm response: %w", readErr)
 		}
 
 		if resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode >= 500 {
-			lastErr = StatusError{Provider: ProviderAnthropic, Status: resp.StatusCode}
+			lastErr = providerStatusError(ProviderAnthropic, resp.StatusCode, responseBody)
 			if attempt < c.maxRetries() {
 				_, _ = io.Copy(io.Discard, resp.Body)
 				_ = resp.Body.Close()
+				cancel()
 				if err := sleepContext(ctx, c.backoff(attempt+1, resp.Header)); err != nil {
+					recordLLMFailure(ctx, ProviderAnthropic, c.Model, start, span, classifyLLMFailure(err))
 					return nil, err
 				}
 				continue
 			}
 		}
 		_ = resp.Body.Close()
+		cancel()
 
 		if resp.StatusCode < 200 || resp.StatusCode > 299 {
-			return nil, StatusError{Provider: ProviderAnthropic, Status: resp.StatusCode}
+			err := providerStatusError(ProviderAnthropic, resp.StatusCode, responseBody)
+			recordLLMFailure(ctx, ProviderAnthropic, c.Model, start, span, classifyLLMFailure(err))
+			return nil, err
 		}
 
 		var decoded completionResponse
 		if err := json.Unmarshal(responseBody, &decoded); err != nil {
+			recordLLMFailure(ctx, ProviderAnthropic, c.Model, start, span, "decode")
 			return nil, fmt.Errorf("decode llm response: %w", err)
 		}
+		raw, err := extractToolJSON(decoded)
+		if err != nil {
+			recordLLMFailure(ctx, ProviderAnthropic, c.Model, start, span, "response")
+			return nil, err
+		}
 		log.Printf("llm_complete model=%s input_tokens=%d output_tokens=%d latency_ms=%d", c.Model, decoded.Usage.InputTokens, decoded.Usage.OutputTokens, time.Since(start).Milliseconds())
-		return extractToolJSON(decoded)
+		recordLLMSuccess(ctx, ProviderAnthropic, c.Model, start, span, decoded.Usage.InputTokens, decoded.Usage.OutputTokens)
+		return raw, nil
 	}
+	recordLLMFailure(ctx, ProviderAnthropic, c.Model, start, span, classifyLLMFailure(lastErr))
 	return nil, lastErr
 }
 
-func (c *Client) do(ctx context.Context, payload []byte) (*http.Response, error) {
-	reqCtx := ctx
-	var cancel context.CancelFunc
-	if c.Timeout > 0 {
-		reqCtx, cancel = context.WithTimeout(ctx, c.Timeout)
-		defer cancel()
+func providerStatusError(provider string, status int, body []byte) StatusError {
+	return StatusError{Provider: provider, Status: status, Detail: providerErrorSummary(body)}
+}
+
+func startLLMTelemetry(ctx context.Context, provider string, model string) (context.Context, time.Time, trace.Span) {
+	ctx, span := llmTracer.Start(ctx, "llm.complete",
+		trace.WithAttributes(
+			attribute.String("llm.provider", provider),
+			attribute.String("llm.model", model),
+		),
+	)
+	return ctx, time.Now(), span
+}
+
+func recordLLMSuccess(ctx context.Context, provider string, model string, start time.Time, span trace.Span, inputTokens int, outputTokens int) {
+	duration := time.Since(start).Milliseconds()
+	attrs := metric.WithAttributes(
+		attribute.String("provider", provider),
+		attribute.String("model", model),
+		attribute.String("status", "completed"),
+		attribute.String("failure_class", "none"),
+	)
+	llmRequestDuration.Record(ctx, duration, attrs)
+	llmInputTokens.Record(ctx, int64(inputTokens), attrs)
+	llmOutputTokens.Record(ctx, int64(outputTokens), attrs)
+	llmRequests.Add(ctx, 1, attrs)
+	span.SetAttributes(
+		attribute.String("llm.status", "completed"),
+		attribute.String("llm.failure_class", "none"),
+		attribute.Int64("llm.duration_ms", duration),
+		attribute.Int("llm.input_tokens", inputTokens),
+		attribute.Int("llm.output_tokens", outputTokens),
+	)
+}
+
+func recordLLMFailure(ctx context.Context, provider string, model string, start time.Time, span trace.Span, failureClass string) {
+	duration := time.Since(start).Milliseconds()
+	attrs := metric.WithAttributes(
+		attribute.String("provider", provider),
+		attribute.String("model", model),
+		attribute.String("status", "failed"),
+		attribute.String("failure_class", failureClass),
+	)
+	llmRequestDuration.Record(ctx, duration, attrs)
+	llmRequests.Add(ctx, 1, attrs)
+	span.SetAttributes(
+		attribute.String("llm.status", "failed"),
+		attribute.String("llm.failure_class", failureClass),
+		attribute.Int64("llm.duration_ms", duration),
+	)
+}
+
+func classifyLLMFailure(err error) string {
+	if err == nil {
+		return "unknown"
 	}
-	req, err := http.NewRequestWithContext(reqCtx, http.MethodPost, c.baseURL(), bytes.NewReader(payload))
+	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+		return "timeout"
+	}
+	var statusErr StatusError
+	if errors.As(err, &statusErr) {
+		switch {
+		case statusErr.Status == http.StatusTooManyRequests:
+			return "rate_limit"
+		case statusErr.Status == http.StatusUnauthorized || statusErr.Status == http.StatusForbidden:
+			return "provider_auth"
+		case statusErr.Status >= 500:
+			return "provider_5xx"
+		case statusErr.Status >= 400:
+			return "provider_4xx"
+		}
+	}
+	return "provider_or_system"
+}
+
+func providerErrorSummary(body []byte) string {
+	var payload struct {
+		Error struct {
+			Type    string `json:"type"`
+			Code    any    `json:"code"`
+			Param   string `json:"param"`
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return ""
+	}
+	parts := make([]string, 0, 4)
+	if payload.Error.Type != "" {
+		parts = append(parts, "type="+cleanProviderErrorValue(payload.Error.Type, 80))
+	}
+	if payload.Error.Code != nil {
+		parts = append(parts, "code="+cleanProviderErrorValue(fmt.Sprint(payload.Error.Code), 80))
+	}
+	if payload.Error.Param != "" {
+		parts = append(parts, "param="+cleanProviderErrorValue(payload.Error.Param, 80))
+	}
+	if payload.Error.Message != "" {
+		parts = append(parts, "message="+cleanProviderErrorValue(payload.Error.Message, 240))
+	}
+	return strings.Join(parts, " ")
+}
+
+func cleanProviderErrorValue(value string, maxLen int) string {
+	value = strings.Join(strings.Fields(value), " ")
+	if len(value) > maxLen {
+		return value[:maxLen] + "..."
+	}
+	return value
+}
+
+func requestContext(parent context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
+	if timeout <= 0 {
+		return parent, func() {}
+	}
+	return context.WithTimeout(parent, timeout)
+}
+
+func (c *Client) do(ctx context.Context, payload []byte) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL(), bytes.NewReader(payload))
 	if err != nil {
 		return nil, err
 	}

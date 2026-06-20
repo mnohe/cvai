@@ -97,14 +97,6 @@ export function getCVCompleteness(cv: CV) {
       complete: cv.certifications.some(hasCertificationContent),
     },
     { label: "Languages", complete: cv.languages.some(hasLanguageContent) },
-    {
-      label: "Projects",
-      complete:
-        hasText(cv.projects.url) ||
-        cv.projects.items.some((item) =>
-          [item.name, item.summary, item.url, item.description].some(hasText),
-        ),
-    },
   ];
 
   const complete = checks.filter((check) => check.complete).length;

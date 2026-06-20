@@ -52,6 +52,43 @@ func TestImportCVHappyPath(t *testing.T) {
 	}
 }
 
+func TestImportCVNormalizesAbsentSourceFacts(t *testing.T) {
+	accounts := &fakeAccounts{credits: 1}
+	actions := newFakeActions()
+	candidates := &fakeCandidates{}
+	importer := &fakeImporter{raw: json.RawMessage(`{
+		"summary":"Analytical engineer.",
+		"contact":{"name":"Ada","surname":"Lovelace","phone":{"prefix":"+44","number":"123456"},"email":"ada@example.test","linkedin":"https://linkedin.example/ada"},
+		"languages":[{"name":"English","level":"Native"}],
+		"certifications":[{"name":"Kubernetes","issuer":"CNCF","year":0}],
+		"education":[{"name":"Mathematics","type":"Degree","issuer":"University","year":0}],
+		"experience":[{"company":"Engines Ltd","positions":[{"roles":["Staff Engineer"],"start":"2021","location":"London","tasks":["Built systems"]}]}],
+		"projects":{"items":[]}
+	}`)}
+	handler := NewImportCVHandler(accounts, actions, candidates, importer)
+
+	rec := httptest.NewRecorder()
+	handler.ImportCV(rec, importRequest(t, smallPDF()))
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	var body map[string]string
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, func() bool {
+		action, _ := actions.Get(context.Background(), "uid-1", body["actionId"])
+		return action != nil && action.Status == domain.ActionComplete
+	})
+	writtenCV, _ := candidates.GetCV(context.Background(), "uid-1")
+	if writtenCV == nil {
+		t.Fatal("cv was not written")
+	}
+	if got := writtenCV.Experience[0].Positions[0].ID; got != "engines_ltd_staff_engineer_1" {
+		t.Fatalf("position id = %q", got)
+	}
+}
+
 func TestImportCVInjectsCandidatePreferences(t *testing.T) {
 	accounts := &fakeAccounts{credits: 1}
 	actions := newFakeActions()

@@ -8,18 +8,25 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
 	"github.com/mnohe/cvai/functions/internal/auth"
 	"github.com/mnohe/cvai/functions/internal/handlers"
 	"github.com/mnohe/cvai/functions/internal/llm"
+	"github.com/mnohe/cvai/functions/internal/observability"
 	"github.com/mnohe/cvai/functions/internal/repo"
 	fsrepo "github.com/mnohe/cvai/functions/internal/repo/firestore"
 )
 
 func main() {
 	ctx := context.Background()
+
+	shutdownTelemetry, err := observability.Init(ctx)
+	if err != nil {
+		log.Fatalf("observability: %v", err)
+	}
 
 	authMW, err := auth.New(ctx)
 	if err != nil {
@@ -107,6 +114,9 @@ func main() {
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		log.Printf("shutdown error: %v", err)
 	}
+	if err := shutdownTelemetry(shutdownCtx); err != nil {
+		log.Printf("telemetry shutdown error: %v", err)
+	}
 }
 
 func newLLMClient() (llm.Completer, error) {
@@ -129,7 +139,8 @@ func newLLMClient() (llm.Completer, error) {
 	if model == "" {
 		return nil, fmt.Errorf("LLM_MODEL must be set")
 	}
-	timeout := 60 * time.Second
+	timeout := envDurationSeconds("LLM_TIMEOUT_SECONDS", 180*time.Second)
+	log.Printf("llm_client_init provider=%s model_set=%t timeout_seconds=%d max_retries=%d", provider, model != "", int(timeout.Seconds()), 2)
 	return llm.NewCompleter(llm.Config{
 		Provider:   provider,
 		APIKey:     apiKey,
@@ -153,6 +164,19 @@ func envOrDefaultValue(value string, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+func envDurationSeconds(key string, fallback time.Duration) time.Duration {
+	raw := os.Getenv(key)
+	if raw == "" {
+		return fallback
+	}
+	seconds, err := strconv.Atoi(raw)
+	if err != nil || seconds <= 0 {
+		log.Printf("invalid_duration_env key=%s value=%q", key, raw)
+		return fallback
+	}
+	return time.Duration(seconds) * time.Second
 }
 
 // stub501 returns a handler responding 501 Not Implemented.

@@ -65,6 +65,18 @@ func TestCVValidateEnforcesSchemaRequiredFields(t *testing.T) {
 	assertValidationErrorContains(t, err, "cv_project.links[0]: link.url is required")
 }
 
+func TestCVValidateAllowsOptionalImportedFields(t *testing.T) {
+	cv := validCV()
+	cv.Certifications[0].ID = ""
+	cv.Certifications[0].Year = 0
+	cv.Education[0].Year = 0
+	cv.Projects.Items = nil
+
+	if err := cv.Validate(); err != nil {
+		t.Fatalf("Validate() returned error: %v", err)
+	}
+}
+
 func TestTaskValidateRejectsInvalidEffortAndSource(t *testing.T) {
 	negative := -1
 	task := Task{

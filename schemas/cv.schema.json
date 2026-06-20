@@ -136,9 +136,7 @@
       "additionalProperties": false,
       "required": [
         "name",
-        "id",
-        "issuer",
-        "year"
+        "issuer"
       ],
       "properties": {
         "name": {
@@ -165,8 +163,7 @@
       "additionalProperties": false,
       "required": [
         "name",
-        "issuer",
-        "year"
+        "issuer"
       ],
       "properties": {
         "name": {
@@ -282,7 +279,6 @@
         },
         "items": {
           "type": "array",
-          "minItems": 1,
           "items": {
             "$ref": "#/$defs/projectItem"
           }
@@ -295,7 +291,6 @@
       "required": [
         "name",
         "summary",
-        "url",
         "description"
       ],
       "properties": {

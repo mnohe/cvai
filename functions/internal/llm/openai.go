@@ -100,14 +100,18 @@ func (c *OpenAIClient) Complete(ctx context.Context, systemPrompt string, messag
 		return nil, fmt.Errorf("marshal llm request: %w", err)
 	}
 
-	start := time.Now()
+	ctx, start, span := startLLMTelemetry(ctx, ProviderOpenAI, c.Model)
+	defer span.End()
 	var lastErr error
 	for attempt := 0; attempt <= c.maxRetries(); attempt++ {
-		resp, err := c.do(ctx, payload)
+		reqCtx, cancel := requestContext(ctx, c.Timeout)
+		resp, err := c.do(reqCtx, payload)
 		if err != nil {
+			cancel()
 			lastErr = err
 			if attempt < c.maxRetries() {
 				if err := sleepContext(ctx, c.backoff(attempt+1, nil)); err != nil {
+					recordLLMFailure(ctx, ProviderOpenAI, c.Model, start, span, classifyLLMFailure(err))
 					return nil, err
 				}
 				continue
@@ -117,44 +121,53 @@ func (c *OpenAIClient) Complete(ctx context.Context, systemPrompt string, messag
 		responseBody, readErr := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
 		if readErr != nil {
 			_ = resp.Body.Close()
+			cancel()
+			recordLLMFailure(ctx, ProviderOpenAI, c.Model, start, span, classifyLLMFailure(readErr))
 			return nil, fmt.Errorf("read llm response: %w", readErr)
 		}
 
 		if resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode >= 500 {
-			lastErr = StatusError{Provider: ProviderOpenAI, Status: resp.StatusCode}
+			lastErr = providerStatusError(ProviderOpenAI, resp.StatusCode, responseBody)
 			if attempt < c.maxRetries() {
 				_, _ = io.Copy(io.Discard, resp.Body)
 				_ = resp.Body.Close()
+				cancel()
 				if err := sleepContext(ctx, c.backoff(attempt+1, resp.Header)); err != nil {
+					recordLLMFailure(ctx, ProviderOpenAI, c.Model, start, span, classifyLLMFailure(err))
 					return nil, err
 				}
 				continue
 			}
 		}
 		_ = resp.Body.Close()
+		cancel()
 
 		if resp.StatusCode < 200 || resp.StatusCode > 299 {
-			return nil, StatusError{Provider: ProviderOpenAI, Status: resp.StatusCode}
+			err := providerStatusError(ProviderOpenAI, resp.StatusCode, responseBody)
+			recordLLMFailure(ctx, ProviderOpenAI, c.Model, start, span, classifyLLMFailure(err))
+			return nil, err
 		}
 
 		var decoded openAIResponse
 		if err := json.Unmarshal(responseBody, &decoded); err != nil {
+			recordLLMFailure(ctx, ProviderOpenAI, c.Model, start, span, "decode")
 			return nil, fmt.Errorf("decode llm response: %w", err)
 		}
+		raw, err := extractOpenAIJSON(decoded)
+		if err != nil {
+			recordLLMFailure(ctx, ProviderOpenAI, c.Model, start, span, "response")
+			return nil, err
+		}
 		log.Printf("llm_complete model=%s input_tokens=%d output_tokens=%d latency_ms=%d", c.Model, decoded.Usage.InputTokens, decoded.Usage.OutputTokens, time.Since(start).Milliseconds())
-		return extractOpenAIJSON(decoded)
+		recordLLMSuccess(ctx, ProviderOpenAI, c.Model, start, span, decoded.Usage.InputTokens, decoded.Usage.OutputTokens)
+		return raw, nil
 	}
+	recordLLMFailure(ctx, ProviderOpenAI, c.Model, start, span, classifyLLMFailure(lastErr))
 	return nil, lastErr
 }
 
 func (c *OpenAIClient) do(ctx context.Context, payload []byte) (*http.Response, error) {
-	reqCtx := ctx
-	var cancel context.CancelFunc
-	if c.Timeout > 0 {
-		reqCtx, cancel = context.WithTimeout(ctx, c.Timeout)
-		defer cancel()
-	}
-	req, err := http.NewRequestWithContext(reqCtx, http.MethodPost, c.endpoint(), bytes.NewReader(payload))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.endpoint(), bytes.NewReader(payload))
 	if err != nil {
 		return nil, err
 	}

@@ -44,7 +44,19 @@ test.describe("UC-ONBOARD-001", () => {
   test("clicking meter opens the CV completion panel", async ({ page }) => {
     await signIn(page, "onboard.click@example.test");
     await page.getByRole("button", { name: "Profile completion 0 of 5" }).click();
-    await expect(page).toHaveURL(/\/profile\/cv\?completion=open$/);
+    await expect(page).toHaveURL(/\/profile\/cv$/);
+    await expect(page.getByRole("heading", { name: "Complete your profile" })).toBeVisible();
+  });
+
+  test("dismissed profile completion collapses into title diamonds", async ({ page }) => {
+    await signIn(page, "onboard.diamonds@example.test");
+    await expect(page.getByRole("heading", { name: "Complete your profile" })).toBeVisible();
+
+    await page.getByRole("button", { name: "Dismiss completion panel" }).click();
+    await expect(page.getByRole("heading", { name: "Complete your profile" })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Show profile completion details, 0 of 5 complete" })).toBeVisible();
+
+    await page.getByRole("link", { name: "Show profile completion details, 0 of 5 complete" }).click();
     await expect(page.getByRole("heading", { name: "Complete your profile" })).toBeVisible();
   });
 });

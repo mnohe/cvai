@@ -4,6 +4,7 @@ import { BrowserRouter } from "react-router-dom";
 import App from "@/App";
 import { AuthProvider } from "@/components/AuthProvider";
 import "@/index.css";
+import "@/styles/cv-print.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

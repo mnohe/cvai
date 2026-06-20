@@ -168,9 +168,8 @@ func (l Language) Validate() error {
 func (c Certification) Validate() error {
 	return join(
 		required("certification.name", c.Name),
-		required("certification.id", c.ID),
 		required("certification.issuer", c.Issuer),
-		year("certification.year", c.Year),
+		optionalYear("certification.year", c.Year),
 	)
 }
 
@@ -179,7 +178,7 @@ func (e Education) Validate() error {
 	return join(
 		required("education.name", e.Name),
 		required("education.issuer", e.Issuer),
-		year("education.year", e.Year),
+		optionalYear("education.year", e.Year),
 	)
 }
 
@@ -209,7 +208,6 @@ func (p CVPosition) Validate() error {
 // Validate checks that CVProjects contains at least one valid project item.
 func (p CVProjects) Validate() error {
 	return join(
-		minLen("cv.projects.items", len(p.Items), 1),
 		validateSlice("cv.projects.items", p.Items),
 	)
 }
@@ -219,7 +217,6 @@ func (p CVProjectItem) Validate() error {
 	return join(
 		required("cv_project.name", p.Name),
 		required("cv_project.summary", p.Summary),
-		required("cv_project.url", p.URL),
 		required("cv_project.description", p.Description),
 		validateSlice("cv_project.links", p.Links),
 		nonEmptyStrings("cv_project.keywords", p.Keywords),
@@ -421,6 +418,13 @@ func year(field string, value int) error {
 		return fmt.Errorf("%s must be between 1900 and 2100", field)
 	}
 	return nil
+}
+
+func optionalYear(field string, value int) error {
+	if value == 0 {
+		return nil
+	}
+	return year(field, value)
 }
 
 func nonNegativeInt(field string, value int) error {

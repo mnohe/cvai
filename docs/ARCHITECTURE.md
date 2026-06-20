@@ -44,7 +44,7 @@ graph TD
 | Backend runtime | Go — Cloud Run Gen 2 | Statically compiled; cold start <200 ms; scales to zero |
 | Database | Firestore | Document model maps to domain aggregates; `onSnapshot` replaces polling |
 | Auth | Firebase Auth | Managed OAuth (Google, GitHub); ID token verification in middleware; no session state |
-| LLM | Provider-configurable API dialect (`anthropic` or `openai`) | Direct HTTP client (no SDK); structured output for extraction. Provider, model, and compatible OpenAI host are configured via `LLM_PROVIDER`, `LLM_MODEL`, and `LLM_BASE_URL`. |
+| LLM | Provider-configurable API dialect (`anthropic` or `openai`) | Direct HTTP client (no SDK); structured output for extraction. Provider, model, compatible OpenAI host, and timeout are configured via `LLM_PROVIDER`, `LLM_MODEL`, `LLM_BASE_URL`, and `LLM_TIMEOUT_SECONDS`. |
 | Billing | Stripe Checkout | Hosted payment page; webhook-driven credit fulfilment; idempotent session tracking |
 | Frontend | Vite + React 19 + Tailwind | SPA served from Firebase Hosting; every request carries `Authorization: Bearer <idToken>` |
 | PDF export | Browser `window.print()` | Zero backend cost; A4 CSS print layout; no server-side renderer needed |
@@ -206,7 +206,35 @@ Charging only after successful completion is intentionally avoided: it permits
 concurrent overspend and creates harder-to-reconcile cases where external model
 cost is incurred but the later credit charge fails.
 
-The LLM timeout ceiling is 60 s. Blocking the HTTP handler on an LLM call would exhaust Cloud Run concurrency.
+The default LLM timeout ceiling is 180 s, configurable via `LLM_TIMEOUT_SECONDS`; CV import processing is separately bounded by `CV_IMPORT_TIMEOUT_SECONDS`. Blocking the HTTP handler on an LLM call would exhaust Cloud Run concurrency.
+
+### Observability
+
+LLM-backed actions emit OpenTelemetry metrics and spans for operational dashboards and alerting. Logs remain the drill-down surface for sanitised diagnostics such as provider status summaries, action IDs, and failure reasons. Metrics carry bounded labels only.
+
+The Go service wires vendor-neutral OTLP export when standard `OTEL_*` environment variables are present. With no OTLP endpoint configured, instrumentation remains no-op. Supported protocols are `grpc` and `http/protobuf`; examples:
+
+```text
+OTEL_SERVICE_NAME=cvai-api
+OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+```
+
+Current CV import instruments:
+
+- `cv_import_pdf_bytes` histogram
+- `cv_import_llm_duration_ms` histogram
+- `cv_import_total_duration_ms` histogram
+- `cv_import_attempts_total` counter labelled by `status` and bounded `failure_class`
+- `cv.import` spans with action ID, PDF size, timeout, LLM duration, total duration, and terminal status
+
+Shared LLM client instruments:
+
+- `llm_request_duration_ms` histogram
+- `llm_input_tokens` histogram
+- `llm_output_tokens` histogram
+- `llm_requests_total` counter labelled by provider, model, status, and bounded failure class
+- `llm.complete` spans labelled by provider, model, terminal status, duration, and token counts when available
 
 ---
 

@@ -7,13 +7,13 @@ import {
   type FormEvent,
   type ReactNode,
 } from "react";
-import { NavLink, useParams, useSearchParams } from "react-router-dom";
+import { NavLink, useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "@/components/AuthProvider";
+import { CVPrintLayout } from "@/components/CVPrintLayout";
 import { ImportCVModal } from "@/components/ImportCVModal";
 import { ThinkButton } from "@/components/ThinkButton";
 import {
   emptyCandidateContext,
-  getCVCompleteness,
   hasCertificationContent,
   hasContactContent,
   hasCVContent,
@@ -34,9 +34,11 @@ import {
 } from "@/lib/profileCompletion";
 import type {
   CV,
+  CVPosition,
   Candidate,
   Certification,
   Education,
+  Experience,
   Language,
 } from "@/lib/types";
 
@@ -47,12 +49,11 @@ type CVSection =
   | "education"
   | "skills"
   | "certifications"
-  | "languages"
-  | "projects"
-  | "preferences";
+  | "languages";
 
 const profileTabs = [
   { to: "/profile/cv", label: "CV", section: "cv" },
+  { to: "/profile/preferences", label: "Preferences", section: "preferences" },
   { to: "/profile/stories", label: "Stories", section: "stories" },
   { to: "/profile/portfolio", label: "Portfolio", section: "portfolio" },
 ] as const;
@@ -65,52 +66,19 @@ const cvSections: { id: CVSection; label: string }[] = [
   { id: "skills", label: "Skills" },
   { id: "certifications", label: "Certifications" },
   { id: "languages", label: "Languages" },
-  { id: "projects", label: "Projects" },
-  { id: "preferences", label: "Preferences" },
 ];
 
 export function ProfilePage() {
   const { section = "cv" } = useParams();
-  const [searchParams] = useSearchParams();
-
-  return (
-    <section className="page-stack">
-      <div className="page-header">
-        <h1>Profile</h1>
-      </div>
-      <div>
-        <nav className="profile-tabs" aria-label="Profile sections">
-          {profileTabs.map((tab) => (
-            <NavLink className="profile-tab" to={tab.to} key={tab.to}>
-              {tab.label}
-            </NavLink>
-          ))}
-        </nav>
-
-        {section === "cv" ? (
-          <CVProfile completionOpen={searchParams.get("completion") === "open"} />
-        ) : (
-          <div className="empty-panel">
-            <p className="muted">Coming soon</p>
-          </div>
-        )}
-      </div>
-
-    </section>
-  );
-}
-
-function CVProfile({ completionOpen }: { completionOpen: boolean }) {
+  const location = useLocation();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [candidate, setCandidate] = useState<Partial<Candidate> | null>(null);
   const [snapshotReady, setSnapshotReady] = useState(false);
-  const [started, setStarted] = useState(false);
-  const [activeSection, setActiveSection] = useState<CVSection>("personal");
-  const [importOpen, setImportOpen] = useState(false);
-  const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [completionDismissed, setCompletionDismissed] = useState(
     () => sessionStorage.getItem("cvai:completion-dismissed") === "true",
   );
+  const [requestedCVSection, setRequestedCVSection] = useState<CVSection | null>(null);
 
   useEffect(() => {
     if (!user) {
@@ -138,13 +106,123 @@ function CVProfile({ completionOpen }: { completionOpen: boolean }) {
 
   const cv = useMemo(() => normaliseCV(candidate), [candidate]);
   const completion = useMemo(() => getProfileCompletion(candidate ?? { cv }), [candidate, cv]);
-  const cvCompleteness = useMemo(() => getCVCompleteness(cv), [cv]);
+  const showCompletionPanel = completion.score < 5 && !completionDismissed;
+
+  useEffect(() => {
+    if (!isCompletionOpenNavigation(location.state)) return;
+    sessionStorage.removeItem("cvai:completion-dismissed");
+    setCompletionDismissed(false);
+  }, [location.state]);
+
+  function handleCompletionSection(nextSection: CVSection | "stories" | "portfolio") {
+    if (nextSection === "stories" || nextSection === "portfolio") {
+      void navigate(`/profile/${nextSection}`);
+      return;
+    }
+    setRequestedCVSection(nextSection);
+    void navigate("/profile/cv");
+  }
+
+  return (
+    <section className="page-stack">
+      <div className="page-header">
+        <h1>
+          Profile
+          {!showCompletionPanel && completion.score < 5 && (
+            <>
+              {" "}
+              <a
+                href="#profile-completion"
+                className="profile-completion-diamonds"
+                aria-label={`Show profile completion details, ${completion.score} of 5 complete`}
+                onClick={(event) => {
+                  event.preventDefault();
+                  sessionStorage.removeItem("cvai:completion-dismissed");
+                  setCompletionDismissed(false);
+                }}
+              >
+                {completion.segments.map((segment) => (
+                  <svg
+                    className={segment.complete ? "completion-diamond complete" : "completion-diamond missing"}
+                    key={segment.id}
+                    viewBox="0 0 12 12"
+                    aria-hidden="true"
+                  >
+                    <path d="M6 1 L11 6 L6 11 L1 6 Z" />
+                  </svg>
+                ))}
+              </a>
+            </>
+          )}
+        </h1>
+      </div>
+      {showCompletionPanel && (
+        <ProfileCompletionPanel
+          score={completion.score}
+          segments={completion.segments}
+          onDismiss={() => {
+            sessionStorage.setItem("cvai:completion-dismissed", "true");
+            setCompletionDismissed(true);
+          }}
+          onSection={handleCompletionSection}
+        />
+      )}
+      <div>
+        <nav className="section-tabs" aria-label="Profile sections">
+          {profileTabs.map((tab) => (
+            <NavLink className="section-tab" to={tab.to} key={tab.to}>
+              {tab.label}
+            </NavLink>
+          ))}
+        </nav>
+
+        {section === "cv" ? (
+          <CVProfile
+            candidate={candidate}
+            snapshotReady={snapshotReady}
+            requestedSection={requestedCVSection}
+            onRequestedSectionHandled={() => setRequestedCVSection(null)}
+          />
+        ) : section === "preferences" ? (
+          <PreferencesProfile candidate={candidate} snapshotReady={snapshotReady} />
+        ) : (
+          <div className="tab-content empty-panel">
+            <p className="muted">Coming soon</p>
+          </div>
+        )}
+      </div>
+
+    </section>
+  );
+}
+
+function CVProfile({
+  candidate,
+  snapshotReady,
+  requestedSection,
+  onRequestedSectionHandled,
+}: {
+  candidate: Partial<Candidate> | null;
+  snapshotReady: boolean;
+  requestedSection: CVSection | null;
+  onRequestedSectionHandled: () => void;
+}) {
+  const { user } = useAuth();
+  const [started, setStarted] = useState(false);
+  const [activeSection, setActiveSection] = useState<CVSection>("personal");
+  const [importOpen, setImportOpen] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+
+  const cv = useMemo(() => normaliseCV(candidate), [candidate]);
   const hasExistingCV = candidate?.cv ? hasCVContent(cv) : false;
-  const hasExistingPreferences = hasText(candidate?.preferences ?? "");
-  const showEditor = started || hasExistingCV || hasExistingPreferences;
-  const showCompletionPanel =
-    completion.score < 5 &&
-    (completionOpen || (!completionDismissed && (started || hasExistingCV)));
+  const showEditor = started || hasExistingCV;
+
+  useEffect(() => {
+    if (!requestedSection) return;
+    setStarted(true);
+    setActiveSection(requestedSection);
+    onRequestedSectionHandled();
+  }, [onRequestedSectionHandled, requestedSection]);
 
   async function saveCV(nextCV: CV, sectionHasMeaningfulContent: boolean) {
     if (!user || !sectionHasMeaningfulContent) {
@@ -166,56 +244,18 @@ function CVProfile({ completionOpen }: { completionOpen: boolean }) {
     setSaveMessage("Saved");
   }
 
-  async function savePreferences(preferences: string) {
-    if (!user) {
-      return;
-    }
-
-    try {
-      await setDoc(
-        doc(db, "users", user.uid, "candidate", "profile"),
-        {
-          preferences,
-          updated_at: serverTimestamp(),
-        },
-        { merge: true },
-      );
-      setStarted(true);
-      setSaveMessage("Saved");
-    } catch {
-      setSaveMessage("Could not save preferences.");
-    }
-  }
-
   useEffect(() => {
     setSaveMessage(null);
   }, [activeSection]);
 
   if (!snapshotReady) {
-    return <div className="empty-panel">Loading CV...</div>;
+    return <div className="tab-content empty-panel">Loading CV...</div>;
   }
 
   return (
     <>
-      {showCompletionPanel && (
-        <ProfileCompletionPanel
-          score={completion.score}
-          segments={completion.segments}
-          onDismiss={() => {
-            sessionStorage.setItem("cvai:completion-dismissed", "true");
-            setCompletionDismissed(true);
-          }}
-          onSection={(nextSection) => {
-            if (nextSection === "stories") return;
-            if (nextSection === "portfolio") return;
-            setStarted(true);
-            setActiveSection(nextSection);
-          }}
-        />
-      )}
-
       {!showEditor ? (
-        <div className="empty-panel cv-empty-state">
+        <div className="tab-content empty-panel cv-empty-state">
           <h2>You haven't added a CV yet.</h2>
           <div className="empty-actions">
             <button type="button" className="primary-rect-button" onClick={() => setStarted(true)}>
@@ -227,102 +267,70 @@ function CVProfile({ completionOpen }: { completionOpen: boolean }) {
           </div>
         </div>
       ) : (
-        <div className="cv-editor">
-          <div className="cv-completeness" aria-label="CV completeness">
-            <div className="cv-panel-heading">
-              <div className="cv-completeness-copy">
-                <span className="label">Completeness</span>
-                <strong>{cvCompleteness.percent}%</strong>
-                <span className="muted">
-                  {cvCompleteness.complete} of {cvCompleteness.total} section signals
-                </span>
-              </div>
-              <button type="button" className="secondary-button" onClick={() => window.print()}>
-                Export PDF
-              </button>
-            </div>
-            <div
-              className="cv-progress"
-              role="progressbar"
-              aria-label="CV completeness"
-              aria-valuenow={cvCompleteness.percent}
-              aria-valuemin={0}
-              aria-valuemax={100}
-            >
-              <span style={{ width: `${cvCompleteness.percent}%` }} />
-            </div>
+        <div className="tab-content cv-panel">
+          <div className="cv-panel-actions">
+            <button type="button" className="secondary-button" onClick={() => window.print()}>
+              Export PDF
+            </button>
+            <ThinkButton completionScore={2} variant="ghost" onClick={() => setImportOpen(true)}>
+              Import from PDF
+            </ThinkButton>
           </div>
 
-          <nav className="cv-section-tabs" aria-label="CV editor sections">
-            {cvSections.map((tab) => (
-              <button
-                className={activeSection === tab.id ? "cv-section-tab active" : "cv-section-tab"}
-                type="button"
-                key={tab.id}
-                onClick={() => setActiveSection(tab.id)}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </nav>
+          <div className="cv-section">
 
-          {saveMessage && <p className="save-message">{saveMessage}</p>}
+            <nav className="section-tabs section-tabs-small" aria-label="CV editor sections">
+              {cvSections.map((tab) => (
+                <button
+                  className={activeSection === tab.id ? "section-tab active" : "section-tab"}
+                  type="button"
+                  key={tab.id}
+                  onClick={() => setActiveSection(tab.id)}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </nav>
 
-          <CVSectionPanel section={activeSection}>
-            {activeSection === "personal" && (
-              <PersonalForm cv={cv} onSave={(next) => void saveCV(next, hasContactContent(next))} />
-            )}
-            {activeSection === "summary" && (
-              <SummaryForm cv={cv} onSave={(next) => void saveCV(next, hasText(next.summary))} />
-            )}
-            {activeSection === "experience" && (
-              <ExperienceForm
-                cv={cv}
-                onSave={(next) => void saveCV(next, next.experience.some(hasExperienceContent))}
-              />
-            )}
-            {activeSection === "education" && (
-              <EducationForm
-                cv={cv}
-                onSave={(next) => void saveCV(next, next.education.some(hasEducationContent))}
-              />
-            )}
-            {activeSection === "skills" && (
-              <SkillsForm cv={cv} onSave={(next) => void saveCV(next, (next.skills ?? []).length > 0)} />
-            )}
-            {activeSection === "certifications" && (
-              <CertificationsForm
-                cv={cv}
-                onSave={(next) => void saveCV(next, next.certifications.some(hasCertificationContent))}
-              />
-            )}
-            {activeSection === "languages" && (
-              <LanguagesForm
-                cv={cv}
-                onSave={(next) => void saveCV(next, next.languages.some(hasLanguageContent))}
-              />
-            )}
-            {activeSection === "projects" && (
-              <ProjectsForm
-                cv={cv}
-                onSave={(next) =>
-                  void saveCV(
-                    next,
-                    hasText(next.projects.url) ||
-                      next.projects.items.some((item) =>
-                        [item.name, item.summary, item.url, item.description].some(hasText),
-                      ),
-                  )
-                }
-              />
-            )}
-            {activeSection === "preferences" && (
-              <PreferencesForm
-                preferences={candidate?.preferences ?? ""}
-                onSave={(preferences) => void savePreferences(preferences)}
-              />
-            )}
-          </CVSectionPanel>
+            {saveMessage && <p className="save-message">{saveMessage}</p>}
+
+            <CVSectionPanel section={activeSection}>
+              {activeSection === "personal" && (
+                <PersonalForm cv={cv} onSave={(next) => void saveCV(next, hasContactContent(next))} />
+              )}
+              {activeSection === "summary" && (
+                <SummaryForm cv={cv} onSave={(next) => void saveCV(next, hasText(next.summary))} />
+              )}
+              {activeSection === "experience" && (
+                <ExperienceForm
+                  cv={cv}
+                  onSave={(next) => void saveCV(next, next.experience.some(hasExperienceContent))}
+                />
+              )}
+              {activeSection === "education" && (
+                <EducationForm
+                  cv={cv}
+                  onSave={(next) => void saveCV(next, next.education.some(hasEducationContent))}
+                />
+              )}
+              {activeSection === "skills" && (
+                <SkillsForm cv={cv} onSave={(next) => void saveCV(next, (next.skills ?? []).length > 0)} />
+              )}
+              {activeSection === "certifications" && (
+                <CertificationsForm
+                  cv={cv}
+                  onSave={(next) => void saveCV(next, next.certifications.some(hasCertificationContent))}
+                />
+              )}
+              {activeSection === "languages" && (
+                <LanguagesForm
+                  cv={cv}
+                  onSave={(next) => void saveCV(next, next.languages.some(hasLanguageContent))}
+                />
+              )}
+            </CVSectionPanel>
+          </div>
+          <CVPrintLayout cv={cv} />
         </div>
       )}
 
@@ -332,9 +340,53 @@ function CVProfile({ completionOpen }: { completionOpen: boolean }) {
           onImported={() => {
             setStarted(true);
           }}
+          replacingExisting={hasExistingCV}
         />
       )}
     </>
+  );
+}
+
+function PreferencesProfile({
+  candidate,
+  snapshotReady,
+}: {
+  candidate: Partial<Candidate> | null;
+  snapshotReady: boolean;
+}) {
+  const { user } = useAuth();
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+
+  async function savePreferences(preferences: string) {
+    if (!user) return;
+    try {
+      await setDoc(
+        doc(db, "users", user.uid, "candidate", "profile"),
+        {
+          preferences,
+          updated_at: serverTimestamp(),
+        },
+        { merge: true },
+      );
+      setSaveMessage("Saved");
+    } catch {
+      setSaveMessage("Could not save preferences.");
+    }
+  }
+
+  if (!snapshotReady) {
+    return <div className="tab-content empty-panel">Loading preferences...</div>;
+  }
+
+  return (
+    <section className="tab-content preferences-panel" aria-labelledby="preferences-heading">
+      {saveMessage && <p className="save-message">{saveMessage}</p>}
+      <h2 id="preferences-heading">Preferences</h2>
+      <PreferencesForm
+        preferences={candidate?.preferences ?? ""}
+        onSave={(preferences) => void savePreferences(preferences)}
+      />
+    </section>
   );
 }
 
@@ -397,9 +449,18 @@ function segmentCTA(id: CompletionSegment["id"]) {
   return "Add personal details";
 }
 
+function isCompletionOpenNavigation(state: unknown): state is { openCompletionPanel: number } {
+  return (
+    typeof state === "object" &&
+    state !== null &&
+    "openCompletionPanel" in state &&
+    typeof (state as { openCompletionPanel?: unknown }).openCompletionPanel === "number"
+  );
+}
+
 function CVSectionPanel({ section, children }: { section: CVSection; children: ReactNode }) {
   return (
-    <section className="cv-section-panel" aria-labelledby={`cv-${section}-heading`}>
+    <section className="section-panel cv-section-panel" aria-labelledby={`cv-${section}-heading`}>
       <h2 id={`cv-${section}-heading`}>{cvSections.find((item) => item.id === section)?.label}</h2>
       {children}
     </section>
@@ -436,88 +497,192 @@ function SummaryForm({ cv, onSave }: { cv: CV; onSave: (cv: CV) => void }) {
 }
 
 function ExperienceForm({ cv, onSave }: { cv: CV; onSave: (cv: CV) => void }) {
-  const initial = cv.experience[0] ?? makeExperience();
-  const firstPosition = initial.positions[0] ?? {
-    id: crypto.randomUUID(),
-    roles: [],
-    start: "",
-    location: "",
-    tasks: [],
-  };
-  const [company, setCompany] = useState(initial.company);
-  const [roles, setRoles] = useState(joinLines(firstPosition.roles));
-  const [start, setStart] = useState(firstPosition.start);
-  const [end, setEnd] = useState(firstPosition.end ?? "");
-  const [location, setLocation] = useState(firstPosition.location);
-  const [tasks, setTasks] = useState(joinLines(firstPosition.tasks));
+  const [items, setItems] = useState(() => normaliseExperienceList(cv.experience));
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [selectedPositionIndex, setSelectedPositionIndex] = useState(0);
 
   useEffect(() => {
-    const next = cv.experience[0] ?? makeExperience();
-    const position = next.positions[0] ?? makePosition();
-    setCompany(next.company);
-    setRoles(joinLines(position.roles));
-    setStart(position.start);
-    setEnd(position.end ?? "");
-    setLocation(position.location);
-    setTasks(joinLines(position.tasks));
+    setItems(normaliseExperienceList(cv.experience));
+    setSelectedIndex(0);
+    setSelectedPositionIndex(0);
   }, [cv.experience]);
 
+  const selectedExperience = items[selectedIndex] ?? makeExperience();
+  const selectedPosition = selectedExperience.positions[selectedPositionIndex] ?? makePosition();
+
+  function updateSelectedExperience(next: Experience) {
+    setItems((current) => current.map((item, index) => (index === selectedIndex ? next : item)));
+  }
+
+  function updateSelectedPosition(nextPosition: CVPosition) {
+    updateSelectedExperience({
+      ...selectedExperience,
+      positions: selectedExperience.positions.map((position, index) =>
+        index === selectedPositionIndex ? nextPosition : position,
+      ),
+    });
+  }
+
+  function addExperience() {
+    setItems((current) => [...current, makeExperience()]);
+    setSelectedIndex(items.length);
+    setSelectedPositionIndex(0);
+  }
+
+  function removeExperience() {
+    if (items.length === 1) return;
+    const nextItems = items.filter((_, index) => index !== selectedIndex);
+    setItems(nextItems);
+    setSelectedIndex(Math.max(0, selectedIndex - 1));
+    setSelectedPositionIndex(0);
+  }
+
+  function addPosition() {
+    updateSelectedExperience({
+      ...selectedExperience,
+      positions: [...selectedExperience.positions, makePosition()],
+    });
+    setSelectedPositionIndex(selectedExperience.positions.length);
+  }
+
+  function removePosition() {
+    if (selectedExperience.positions.length === 1) return;
+    updateSelectedExperience({
+      ...selectedExperience,
+      positions: selectedExperience.positions.filter((_, index) => index !== selectedPositionIndex),
+    });
+    setSelectedPositionIndex(Math.max(0, selectedPositionIndex - 1));
+  }
+
   return (
-    <FormShell
-      onSubmit={() =>
-        onSave({
-          ...cv,
-          experience: [
-            {
-              company,
-              positions: [
-                {
-                  id: firstPosition.id || crypto.randomUUID(),
-                  roles: splitLines(roles),
-                  start,
-                  end,
-                  location,
-                  tasks: splitLines(tasks),
-                },
-              ],
-            },
-            ...cv.experience.slice(1),
-          ],
-        })
-      }
-    >
-      <Field label="Company" value={company} onChange={setCompany} />
-      <Textarea label="Roles, one per line" value={roles} onChange={setRoles} rows={3} />
-      <Field label="Start" value={start} onChange={setStart} placeholder="2022-01" />
-      <Field label="End" value={end} onChange={setEnd} placeholder="Present" />
-      <Field label="Location" value={location} onChange={setLocation} />
-      <Textarea label="Tasks and outcomes, one per line" value={tasks} onChange={setTasks} rows={6} />
+    <FormShell onSubmit={() => onSave({ ...cv, experience: items })}>
+      <EntryControls
+        label="Experience entry"
+        entries={items}
+        selectedIndex={selectedIndex}
+        onSelect={(index) => {
+          setSelectedIndex(index);
+          setSelectedPositionIndex(0);
+        }}
+        onAdd={addExperience}
+        onRemove={removeExperience}
+        renderLabel={(experience, index) =>
+          entryLabel("Experience", index, joinText([experience.company, experience.positions[0]?.roles?.[0]], " - "))
+        }
+      />
+      <Field
+        label="Company"
+        value={selectedExperience.company}
+        onChange={(company) => updateSelectedExperience({ ...selectedExperience, company })}
+      />
+      <EntryControls
+        label="Position"
+        entries={selectedExperience.positions}
+        selectedIndex={selectedPositionIndex}
+        onSelect={setSelectedPositionIndex}
+        onAdd={addPosition}
+        onRemove={removePosition}
+        renderLabel={(position, index) => entryLabel("Position", index, joinText(position.roles))}
+      />
+      <Textarea
+        label="Roles, one per line"
+        value={joinLines(selectedPosition.roles)}
+        onChange={(roles) => updateSelectedPosition({ ...selectedPosition, roles: splitLines(roles) })}
+        rows={3}
+      />
+      <Field
+        label="Start"
+        value={selectedPosition.start}
+        onChange={(start) => updateSelectedPosition({ ...selectedPosition, start })}
+        placeholder="2022-01"
+      />
+      <Field
+        label="End"
+        value={selectedPosition.end ?? ""}
+        onChange={(end) => updateSelectedPosition({ ...selectedPosition, end })}
+        placeholder="Present"
+      />
+      <Field
+        label="Location"
+        value={selectedPosition.location}
+        onChange={(location) => updateSelectedPosition({ ...selectedPosition, location })}
+      />
+      <Textarea
+        label="Tasks and outcomes, one per line"
+        value={joinLines(selectedPosition.tasks)}
+        onChange={(tasks) => updateSelectedPosition({ ...selectedPosition, tasks: splitLines(tasks) })}
+        rows={6}
+      />
     </FormShell>
   );
 }
 
 function EducationForm({ cv, onSave }: { cv: CV; onSave: (cv: CV) => void }) {
-  const initial = cv.education[0] ?? emptyEducation();
-  const [draft, setDraft] = useState<Education>(initial);
-  useEffect(() => setDraft(cv.education[0] ?? emptyEducation()), [cv.education]);
+  const [items, setItems] = useState<Education[]>(cv.education.length ? cv.education : [emptyEducation()]);
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  useEffect(() => {
+    setItems(cv.education.length ? cv.education : [emptyEducation()]);
+    setSelectedIndex(0);
+  }, [cv.education]);
+  const draft = items[selectedIndex] ?? emptyEducation();
+
+  function updateDraft(next: Education) {
+    setItems((current) => current.map((item, index) => (index === selectedIndex ? next : item)));
+  }
 
   return (
-    <FormShell onSubmit={() => onSave({ ...cv, education: [draft, ...cv.education.slice(1)] })}>
-      <Field label="Qualification" value={draft.name} onChange={(name) => setDraft({ ...draft, name })} />
-      <Field label="Type" value={draft.type ?? ""} onChange={(type) => setDraft({ ...draft, type })} />
-      <Field label="Issuer" value={draft.issuer} onChange={(issuer) => setDraft({ ...draft, issuer })} />
-      <Field label="Year" type="number" value={draft.year ? String(draft.year) : ""} onChange={(year) => setDraft({ ...draft, year: Number(year) || 0 })} />
+    <FormShell onSubmit={() => onSave({ ...cv, education: items })}>
+      <EntryControls
+        label="Education entry"
+        entries={items}
+        selectedIndex={selectedIndex}
+        onSelect={setSelectedIndex}
+        onAdd={() => {
+          setItems((current) => [...current, emptyEducation()]);
+          setSelectedIndex(items.length);
+        }}
+        onRemove={() => {
+          if (items.length === 1) return;
+          setItems((current) => current.filter((_, index) => index !== selectedIndex));
+          setSelectedIndex(Math.max(0, selectedIndex - 1));
+        }}
+        renderLabel={(education, index) => entryLabel("Education", index, joinText([education.name, education.issuer]))}
+      />
+      <Field label="Qualification" value={draft.name} onChange={(name) => updateDraft({ ...draft, name })} />
+      <Field label="Type" value={draft.type ?? ""} onChange={(type) => updateDraft({ ...draft, type })} />
+      <Field label="Issuer" value={draft.issuer} onChange={(issuer) => updateDraft({ ...draft, issuer })} />
+      <Field label="Year" type="number" value={draft.year ? String(draft.year) : ""} onChange={(year) => updateDraft({ ...draft, year: Number(year) || 0 })} />
     </FormShell>
   );
 }
 
 function SkillsForm({ cv, onSave }: { cv: CV; onSave: (cv: CV) => void }) {
-  const [skills, setSkills] = useState(joinLines(cv.skills));
-  useEffect(() => setSkills(joinLines(cv.skills)), [cv.skills]);
+  const [skills, setSkills] = useState<string[]>(cv.skills?.length ? cv.skills : [""]);
+  useEffect(() => setSkills(cv.skills?.length ? cv.skills : [""]), [cv.skills]);
+
+  function updateSkill(index: number, value: string) {
+    setSkills((current) => current.map((skill, skillIndex) => (skillIndex === index ? value : skill)));
+  }
+
+  function removeSkill(index: number) {
+    setSkills((current) => current.filter((_, skillIndex) => skillIndex !== index));
+  }
 
   return (
-    <FormShell onSubmit={() => onSave({ ...cv, skills: splitLines(skills) })}>
-      <Textarea label="Skills, one per line" value={skills} onChange={setSkills} rows={8} />
+    <FormShell onSubmit={() => onSave({ ...cv, skills: skills.map((skill) => skill.trim()).filter(Boolean) })}>
+      <div className="editable-list field-wide">
+        {skills.map((skill, index) => (
+          <div className="editable-list-row" key={index}>
+            <Field label={`Skill ${index + 1}`} value={skill} onChange={(value) => updateSkill(index, value)} />
+            <button type="button" className="secondary-button" onClick={() => removeSkill(index)} disabled={skills.length === 1}>
+              Remove
+            </button>
+          </div>
+        ))}
+        <button type="button" className="secondary-button" onClick={() => setSkills((current) => [...current, ""])}>
+          Add skill
+        </button>
+      </div>
     </FormShell>
   );
 }
@@ -534,69 +699,80 @@ function emptyLanguage(): Language {
   return { name: "", level: "" };
 }
 
-function emptyProjectItem() {
-  return {
-    name: "",
-    summary: "",
-    url: "",
-    description: "",
-  };
-}
-
 function CertificationsForm({ cv, onSave }: { cv: CV; onSave: (cv: CV) => void }) {
-  const initial = cv.certifications[0] ?? emptyCertification();
-  const [draft, setDraft] = useState<Certification>(initial);
-  useEffect(() => setDraft(cv.certifications[0] ?? emptyCertification()), [cv.certifications]);
+  const [items, setItems] = useState<Certification[]>(cv.certifications.length ? cv.certifications : [emptyCertification()]);
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  useEffect(() => {
+    setItems(cv.certifications.length ? cv.certifications : [emptyCertification()]);
+    setSelectedIndex(0);
+  }, [cv.certifications]);
+  const draft = items[selectedIndex] ?? emptyCertification();
+
+  function updateDraft(next: Certification) {
+    setItems((current) => current.map((item, index) => (index === selectedIndex ? next : item)));
+  }
 
   return (
-    <FormShell onSubmit={() => onSave({ ...cv, certifications: [draft, ...cv.certifications.slice(1)] })}>
-      <Field label="Certification" value={draft.name} onChange={(name) => setDraft({ ...draft, name })} />
-      <Field label="Credential ID" value={draft.id} onChange={(id) => setDraft({ ...draft, id })} />
-      <Field label="Issuer" value={draft.issuer} onChange={(issuer) => setDraft({ ...draft, issuer })} />
-      <Field label="Year" type="number" value={draft.year ? String(draft.year) : ""} onChange={(year) => setDraft({ ...draft, year: Number(year) || 0 })} />
+    <FormShell onSubmit={() => onSave({ ...cv, certifications: items })}>
+      <EntryControls
+        label="Certification entry"
+        entries={items}
+        selectedIndex={selectedIndex}
+        onSelect={setSelectedIndex}
+        onAdd={() => {
+          setItems((current) => [...current, emptyCertification()]);
+          setSelectedIndex(items.length);
+        }}
+        onRemove={() => {
+          if (items.length === 1) return;
+          setItems((current) => current.filter((_, index) => index !== selectedIndex));
+          setSelectedIndex(Math.max(0, selectedIndex - 1));
+        }}
+        renderLabel={(certification, index) =>
+          entryLabel("Certification", index, joinText([certification.name, certification.issuer]))
+        }
+      />
+      <Field label="Certification" value={draft.name} onChange={(name) => updateDraft({ ...draft, name })} />
+      <Field label="Credential ID" value={draft.id} onChange={(id) => updateDraft({ ...draft, id })} />
+      <Field label="Issuer" value={draft.issuer} onChange={(issuer) => updateDraft({ ...draft, issuer })} />
+      <Field label="Year" type="number" value={draft.year ? String(draft.year) : ""} onChange={(year) => updateDraft({ ...draft, year: Number(year) || 0 })} />
     </FormShell>
   );
 }
 
 function LanguagesForm({ cv, onSave }: { cv: CV; onSave: (cv: CV) => void }) {
-  const initial = cv.languages[0] ?? emptyLanguage();
-  const [draft, setDraft] = useState<Language>(initial);
-  useEffect(() => setDraft(cv.languages[0] ?? emptyLanguage()), [cv.languages]);
-
-  return (
-    <FormShell onSubmit={() => onSave({ ...cv, languages: [draft, ...cv.languages.slice(1)] })}>
-      <Field label="Language" value={draft.name} onChange={(name) => setDraft({ ...draft, name })} />
-      <Field label="Level" value={draft.level} onChange={(level) => setDraft({ ...draft, level })} />
-    </FormShell>
-  );
-}
-
-function ProjectsForm({ cv, onSave }: { cv: CV; onSave: (cv: CV) => void }) {
-  const initial = cv.projects.items[0] ?? emptyProjectItem();
-  const [portfolioURL, setPortfolioURL] = useState(cv.projects.url ?? "");
-  const [draft, setDraft] = useState(initial);
+  const [items, setItems] = useState<Language[]>(cv.languages.length ? cv.languages : [emptyLanguage()]);
+  const [selectedIndex, setSelectedIndex] = useState(0);
   useEffect(() => {
-    setPortfolioURL(cv.projects.url ?? "");
-    setDraft(cv.projects.items[0] ?? emptyProjectItem());
-  }, [cv.projects]);
+    setItems(cv.languages.length ? cv.languages : [emptyLanguage()]);
+    setSelectedIndex(0);
+  }, [cv.languages]);
+  const draft = items[selectedIndex] ?? emptyLanguage();
+
+  function updateDraft(next: Language) {
+    setItems((current) => current.map((item, index) => (index === selectedIndex ? next : item)));
+  }
 
   return (
-    <FormShell
-      onSubmit={() =>
-        onSave({
-          ...cv,
-          projects: {
-            url: portfolioURL,
-            items: [draft, ...cv.projects.items.slice(1)],
-          },
-        })
-      }
-    >
-      <Field label="Portfolio URL" value={portfolioURL} onChange={setPortfolioURL} />
-      <Field label="Project name" value={draft.name} onChange={(name) => setDraft({ ...draft, name })} />
-      <Field label="Project URL" value={draft.url} onChange={(url) => setDraft({ ...draft, url })} />
-      <Textarea label="Project summary" value={draft.summary} onChange={(summary) => setDraft({ ...draft, summary })} rows={3} />
-      <Textarea label="Project description" value={draft.description} onChange={(description) => setDraft({ ...draft, description })} rows={5} />
+    <FormShell onSubmit={() => onSave({ ...cv, languages: items })}>
+      <EntryControls
+        label="Language entry"
+        entries={items}
+        selectedIndex={selectedIndex}
+        onSelect={setSelectedIndex}
+        onAdd={() => {
+          setItems((current) => [...current, emptyLanguage()]);
+          setSelectedIndex(items.length);
+        }}
+        onRemove={() => {
+          if (items.length === 1) return;
+          setItems((current) => current.filter((_, index) => index !== selectedIndex));
+          setSelectedIndex(Math.max(0, selectedIndex - 1));
+        }}
+        renderLabel={(language, index) => entryLabel("Language", index, joinText([language.name, language.level]))}
+      />
+      <Field label="Language" value={draft.name} onChange={(name) => updateDraft({ ...draft, name })} />
+      <Field label="Level" value={draft.level} onChange={(level) => updateDraft({ ...draft, level })} />
     </FormShell>
   );
 }
@@ -642,6 +818,47 @@ function PreferencesForm({
   );
 }
 
+function EntryControls<T>({
+  label,
+  entries,
+  selectedIndex,
+  onSelect,
+  onAdd,
+  onRemove,
+  renderLabel,
+}: {
+  label: string;
+  entries: T[];
+  selectedIndex: number;
+  onSelect: (index: number) => void;
+  onAdd: () => void;
+  onRemove: () => void;
+  renderLabel: (entry: T, index: number) => string;
+}) {
+  return (
+    <div className="entry-controls field-wide">
+      <label className="field">
+        <span>{label}</span>
+        <select value={selectedIndex} onChange={(event) => onSelect(Number(event.target.value))}>
+          {entries.map((entry, index) => (
+            <option value={index} key={index}>
+              {renderLabel(entry, index)}
+            </option>
+          ))}
+        </select>
+      </label>
+      <div className="entry-actions">
+        <button type="button" className="secondary-button" onClick={onAdd}>
+          Add
+        </button>
+        <button type="button" className="secondary-button" onClick={onRemove} disabled={entries.length === 1}>
+          Remove
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function FormShell({ children, onSubmit }: { children: ReactNode; onSubmit: () => void }) {
   return (
     <form
@@ -657,6 +874,22 @@ function FormShell({ children, onSubmit }: { children: ReactNode; onSubmit: () =
       </button>
     </form>
   );
+}
+
+function joinText(parts: Array<string | undefined>, separator = " | ") {
+  return parts.filter(hasText).join(separator);
+}
+
+function entryLabel(fallback: string, index: number, label: string) {
+  return `${index + 1}. ${hasText(label) ? label : fallback}`;
+}
+
+function normaliseExperienceList(experience: Experience[]) {
+  const items = experience.length ? experience : [makeExperience()];
+  return items.map((item) => ({
+    ...item,
+    positions: item.positions.length ? item.positions : [makePosition()],
+  }));
 }
 
 function Field({

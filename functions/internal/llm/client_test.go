@@ -76,6 +76,16 @@ func TestIsUserInputError(t *testing.T) {
 	}
 }
 
+func TestProviderStatusErrorIncludesSanitizedSummary(t *testing.T) {
+	err := providerStatusError(ProviderOpenAI, http.StatusBadRequest, []byte(`{"error":{"type":"invalid_request_error","code":"bad_pdf","param":"input[0].content[0]","message":"PDF could not be processed\ntry another file"}}`))
+	got := err.Error()
+	for _, want := range []string{"openai status 400", "type=invalid_request_error", "code=bad_pdf", "param=input[0].content[0]", "message=PDF could not be processed try another file"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("error = %q, want %q", got, want)
+		}
+	}
+}
+
 type roundTripFunc func(*http.Request) (*http.Response, error)
 
 func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) {

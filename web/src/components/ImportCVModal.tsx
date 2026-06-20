@@ -5,9 +5,18 @@ import { ApiError, apiFetch } from "@/lib/api";
 
 const maxPDFBytes = 10 * 1024 * 1024;
 
-export function ImportCVModal({ onClose, onImported }: { onClose: () => void; onImported: () => void }) {
+export function ImportCVModal({
+  onClose,
+  onImported,
+  replacingExisting = false,
+}: {
+  onClose: () => void;
+  onImported: () => void;
+  replacingExisting?: boolean;
+}) {
   const [message, setMessage] = useState<string | null>(null);
   const [actionId, setActionId] = useState<string | null>(null);
+  const [supportReference, setSupportReference] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -32,6 +41,7 @@ export function ImportCVModal({ onClose, onImported }: { onClose: () => void; on
     try {
       setUploading(true);
       setMessage(null);
+      setSupportReference(null);
       const response = await apiFetch<{ actionId: string }>("/cv/imports", { method: "POST", body });
       setActionId(response.actionId);
       setMessage("Import started.");
@@ -52,10 +62,16 @@ export function ImportCVModal({ onClose, onImported }: { onClose: () => void; on
     onClose();
   }, [onClose, onImported]);
 
-  const handleFailed = useCallback((reason: string) => {
+  const handleFailed = useCallback((reason: string, failedActionId: string) => {
     setMessage(reason);
+    setSupportReference(failedActionId);
     setActionId(null);
   }, []);
+
+  async function copySupportReference() {
+    if (!supportReference) return;
+    await navigator.clipboard?.writeText(supportReference);
+  }
 
   return (
     <div className="modal-backdrop" role="presentation">
@@ -64,6 +80,7 @@ export function ImportCVModal({ onClose, onImported }: { onClose: () => void; on
           <div>
             <h2>Import from PDF</h2>
             <p className="muted">Upload a PDF CV. This uses 1 credit.</p>
+            {replacingExisting && <p className="form-error">Importing a PDF will replace the current CV.</p>}
           </div>
           <button type="button" className="icon-button" aria-label="Close import modal" onClick={onClose}>
             x
@@ -72,6 +89,15 @@ export function ImportCVModal({ onClose, onImported }: { onClose: () => void; on
         <input ref={inputRef} type="file" accept="application/pdf" disabled={Boolean(actionId)} />
         {actionId && <ActionProgress actionId={actionId} onComplete={handleComplete} onFailed={handleFailed} />}
         {message && <p className="muted">{message}</p>}
+        {supportReference && (
+          <div className="support-reference">
+            <span className="muted">Reference ID</span>
+            <code>{supportReference}</code>
+            <button type="button" className="secondary-button" onClick={() => void copySupportReference()}>
+              Copy
+            </button>
+          </div>
+        )}
         <div className="panel-actions">
           <ThinkButton completionScore={2} onClick={() => void upload()} disabled={uploading || Boolean(actionId)}>
             {uploading ? "Uploading" : "Start import"}

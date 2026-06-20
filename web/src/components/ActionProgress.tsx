@@ -11,7 +11,7 @@ export function ActionProgress({
 }: {
   actionId: string;
   onComplete: () => void;
-  onFailed: (reason: string) => void;
+  onFailed: (reason: string, actionId: string) => void;
 }) {
   const { user } = useAuth();
   const [action, setAction] = useState<Action | null>(null);
@@ -30,7 +30,7 @@ export function ActionProgress({
       }
       if (nextAction.status === ActionFailed) {
         unsubscribe();
-        onFailed(nextAction.error ?? "Import failed");
+        onFailed(nextAction.error ?? "Import failed", actionId);
       }
     });
 

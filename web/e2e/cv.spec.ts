@@ -15,6 +15,7 @@ test.describe("UC-CV-001 start from scratch", () => {
     await signIn(page, "cv.start@example.test");
     await page.getByRole("button", { name: "Start from scratch" }).click();
     await expect(page.getByRole("navigation", { name: "CV editor sections" })).toBeVisible();
+    await openAccountPanel(page);
     await expect(page.getByRole("progressbar", { name: "CV completeness" })).toHaveAttribute(
       "aria-valuenow",
       "0",
@@ -27,6 +28,16 @@ test.describe("UC-CV-001 import entry point", () => {
     await signIn(page, "cv.import@example.test");
     await page.getByRole("button", { name: /Import from PDF/ }).click();
     await expect(page.getByRole("dialog", { name: "Import CV from PDF" })).toBeVisible();
+  });
+
+  test("is available from an existing CV and warns before replacement", async ({ page }) => {
+    await signIn(page, "cv.import.replace@example.test");
+    const session = await currentSession(page);
+    await writeCandidate(session, importedCandidate());
+
+    await expect(page.getByRole("button", { name: /Import from PDF/ })).toBeVisible();
+    await page.getByRole("button", { name: /Import from PDF/ }).click();
+    await expect(page.getByText("Importing a PDF will replace the current CV.")).toBeVisible();
   });
 });
 
@@ -113,6 +124,9 @@ test.describe("UC-CV-002 import CV from PDF", () => {
     });
 
     await expect(page.getByText("There was a problem reading your PDF.")).toBeVisible();
+    await expect(page.getByText("Reference ID")).toBeVisible();
+    await expect(page.getByText("import-failed")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Copy" })).toBeVisible();
     const creditBalance = await readAccountCredit(session);
     expect(creditBalance).toBe(1);
   });
@@ -172,6 +186,106 @@ test.describe("UC-CV-003 direct firestore write", () => {
   });
 });
 
+test.describe("UC-CV-003 imported CV editor", () => {
+  test("sparse imported CV remains editable", async ({ page }) => {
+    await signIn(page, "cv.sparse@example.test");
+    const session = await currentSession(page);
+    await writeCandidate(session, sparseImportedCandidate());
+
+    await expect(page.getByLabel("First name")).toHaveValue("Sparse");
+    await page.getByLabel("Surname").fill("Candidate");
+    await page.getByLabel("Email").fill("sparse@example.test");
+    await saveVisibleSection(page);
+
+    await openCVSection(page, "Languages");
+    await page.getByLabel("Language").fill("Esperanto");
+    await page.getByLabel("Level").fill("Conversational");
+    await saveVisibleSection(page);
+
+    await page.reload();
+    await expect(page.getByLabel("Surname")).toHaveValue("Candidate");
+    await openCVSection(page, "Languages");
+    await expect(page.getByLabel("Language")).toHaveValue("Esperanto");
+    await expect(page.getByLabel("Level")).toHaveValue("Conversational");
+  });
+
+  test("large imported CV exposes and preserves many entries", async ({ page }) => {
+    await signIn(page, "cv.large@example.test");
+    const session = await currentSession(page);
+    await writeCandidate(session, largeAcademicCandidate());
+
+    await expect(page.getByLabel("First name")).toHaveValue("Proteus");
+    await openCVSection(page, "Experience");
+    await expect(page.getByLabel("Experience entry").locator("option")).toHaveCount(28);
+    await page.getByLabel("Experience entry").selectOption("27");
+    await expect(page.getByLabel("Company")).toHaveValue("Institute 28");
+    await expect(page.getByLabel("Position").locator("option")).toHaveCount(3);
+    await page.getByLabel("Position").selectOption("2");
+    await expect(page.getByLabel("Roles, one per line")).toHaveValue("Visiting professor 28.3");
+    await page.getByLabel("Tasks and outcomes, one per line").fill("Published paper 28.3\nDelivered lecture 28.3\nWon impossible grant");
+    await saveVisibleSection(page);
+
+    await openCVSection(page, "Languages");
+    await expect(page.getByLabel("Language entry").locator("option")).toHaveCount(14);
+    await page.getByLabel("Language entry").selectOption("13");
+    await expect(page.getByLabel("Language")).toHaveValue("Language 14");
+    await expect(page.getByLabel("Level")).toHaveValue("Research fluency");
+
+    await page.reload();
+    await openCVSection(page, "Experience");
+    await expect(page.getByLabel("Experience entry").locator("option")).toHaveCount(28);
+    await page.getByLabel("Experience entry").selectOption("27");
+    await page.getByLabel("Position").selectOption("2");
+    await expect(page.getByLabel("Tasks and outcomes, one per line")).toHaveValue(
+      "Published paper 28.3\nDelivered lecture 28.3\nWon impossible grant",
+    );
+  });
+
+  test("multi-entry sections can edit imported entries beyond the first", async ({ page }) => {
+    await signIn(page, "cv.multi@example.test");
+    const session = await currentSession(page);
+    await writeCandidate(session, multiEntryCandidate());
+
+    await openCVSection(page, "Experience");
+    await page.getByLabel("Experience entry").selectOption("1");
+    await expect(page.getByLabel("Company")).toHaveValue("Second Company");
+    await page.getByLabel("Company").fill("Second Company Edited");
+    await saveVisibleSection(page);
+
+    await openCVSection(page, "Education");
+    await page.getByLabel("Education entry").selectOption("1");
+    await expect(page.getByLabel("Qualification")).toHaveValue("PhD Systems");
+    await page.getByLabel("Qualification").fill("PhD Systems Edited");
+    await saveVisibleSection(page);
+
+    await openCVSection(page, "Certifications");
+    await page.getByLabel("Certification entry").selectOption("1");
+    await expect(page.getByRole("textbox", { name: "Certification" })).toHaveValue("Second Cert");
+    await page.getByRole("textbox", { name: "Certification" }).fill("Second Cert Edited");
+    await saveVisibleSection(page);
+
+    await openCVSection(page, "Languages");
+    await page.getByLabel("Language entry").selectOption("1");
+    await expect(page.getByLabel("Language")).toHaveValue("French");
+    await page.getByLabel("Level").fill("Professional");
+    await saveVisibleSection(page);
+
+    await page.reload();
+    await openCVSection(page, "Experience");
+    await page.getByLabel("Experience entry").selectOption("1");
+    await expect(page.getByLabel("Company")).toHaveValue("Second Company Edited");
+    await openCVSection(page, "Education");
+    await page.getByLabel("Education entry").selectOption("1");
+    await expect(page.getByLabel("Qualification")).toHaveValue("PhD Systems Edited");
+    await openCVSection(page, "Certifications");
+    await page.getByLabel("Certification entry").selectOption("1");
+    await expect(page.getByRole("textbox", { name: "Certification" })).toHaveValue("Second Cert Edited");
+    await openCVSection(page, "Languages");
+    await page.getByLabel("Language entry").selectOption("1");
+    await expect(page.getByLabel("Level")).toHaveValue("Professional");
+  });
+});
+
 test.describe("UC-CV-003 completeness advances", () => {
   test("progress advances after filling experience", async ({ page }) => {
     await signIn(page, "cv.progress@example.test");
@@ -181,6 +295,7 @@ test.describe("UC-CV-003 completeness advances", () => {
     await page.getByLabel("Roles, one per line").fill("Principal engineer");
     await page.getByLabel("Tasks and outcomes, one per line").fill("Shipped reliable systems");
     await page.getByRole("button", { name: "Save section" }).click();
+    await openAccountPanel(page);
     await expect(page.getByRole("progressbar", { name: "CV completeness" })).not.toHaveAttribute(
       "aria-valuenow",
       "0",
@@ -191,8 +306,7 @@ test.describe("UC-CV-003 completeness advances", () => {
 test.describe("candidate preferences", () => {
   test("preferences save on blur and persist after reload", async ({ page }) => {
     await signIn(page, "cv.preferences@example.test");
-    await page.getByRole("button", { name: "Start from scratch" }).click();
-    await page.getByRole("button", { name: "Preferences", exact: true }).click();
+    await page.getByRole("link", { name: "Preferences", exact: true }).click();
     const preferences =
       "Remote-first roles, transparent salary bands, and sectors with strong public-interest value.";
 
@@ -205,8 +319,40 @@ test.describe("candidate preferences", () => {
     await expect(page.getByText("Saved")).toBeVisible();
 
     await page.reload();
-    await page.getByRole("button", { name: "Preferences", exact: true }).click();
     await expect(page.getByRole("textbox", { name: "Preferences and constraints" })).toHaveValue(preferences);
+  });
+});
+
+test.describe("UC-CV-004 CV PDF export", () => {
+  test("print action exposes print layout without app chrome", async ({ page }) => {
+    await page.addInitScript(() => {
+      window.print = () => {
+        const target = window as typeof window & { __printCalls?: number };
+        target.__printCalls = (target.__printCalls ?? 0) + 1;
+      };
+    });
+
+    await signIn(page, "cv.print@example.test");
+    const session = await currentSession(page);
+    await writeCandidate(session, importedCandidate());
+    await expect(page.getByLabel("First name")).toHaveValue("Ada");
+
+    await page.getByRole("button", { name: "Export PDF" }).click();
+    await expect
+      .poll(() => page.evaluate(() => (window as typeof window & { __printCalls?: number }).__printCalls ?? 0))
+      .toBe(1);
+
+    await page.emulateMedia({ media: "print" });
+    await expect(page.locator(".cv-print-layout")).toBeVisible();
+    await expect(page.locator(".cv-print-layout")).toContainText("Ada Lovelace");
+    await expect(page.locator(".cv-print-layout")).toContainText("Analytical engineer.");
+    await expect(page.locator(".cv-print-layout")).toContainText("Engines Ltd");
+    await expect(page.locator(".cv-print-layout")).toContainText("Mathematics");
+    await expect(page.locator(".cv-print-layout")).toContainText("Go");
+    await expect(page.locator(".cv-print-layout")).toContainText("English");
+    await expect(page.locator(".sidebar")).toBeHidden();
+    await expect(page.locator(".top-nav")).toBeHidden();
+    await expect(page.getByRole("button", { name: "Export PDF" })).toBeHidden();
   });
 });
 
@@ -263,7 +409,11 @@ test.describe("UC-CV-007 complete manual onboarding", () => {
     await saveVisibleSection(page);
 
     await openCVSection(page, "Skills");
-    await page.getByLabel("Skills, one per line").fill("TypeScript\nGo\nDistributed systems");
+    await page.getByLabel("Skill 1").fill("TypeScript");
+    await page.getByRole("button", { name: "Add skill" }).click();
+    await page.getByLabel("Skill 2").fill("Go");
+    await page.getByRole("button", { name: "Add skill" }).click();
+    await page.getByLabel("Skill 3").fill("Distributed systems");
     await saveVisibleSection(page);
 
     await openCVSection(page, "Certifications");
@@ -278,20 +428,12 @@ test.describe("UC-CV-007 complete manual onboarding", () => {
     await page.getByLabel("Level").fill("Native");
     await saveVisibleSection(page);
 
-    await openCVSection(page, "Projects");
-    await page.getByLabel("Portfolio URL").fill("https://portfolio.example/ada");
-    await page.getByLabel("Project name").fill("Difference Engine Monitor");
-    await page.getByLabel("Project URL").fill("https://projects.example/difference");
-    await page.getByLabel("Project summary").fill("Operational monitor for calculation workflows.");
-    await page
-      .getByLabel("Project description")
-      .fill("Tracked failures, surfaced bottlenecks, and made system health legible.");
-    await saveVisibleSection(page);
-
+    await openAccountPanel(page);
     await expect(page.getByRole("progressbar", { name: "CV completeness" })).toHaveAttribute(
       "aria-valuenow",
       "100",
     );
+    await page.getByRole("button", { name: "Close" }).click();
 
     await page.reload();
     await expect(page.getByLabel("First name")).toHaveValue("Ada");
@@ -327,9 +469,9 @@ test.describe("UC-CV-007 complete manual onboarding", () => {
     await expect(page.getByLabel("Year")).toHaveValue("2020");
 
     await openCVSection(page, "Skills");
-    await expect(page.getByLabel("Skills, one per line")).toHaveValue(
-      "TypeScript\nGo\nDistributed systems",
-    );
+    await expect(page.getByLabel("Skill 1")).toHaveValue("TypeScript");
+    await expect(page.getByLabel("Skill 2")).toHaveValue("Go");
+    await expect(page.getByLabel("Skill 3")).toHaveValue("Distributed systems");
 
     await openCVSection(page, "Certifications");
     await expect(page.getByRole("textbox", { name: "Certification" })).toHaveValue("Cloud Architect");
@@ -340,17 +482,6 @@ test.describe("UC-CV-007 complete manual onboarding", () => {
     await openCVSection(page, "Languages");
     await expect(page.getByRole("textbox", { name: "Language" })).toHaveValue("English");
     await expect(page.getByLabel("Level")).toHaveValue("Native");
-
-    await openCVSection(page, "Projects");
-    await expect(page.getByLabel("Portfolio URL")).toHaveValue("https://portfolio.example/ada");
-    await expect(page.getByLabel("Project name")).toHaveValue("Difference Engine Monitor");
-    await expect(page.getByLabel("Project URL")).toHaveValue("https://projects.example/difference");
-    await expect(page.getByLabel("Project summary")).toHaveValue(
-      "Operational monitor for calculation workflows.",
-    );
-    await expect(page.getByLabel("Project description")).toHaveValue(
-      "Tracked failures, surfaced bottlenecks, and made system health legible.",
-    );
     expect(apiCalls).toEqual([]);
   });
 });
@@ -373,6 +504,11 @@ async function openCVSection(page: Page, name: string) {
 async function saveVisibleSection(page: Page) {
   await page.getByRole("button", { name: "Save section" }).click();
   await expect(page.getByText("Saved")).toBeVisible();
+}
+
+async function openAccountPanel(page: Page) {
+  await page.getByRole("button", { name: "Open account panel" }).click();
+  await expect(page.getByRole("dialog", { name: "Account panel" })).toBeVisible();
 }
 
 function uniqueEmail(email: string) {
@@ -444,6 +580,135 @@ function importedCandidate() {
         },
       ],
       projects: { items: [] },
+    },
+    context: { version: 1, constraints: {}, preferences: {} },
+    created_at: new Date(),
+    updated_at: new Date(),
+  };
+}
+
+function sparseImportedCandidate() {
+  return {
+    cv: {
+      summary: "",
+      contact: {
+        name: "Sparse",
+        surname: "",
+        phone: { prefix: "", number: "" },
+        email: "",
+        linkedin: "",
+        github: "",
+        www: "",
+      },
+      skills: [],
+      languages: [],
+      certifications: [],
+      education: [],
+      experience: [],
+      projects: { items: [] },
+    },
+    context: { version: 1, constraints: {}, preferences: {} },
+    created_at: new Date(),
+    updated_at: new Date(),
+  };
+}
+
+function multiEntryCandidate() {
+  return {
+    cv: {
+      summary: "Multi-entry imported CV.",
+      contact: {
+        name: "Multi",
+        surname: "Entry",
+        phone: { prefix: "+1", number: "5550100" },
+        email: "multi@example.test",
+        linkedin: "https://linkedin.example/multi",
+      },
+      skills: ["Go", "TypeScript"],
+      languages: [
+        { name: "English", level: "Native" },
+        { name: "French", level: "Working" },
+      ],
+      certifications: [
+        { name: "First Cert", id: "FIRST", issuer: "Guild", year: 2020 },
+        { name: "Second Cert", id: "SECOND", issuer: "Guild", year: 2021 },
+      ],
+      education: [
+        { name: "MSc Computing", type: "Degree", issuer: "First University", year: 2015 },
+        { name: "PhD Systems", type: "Doctorate", issuer: "Second University", year: 2019 },
+      ],
+      experience: [
+        {
+          company: "First Company",
+          positions: [{ id: "first-position", roles: ["Engineer"], start: "2019", location: "Remote", tasks: ["Built first thing"] }],
+        },
+        {
+          company: "Second Company",
+          positions: [{ id: "second-position", roles: ["Lead"], start: "2021", location: "Berlin", tasks: ["Built second thing"] }],
+        },
+      ],
+      projects: { items: [] },
+    },
+    context: { version: 1, constraints: {}, preferences: {} },
+    created_at: new Date(),
+    updated_at: new Date(),
+  };
+}
+
+function largeAcademicCandidate() {
+  return {
+    cv: {
+      summary:
+        "Famously unstable and prolific professor with appointments, publications, public lectures, and languages everywhere.",
+      contact: {
+        name: "Proteus",
+        surname: "Polyglot",
+        phone: { prefix: "+41", number: "5552800" },
+        email: "proteus@example.test",
+        linkedin: "https://linkedin.example/proteus",
+        github: "https://github.example/proteus",
+        www: "https://proteus.example",
+      },
+      skills: Array.from({ length: 36 }, (_, index) => `Research skill ${index + 1}`),
+      languages: Array.from({ length: 14 }, (_, index) => ({
+        name: `Language ${index + 1}`,
+        level: index === 13 ? "Research fluency" : "Professional",
+      })),
+      certifications: Array.from({ length: 12 }, (_, index) => ({
+        name: `Academic honour ${index + 1}`,
+        id: `HONOUR-${index + 1}`,
+        issuer: `Society ${index + 1}`,
+        year: 1990 + index,
+      })),
+      education: Array.from({ length: 8 }, (_, index) => ({
+        name: `Degree ${index + 1}`,
+        type: index === 7 ? "Doctorate" : "Degree",
+        issuer: `University ${index + 1}`,
+        year: 1975 + index,
+      })),
+      experience: Array.from({ length: 28 }, (_, experienceIndex) => ({
+        company: `Institute ${experienceIndex + 1}`,
+        positions: Array.from({ length: 3 }, (_, positionIndex) => ({
+          id: `institute-${experienceIndex + 1}-position-${positionIndex + 1}`,
+          roles: [`Visiting professor ${experienceIndex + 1}.${positionIndex + 1}`],
+          start: String(1980 + experienceIndex),
+          end: positionIndex === 2 ? "Present" : String(1981 + experienceIndex),
+          location: `Campus ${experienceIndex + 1}`,
+          tasks: [
+            `Published paper ${experienceIndex + 1}.${positionIndex + 1}`,
+            `Delivered lecture ${experienceIndex + 1}.${positionIndex + 1}`,
+          ],
+        })),
+      })),
+      projects: {
+        url: "https://proteus.example/publications",
+        items: Array.from({ length: 20 }, (_, index) => ({
+          name: `Publication project ${index + 1}`,
+          summary: `Research programme ${index + 1}`,
+          url: `https://proteus.example/publications/${index + 1}`,
+          description: `Long-running research and publication stream ${index + 1}.`,
+        })),
+      },
     },
     context: { version: 1, constraints: {}, preferences: {} },
     created_at: new Date(),
