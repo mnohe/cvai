@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -122,12 +123,11 @@ func newLLMClient() (llm.Completer, error) {
 		apiKey = envOrDefaultValue(apiKey, os.Getenv("OPENAI_API_KEY"))
 		model = envOrDefaultValue(model, os.Getenv("OPENAI_MODEL"))
 	}
+	if apiKey == "" {
+		return nil, fmt.Errorf("LLM_API_KEY must be set")
+	}
 	if model == "" {
-		if provider == llm.ProviderAnthropic {
-			model = "claude-3-5-sonnet-20241022"
-		} else {
-			model = "gpt-5.5"
-		}
+		return nil, fmt.Errorf("LLM_MODEL must be set")
 	}
 	timeout := 60 * time.Second
 	return llm.NewCompleter(llm.Config{

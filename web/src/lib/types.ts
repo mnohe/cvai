@@ -273,6 +273,7 @@ export interface Candidate {
   id: string;
   cv: CV;
   context: CandidateContext;
+  preferences?: string;
   evidence_library?: EvidenceItem[];
   story_bank?: Story[];
   created_at: FirestoreTimestamp;

@@ -93,6 +93,7 @@ test.describe("UC-CV-002 import CV from PDF", () => {
     await page.getByRole("button", { name: /Import from PDF/ }).click();
     await choosePDF(page, "%PDF-1.7\nfailure");
     await page.getByRole("button", { name: "Start import" }).click();
+    await expect(page.getByRole("progressbar", { name: "CV import progress" })).toBeVisible();
     await writeFirestore(session, "account", "profile", {
       uid: session.uid,
       credit_balance: 1,
@@ -104,14 +105,14 @@ test.describe("UC-CV-002 import CV from PDF", () => {
       id: "import-failed",
       type: "import_cv",
       status: "failed",
-      progress: { step: "failed", message: "We could not read this PDF. Your credit has been refunded." },
-      error: "We could not read this PDF. Your credit has been refunded.",
+      progress: { step: "failed", message: "There was a problem reading your PDF." },
+      error: "There was a problem reading your PDF.",
       created_at: new Date(),
       updated_at: new Date(),
       completed_at: new Date(),
     });
 
-    await expect(page.getByText("Your credit has been refunded.")).toBeVisible();
+    await expect(page.getByText("There was a problem reading your PDF.")).toBeVisible();
     const creditBalance = await readAccountCredit(session);
     expect(creditBalance).toBe(1);
   });
@@ -184,6 +185,28 @@ test.describe("UC-CV-003 completeness advances", () => {
       "aria-valuenow",
       "0",
     );
+  });
+});
+
+test.describe("candidate preferences", () => {
+  test("preferences save on blur and persist after reload", async ({ page }) => {
+    await signIn(page, "cv.preferences@example.test");
+    await page.getByRole("button", { name: "Start from scratch" }).click();
+    await page.getByRole("button", { name: "Preferences", exact: true }).click();
+    const preferences =
+      "Remote-first roles, transparent salary bands, and sectors with strong public-interest value.";
+
+    await page.getByRole("textbox", { name: "Preferences and constraints" }).fill(preferences);
+    await expect(page.getByText(`${preferences.length}/2000`)).toBeVisible();
+    await page.getByRole("textbox", { name: "Preferences and constraints" }).fill("x".repeat(1801));
+    await expect(page.getByText("1801/2000")).toHaveClass(/preference-count-warning/);
+    await page.getByRole("textbox", { name: "Preferences and constraints" }).fill(preferences);
+    await page.getByRole("textbox", { name: "Preferences and constraints" }).blur();
+    await expect(page.getByText("Saved")).toBeVisible();
+
+    await page.reload();
+    await page.getByRole("button", { name: "Preferences", exact: true }).click();
+    await expect(page.getByRole("textbox", { name: "Preferences and constraints" })).toHaveValue(preferences);
   });
 });
 
@@ -337,6 +360,7 @@ async function signIn(page: Page, email: string) {
   await page.addInitScript((e2eEmail) => {
     window.localStorage.setItem("cvai:e2eEmail", e2eEmail);
   }, unique);
+  // The Auth emulator provider flow creates this test identity on demand.
   await page.goto("/login");
   await page.getByRole("button", { name: "Sign in with Google" }).click();
   await expect(page).toHaveURL(/\/profile\/cv$/);

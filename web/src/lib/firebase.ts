@@ -24,8 +24,16 @@ export const googleProvider = new GoogleAuthProvider();
 export const githubProvider = new GithubAuthProvider();
 
 if (import.meta.env.VITE_USE_EMULATOR === "true") {
-  connectAuthEmulator(auth, "http://localhost:9099", {
+  const authEmulatorUrl =
+    import.meta.env.VITE_FIREBASE_AUTH_EMULATOR_URL ?? "http://localhost:9099";
+  const firestoreEmulatorHost =
+    import.meta.env.VITE_FIRESTORE_EMULATOR_HOST ?? "localhost";
+  const firestoreEmulatorPort = Number(
+    import.meta.env.VITE_FIRESTORE_EMULATOR_PORT ?? "8080",
+  );
+
+  connectAuthEmulator(auth, authEmulatorUrl, {
     disableWarnings: true,
   });
-  connectFirestoreEmulator(db, "localhost", 8080);
+  connectFirestoreEmulator(db, firestoreEmulatorHost, firestoreEmulatorPort);
 }

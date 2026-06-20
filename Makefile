@@ -60,22 +60,26 @@ test-e2e:
 
 docker-smoke:
 	cd $(FUNCTIONS_DIR) && docker build -t cvai-ci .
-	docker run --rm -d --name cvai-ci \
+	docker rm -f cvai-ci >/dev/null 2>&1 || true
+	docker run -d --name cvai-ci \
 		-p 18080:8080 \
 		-e FIREBASE_PROJECT_ID=$(FIREBASE_PROJECT_ID) \
 		-e FIRESTORE_EMULATOR_HOST=127.0.0.1:8081 \
 		-e FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099 \
+		-e LLM_PROVIDER=openai \
+		-e LLM_API_KEY=dummy-smoke-test-key \
+		-e LLM_MODEL=dummy-smoke-test-model \
 		cvai-ci
 	for i in $$(seq 1 20); do \
 		if curl --fail http://localhost:18080/healthz; then \
-			docker stop cvai-ci; \
+			docker rm -f cvai-ci; \
 			exit 0; \
 		fi; \
-		docker logs cvai-ci; \
+		docker logs cvai-ci || true; \
 		sleep 1; \
 	done; \
-	docker logs cvai-ci; \
-	docker stop cvai-ci; \
+	docker logs cvai-ci || true; \
+	docker rm -f cvai-ci; \
 	exit 1
 
 precommit: lint build-functions build-web test-rules docker-smoke

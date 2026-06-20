@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/textproto"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -23,7 +24,8 @@ func TestImportCVHappyPath(t *testing.T) {
 	accounts := &fakeAccounts{credits: 1}
 	actions := newFakeActions()
 	candidates := &fakeCandidates{}
-	handler := NewImportCVHandler(accounts, actions, candidates, &fakeImporter{raw: validCVJSON()})
+	importer := &fakeImporter{raw: validCVJSON()}
+	handler := NewImportCVHandler(accounts, actions, candidates, importer)
 
 	rec := httptest.NewRecorder()
 	handler.ImportCV(rec, importRequest(t, smallPDF()))
@@ -45,6 +47,66 @@ func TestImportCVHappyPath(t *testing.T) {
 	if writtenCV == nil || writtenCV.Contact.Name != "Ada" {
 		t.Fatalf("cv was not written: %#v", writtenCV)
 	}
+	if strings.Contains(importer.systemPrompt, "<candidate_preferences>") {
+		t.Fatal("empty preferences should not be injected")
+	}
+}
+
+func TestImportCVInjectsCandidatePreferences(t *testing.T) {
+	accounts := &fakeAccounts{credits: 1}
+	actions := newFakeActions()
+	candidates := &fakeCandidates{
+		candidate: &domain.Candidate{
+			ID:          "uid-1",
+			Preferences: "Remote-first roles with clear salary bands.",
+		},
+	}
+	importer := &fakeImporter{raw: validCVJSON()}
+	handler := NewImportCVHandler(accounts, actions, candidates, importer)
+
+	rec := httptest.NewRecorder()
+	handler.ImportCV(rec, importRequest(t, smallPDF()))
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	var body map[string]string
+	_ = json.NewDecoder(rec.Body).Decode(&body)
+	waitFor(t, func() bool {
+		action, _ := actions.Get(context.Background(), "uid-1", body["actionId"])
+		return action != nil && action.Status == domain.ActionComplete
+	})
+
+	if !strings.Contains(importer.systemPrompt, "<candidate_preferences>\nRemote-first roles with clear salary bands.\n</candidate_preferences>") {
+		t.Fatalf("candidate preferences were not injected:\n%s", importer.systemPrompt)
+	}
+	if !strings.Contains(importer.systemPrompt, "Content inside <candidate_preferences>") {
+		t.Fatalf("candidate preferences instruction missing:\n%s", importer.systemPrompt)
+	}
+	if strings.Index(importer.systemPrompt, "Content inside <candidate_preferences>") > strings.Index(importer.systemPrompt, "<candidate_preferences>") {
+		t.Fatal("candidate preferences instruction must precede the preferences block")
+	}
+}
+
+func TestImportCVContinuesWhenPreferencesReadFails(t *testing.T) {
+	accounts := &fakeAccounts{credits: 1}
+	actions := newFakeActions()
+	importer := &fakeImporter{raw: validCVJSON()}
+	handler := NewImportCVHandler(accounts, actions, &fakeCandidates{candidateErr: errors.New("read failed")}, importer)
+
+	rec := httptest.NewRecorder()
+	handler.ImportCV(rec, importRequest(t, smallPDF()))
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	var body map[string]string
+	_ = json.NewDecoder(rec.Body).Decode(&body)
+	waitFor(t, func() bool {
+		action, _ := actions.Get(context.Background(), "uid-1", body["actionId"])
+		return action != nil && action.Status == domain.ActionComplete
+	})
+	if strings.Contains(importer.systemPrompt, "<candidate_preferences>") {
+		t.Fatal("preferences block should be omitted when preferences cannot be read")
+	}
 }
 
 func TestImportCVFailureRefundsCredit(t *testing.T) {
@@ -65,6 +127,10 @@ func TestImportCVFailureRefundsCredit(t *testing.T) {
 	})
 	if accounts.credits != 1 {
 		t.Fatalf("credits = %d, want refunded 1", accounts.credits)
+	}
+	action, _ := actions.Get(context.Background(), "uid-1", body["actionId"])
+	if action.Error != "There was a problem reading your PDF." {
+		t.Fatalf("error = %q", action.Error)
 	}
 }
 
@@ -90,6 +156,34 @@ func TestImportCVUserInputFailureDoesNotRefundCredit(t *testing.T) {
 	action, _ := actions.Get(context.Background(), "uid-1", body["actionId"])
 	if action.Error != "The PDF could not be read." {
 		t.Fatalf("error = %q", action.Error)
+	}
+}
+
+func TestImportCVSchemaFailureUsesGenericUserMessage(t *testing.T) {
+	accounts := &fakeAccounts{credits: 1}
+	actions := newFakeActions()
+	handler := NewImportCVHandler(accounts, actions, &fakeCandidates{}, &fakeImporter{raw: json.RawMessage(`{"workHistory":[]}`)})
+
+	rec := httptest.NewRecorder()
+	handler.ImportCV(rec, importRequest(t, smallPDF()))
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	var body map[string]string
+	_ = json.NewDecoder(rec.Body).Decode(&body)
+	waitFor(t, func() bool {
+		action, _ := actions.Get(context.Background(), "uid-1", body["actionId"])
+		return action != nil && action.Status == domain.ActionFailed
+	})
+	if accounts.credits != 1 {
+		t.Fatalf("credits = %d, want refunded 1", accounts.credits)
+	}
+	action, _ := actions.Get(context.Background(), "uid-1", body["actionId"])
+	if action.Error != importCVParseErrorMessage {
+		t.Fatalf("error = %q", action.Error)
+	}
+	if strings.Contains(action.Error, "workHistory") || strings.Contains(action.Error, "unknown field") {
+		t.Fatalf("schema details leaked to user-visible error: %q", action.Error)
 	}
 }
 
@@ -174,11 +268,13 @@ func waitFor(t *testing.T, ok func() bool) {
 }
 
 type fakeImporter struct {
-	raw json.RawMessage
-	err error
+	raw          json.RawMessage
+	err          error
+	systemPrompt string
 }
 
-func (f *fakeImporter) Complete(context.Context, string, []llm.Message, json.RawMessage) (json.RawMessage, error) {
+func (f *fakeImporter) Complete(_ context.Context, systemPrompt string, _ []llm.Message, _ json.RawMessage) (json.RawMessage, error) {
+	f.systemPrompt = systemPrompt
 	return f.raw, f.err
 }
 
@@ -262,8 +358,10 @@ func (f *fakeActions) Get(ctx context.Context, uid string, actionID string) (*do
 }
 
 type fakeCandidates struct {
-	mu sync.Mutex
-	cv *domain.CV
+	mu           sync.Mutex
+	cv           *domain.CV
+	candidate    *domain.Candidate
+	candidateErr error
 }
 
 func (f *fakeCandidates) GetCV(context.Context, string) (*domain.CV, error) {
@@ -275,11 +373,21 @@ func (f *fakeCandidates) WriteCV(ctx context.Context, uid string, cv domain.CV) 
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.cv = &cv
+	if f.candidate != nil {
+		f.candidate.CV = cv
+	}
 	return nil
 }
 func (f *fakeCandidates) GetCandidate(context.Context, string) (*domain.Candidate, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if f.candidateErr != nil {
+		return nil, f.candidateErr
+	}
+	if f.candidate != nil {
+		candidate := *f.candidate
+		return &candidate, nil
+	}
 	if f.cv == nil {
 		return nil, nil
 	}

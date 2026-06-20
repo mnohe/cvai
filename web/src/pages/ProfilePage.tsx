@@ -2,6 +2,7 @@ import { doc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
   type FormEvent,
   type ReactNode,
@@ -47,7 +48,8 @@ type CVSection =
   | "skills"
   | "certifications"
   | "languages"
-  | "projects";
+  | "projects"
+  | "preferences";
 
 const profileTabs = [
   { to: "/profile/cv", label: "CV", section: "cv" },
@@ -64,6 +66,7 @@ const cvSections: { id: CVSection; label: string }[] = [
   { id: "certifications", label: "Certifications" },
   { id: "languages", label: "Languages" },
   { id: "projects", label: "Projects" },
+  { id: "preferences", label: "Preferences" },
 ];
 
 export function ProfilePage() {
@@ -137,7 +140,8 @@ function CVProfile({ completionOpen }: { completionOpen: boolean }) {
   const completion = useMemo(() => getProfileCompletion(candidate ?? { cv }), [candidate, cv]);
   const cvCompleteness = useMemo(() => getCVCompleteness(cv), [cv]);
   const hasExistingCV = candidate?.cv ? hasCVContent(cv) : false;
-  const showEditor = started || hasExistingCV;
+  const hasExistingPreferences = hasText(candidate?.preferences ?? "");
+  const showEditor = started || hasExistingCV || hasExistingPreferences;
   const showCompletionPanel =
     completion.score < 5 &&
     (completionOpen || (!completionDismissed && (started || hasExistingCV)));
@@ -160,6 +164,27 @@ function CVProfile({ completionOpen }: { completionOpen: boolean }) {
     );
     setStarted(true);
     setSaveMessage("Saved");
+  }
+
+  async function savePreferences(preferences: string) {
+    if (!user) {
+      return;
+    }
+
+    try {
+      await setDoc(
+        doc(db, "users", user.uid, "candidate", "profile"),
+        {
+          preferences,
+          updated_at: serverTimestamp(),
+        },
+        { merge: true },
+      );
+      setStarted(true);
+      setSaveMessage("Saved");
+    } catch {
+      setSaveMessage("Could not save preferences.");
+    }
   }
 
   useEffect(() => {
@@ -289,6 +314,12 @@ function CVProfile({ completionOpen }: { completionOpen: boolean }) {
                       ),
                   )
                 }
+              />
+            )}
+            {activeSection === "preferences" && (
+              <PreferencesForm
+                preferences={candidate?.preferences ?? ""}
+                onSave={(preferences) => void savePreferences(preferences)}
               />
             )}
           </CVSectionPanel>
@@ -567,6 +598,47 @@ function ProjectsForm({ cv, onSave }: { cv: CV; onSave: (cv: CV) => void }) {
       <Textarea label="Project summary" value={draft.summary} onChange={(summary) => setDraft({ ...draft, summary })} rows={3} />
       <Textarea label="Project description" value={draft.description} onChange={(description) => setDraft({ ...draft, description })} rows={5} />
     </FormShell>
+  );
+}
+
+function PreferencesForm({
+  preferences,
+  onSave,
+}: {
+  preferences: string;
+  onSave: (preferences: string) => void;
+}) {
+  const [draft, setDraft] = useState(preferences);
+  const isEditing = useRef(false);
+
+  useEffect(() => {
+    if (!isEditing.current) {
+      setDraft(preferences);
+    }
+  }, [preferences]);
+
+  const count = draft.length;
+
+  return (
+    <label className="field field-wide">
+      <span>Preferences and constraints</span>
+      <textarea
+        value={draft}
+        rows={8}
+        placeholder="What matters to you in your next role? Remote work, salary range, sectors you prefer or avoid, anything else the AI should know when assessing roles."
+        onFocus={() => {
+          isEditing.current = true;
+        }}
+        onChange={(event) => setDraft(event.target.value)}
+        onBlur={() => {
+          isEditing.current = false;
+          onSave(draft);
+        }}
+      />
+      <span className={count > 1800 ? "preference-count preference-count-warning" : "preference-count"}>
+        {count}/2000
+      </span>
+    </label>
   );
 }
 

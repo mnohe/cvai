@@ -54,6 +54,20 @@ test('owner can write own candidate profile', async () => {
   );
 });
 
+test('candidate preferences length is limited to 2000 characters', async () => {
+  const db = testEnv.authenticatedContext('alice').firestore();
+  await assertSucceeds(
+    setDoc(doc(db, 'users', 'alice', 'candidate', 'profile'), {
+      preferences: 'x'.repeat(2000),
+    }),
+  );
+  await assertFails(
+    setDoc(doc(db, 'users', 'alice', 'candidate', 'profile'), {
+      preferences: 'x'.repeat(2001),
+    }),
+  );
+});
+
 // --- Cross-user access (must fail) ---
 
 test('authenticated user cannot read another user subtree', async () => {

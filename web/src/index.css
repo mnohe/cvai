@@ -722,6 +722,18 @@ button:disabled {
   margin: 0;
 }
 
+.preference-count {
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 700;
+  justify-self: end;
+  text-transform: none;
+}
+
+.preference-count-warning {
+  color: var(--danger);
+}
+
 .modal-backdrop {
   align-items: center;
   background: var(--modal-backdrop-bg);

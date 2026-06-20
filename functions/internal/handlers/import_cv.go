@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -21,7 +20,10 @@ import (
 	"github.com/mnohe/cvai/functions/internal/repo"
 )
 
-const maxCVImportBytes = 10 << 20
+const (
+	maxCVImportBytes          = 10 << 20
+	importCVParseErrorMessage = "The extracted CV could not be parsed."
+)
 
 type cvImporter interface {
 	Complete(ctx context.Context, systemPrompt string, messages []llm.Message, schema json.RawMessage) (json.RawMessage, error)
@@ -128,7 +130,15 @@ func (h *ImportCVHandler) runImport(uid string, actionID string, pdfBytes []byte
 		h.failImport(uid, actionID, "CV schema is unavailable")
 		return
 	}
-	rawCV, err := h.llm.Complete(ctx, prompts.ImportCVSystem, []llm.Message{{
+	systemPrompt := prompts.ImportCVSystemPrompt("")
+	candidate, err := h.candidates.GetCandidate(ctx, uid)
+	if err != nil {
+		log.Printf("candidate_preferences_read_failed uid_set=true action_id=%s: %v", actionID, err)
+	} else if candidate != nil {
+		systemPrompt = prompts.ImportCVSystemPrompt(candidate.Preferences)
+	}
+
+	rawCV, err := h.llm.Complete(ctx, systemPrompt, []llm.Message{{
 		Role: "user",
 		Content: []llm.ContentBlock{
 			{Type: "document", Source: &llm.BlockSource{Type: "base64", MediaType: "application/pdf", Data: base64.StdEncoding.EncodeToString(pdfBytes)}},
@@ -140,29 +150,32 @@ func (h *ImportCVHandler) runImport(uid string, actionID string, pdfBytes []byte
 			h.failImportWithoutRefund(uid, actionID, "The PDF could not be read.")
 			return
 		}
-		h.failImport(uid, actionID, "There was a problem reading your PDF. Your credit has been refunded.")
+		h.failImport(uid, actionID, "There was a problem reading your PDF.")
 		return
 	}
 	rawCV, err = llm.NormalizeStructuredOutput(rawCV)
 	if err != nil {
-		h.failImport(uid, actionID, fmt.Sprintf("The extracted CV did not match the expected schema: %v", err))
+		log.Printf("cv_normalize_failed uid_set=true action_id=%s: %v", actionID, err)
+		h.failImport(uid, actionID, importCVParseErrorMessage)
 		return
 	}
 
 	var cv domain.CV
 	if err := decodeStrict(rawCV, &cv); err != nil {
-		h.failImport(uid, actionID, fmt.Sprintf("The extracted CV did not match the expected schema: %v", err))
+		log.Printf("cv_decode_failed uid_set=true action_id=%s: %v", actionID, err)
+		h.failImport(uid, actionID, importCVParseErrorMessage)
 		return
 	}
 	if err := cv.Validate(); err != nil {
-		h.failImport(uid, actionID, fmt.Sprintf("The extracted CV did not match the expected schema: %v", err))
+		log.Printf("cv_validate_failed uid_set=true action_id=%s: %v", actionID, err)
+		h.failImport(uid, actionID, importCVParseErrorMessage)
 		return
 	}
 	if err := h.actions.Update(ctx, uid, actionID, domain.ActionProgress{Step: "saving", Message: "Saving CV", Percent: intPtr(85)}); err != nil {
 		log.Printf("action_update_failed uid_set=true action_id=%s", actionID)
 	}
 	if err := h.candidates.WriteCV(ctx, uid, cv); err != nil {
-		h.failImport(uid, actionID, "There was a problem saving the extracted CV. Your credit has been refunded.")
+		h.failImport(uid, actionID, "There was a problem saving the extracted CV.")
 		return
 	}
 	if err := h.actions.Complete(ctx, uid, actionID, map[string]interface{}{"resource": "candidate.cv"}); err != nil {

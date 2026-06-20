@@ -111,6 +111,7 @@ type Candidate struct {
 	ID              string           `firestore:"id"`
 	CV              CV               `firestore:"cv"`
 	Context         CandidateContext `firestore:"context"`
+	Preferences     string           `firestore:"preferences,omitempty"`
 	EvidenceLibrary []EvidenceItem   `firestore:"evidence_library,omitempty"`
 	StoryBank       []Story          `firestore:"story_bank,omitempty"`
 	CreatedAt       time.Time        `firestore:"created_at"`
