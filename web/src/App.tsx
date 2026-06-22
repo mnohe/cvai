@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { Shell } from "@/components/Shell";
 import { LoginPage } from "@/pages/LoginPage";
+import { CVPrintPage } from "@/pages/CVPrintPage";
 import { PlaceholderPage } from "@/pages/PlaceholderPage";
 import { ProfilePage } from "@/pages/ProfilePage";
 import { SettingsPage } from "@/pages/SettingsPage";
@@ -11,6 +12,7 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route element={<ProtectedRoute />}>
+        <Route path="/profile/cv/print/:template" element={<CVPrintPage />} />
         <Route element={<Shell />}>
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<PlaceholderPage name="dashboard" />} />

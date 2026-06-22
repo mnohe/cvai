@@ -1,0 +1,298 @@
+@import url("https://fonts.googleapis.com/css2?family=Alegreya+Sans:ital,wght@0,300;0,400;0,500;1,300;1,400;1,500&family=Literata:ital,wght@0,300;0,400;0,500;1,300;1,400;1,500&display=swap");
+
+@page {
+  size: A4 portrait;
+  margin: 15mm 20mm;
+}
+
+:root {
+  --cv-default-font-body: "Literata", Georgia, serif;
+  --cv-default-font-heading: "Alegreya Sans", Arial, Helvetica, sans-serif;
+  --cv-default-weight-body: 300;
+  --cv-default-weight-regular: 400;
+  --cv-default-weight-bold: 500;
+  --cv-default-text: #111111;
+  --cv-default-text-muted: #333333;
+  --cv-default-text-soft: #555555;
+  --cv-default-text-label: #777777;
+  --cv-default-page-bg: #ffffff;
+  --cv-default-screen-bg: #e8edf2;
+  --cv-default-rule: #222222;
+  --cv-default-bullet: #cfcfcf;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.cv-print-document-body,
+.cv-print-default-page {
+  background: var(--cv-default-screen-bg);
+  color: var(--cv-default-text);
+  font-family: var(--cv-default-font-body);
+  font-size: 10pt;
+  font-weight: var(--cv-default-weight-body);
+  line-height: 1.45;
+  margin: 0;
+}
+
+.cv-default-document a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.cv-default-document p,
+.cv-default-document h1,
+.cv-default-document h2,
+.cv-default-document h3,
+.cv-default-document dl,
+.cv-default-document dd,
+.cv-default-document ul {
+  margin: 0;
+}
+
+.cv-default-document strong,
+.cv-default-document b {
+  font-weight: var(--cv-default-weight-bold);
+}
+
+.cv-default-document h1,
+.cv-default-document h2,
+.cv-default-document h3,
+.cv-default-contact,
+.cv-default-entry-header p,
+.cv-default-brand-note {
+  font-family: var(--cv-default-font-heading);
+}
+
+.cv-print-page {
+  background: var(--cv-default-page-bg);
+  margin: 0 auto;
+  min-height: 297mm;
+  padding: 15mm 20mm;
+  width: 210mm;
+}
+
+.cv-default-document {
+  display: grid;
+  gap: 9pt;
+  min-height: calc(297mm - 30mm);
+}
+
+.cv-default-header {
+  border-bottom: 1pt solid var(--cv-default-rule);
+  display: grid;
+  gap: 4pt 12pt;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding-bottom: 8pt;
+}
+
+.cv-default-header h1 {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  font-size: 23pt;
+  font-weight: var(--cv-default-weight-bold);
+  grid-column: 1;
+  grid-row: 1;
+  line-height: 1;
+}
+
+.cv-default-contact {
+  color: var(--cv-default-text-muted);
+  display: contents;
+  font-size: 9pt;
+}
+
+.cv-default-contact-primary {
+  align-self: stretch;
+  display: grid;
+  gap: 0;
+  grid-column: 2;
+  grid-row: 1;
+  grid-template-rows: repeat(2, 1fr);
+  justify-items: end;
+  line-height: 1.05;
+  text-align: right;
+}
+
+.cv-default-contact-primary a {
+  align-content: center;
+  display: grid;
+}
+
+.cv-default-contact-links {
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 8pt;
+  gap: 3pt 10pt;
+  grid-column: 1 / -1;
+  grid-row: 2;
+  justify-content: flex-end;
+}
+
+.cv-default-section {
+  display: grid;
+  gap: 5pt;
+}
+
+.cv-default-section h2 {
+  break-after: avoid;
+  color: var(--cv-default-text-label);
+  font-size: 7pt;
+  font-weight: var(--cv-default-weight-bold);
+  letter-spacing: 0.1em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.cv-default-visually-hidden {
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  height: 1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}
+
+.cv-default-section.summary {
+  color: var(--cv-default-text-soft);
+  font-style: italic;
+  padding: 0 3rem 1rem 3rem;
+}
+
+.cv-default-entry {
+  break-inside: avoid;
+  display: grid;
+  gap: 3pt;
+}
+
+.cv-default-entry + .cv-default-entry {
+  margin-top: 3pt;
+}
+
+.cv-default-entry-header {
+  align-items: baseline;
+  display: grid;
+  gap: 0 10pt;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.cv-default-entry-header > div {
+  display: grid;
+  grid-column: 1;
+  grid-row: 1 / span 2;
+}
+
+.cv-default-entry-header h3 {
+  font-size: 10.5pt;
+  font-weight: var(--cv-default-weight-bold);
+  line-height: 1.25;
+}
+
+.cv-default-entry-header p {
+  color: var(--cv-default-text-muted);
+  font-size: 9.2pt;
+  font-weight: var(--cv-default-weight-body);
+}
+
+.cv-default-entry-header > p {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.cv-default-entry-period {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.cv-default-entry-location {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+.cv-default-entry ul {
+  display: grid;
+  gap: 2pt;
+  list-style: none;
+  padding-left: 0;
+}
+
+.cv-default-entry li {
+  display: grid;
+  gap: 6pt;
+  grid-template-columns: 5pt minmax(0, 1fr);
+}
+
+.cv-default-entry li::before {
+  background: var(--cv-default-bullet);
+  content: "";
+  height: 3.5pt;
+  margin-top: 6pt;
+  transform: rotate(45deg);
+  width: 3.5pt;
+}
+
+.cv-default-definition-list {
+  display: grid;
+  gap: 2pt 9pt;
+  grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
+}
+
+.cv-default-definition-list dt {
+  font-weight: var(--cv-default-weight-regular);
+}
+
+.cv-default-definition-list dd {
+  color: var(--cv-default-text-muted);
+}
+
+.cv-default-definition-list-compact {
+  grid-template-columns: repeat(3, max-content minmax(0, 1fr));
+}
+
+.cv-default-brand-note {
+  align-items: center;
+  color: var(--cv-default-text-label);
+  display: grid;
+  font-size: 7.8pt;
+  gap: 1.5mm;
+  grid-template-columns: 5mm minmax(0, 1fr);
+  justify-self: end;
+  margin-top: auto;
+}
+
+.cv-default-brand-logo {
+  display: block;
+  fill: currentColor;
+  height: 8mm;
+  width: auto;
+}
+
+.cv-default-brand-note > div {
+  display: grid;
+  gap: 0.4mm;
+  line-height: 1.05;
+}
+
+@media print {
+  body {
+    background: var(--cv-default-page-bg);
+  }
+
+  .cv-print-actions {
+    display: none;
+  }
+
+  .cv-print-page {
+    margin: 0;
+    min-height: auto;
+    padding: 0;
+    width: auto;
+  }
+
+  .cv-default-section {
+    break-inside: auto;
+  }
+}

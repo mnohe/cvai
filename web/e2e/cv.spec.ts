@@ -323,8 +323,8 @@ test.describe("candidate preferences", () => {
   });
 });
 
-test.describe("UC-CV-004 CV PDF export", () => {
-  test("print action exposes print layout without app chrome", async ({ page }) => {
+test.describe("UC-CV-004 CV print/PDF export", () => {
+  test("print button opens preview dialog and triggers iframe print", async ({ page }) => {
     await page.addInitScript(() => {
       window.print = () => {
         const target = window as typeof window & { __printCalls?: number };
@@ -335,24 +335,129 @@ test.describe("UC-CV-004 CV PDF export", () => {
     await signIn(page, "cv.print@example.test");
     const session = await currentSession(page);
     await writeCandidate(session, importedCandidate());
-    await expect(page.getByLabel("First name")).toHaveValue("Ada");
+    await page.reload();
 
-    await page.getByRole("button", { name: "Export PDF" }).click();
+    await expect(page.getByRole("button", { name: "Print" })).toBeVisible();
+    await page.getByRole("button", { name: "Print" }).click();
+    await expect(page).toHaveURL(/\/profile\/cv$/);
+    const dialog = page.getByRole("dialog", { name: "CV print preview" });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByLabel("Print template")).toHaveValue("default");
+    await expect(page.frameLocator("iframe[title='CV print preview']").getByLabel("Printable CV default")).toContainText("Ada Lovelace");
+    await dialog.getByRole("button", { name: "Print" }).click();
     await expect
-      .poll(() => page.evaluate(() => (window as typeof window & { __printCalls?: number }).__printCalls ?? 0))
+      .poll(() =>
+        page
+          .frameLocator("iframe[title='CV print preview']")
+          .locator("body")
+          .evaluate(() => (window as typeof window & { __printCalls?: number }).__printCalls ?? 0),
+      )
       .toBe(1);
+  });
 
-    await page.emulateMedia({ media: "print" });
-    await expect(page.locator(".cv-print-layout")).toBeVisible();
-    await expect(page.locator(".cv-print-layout")).toContainText("Ada Lovelace");
-    await expect(page.locator(".cv-print-layout")).toContainText("Analytical engineer.");
-    await expect(page.locator(".cv-print-layout")).toContainText("Engines Ltd");
-    await expect(page.locator(".cv-print-layout")).toContainText("Mathematics");
-    await expect(page.locator(".cv-print-layout")).toContainText("Go");
-    await expect(page.locator(".cv-print-layout")).toContainText("English");
-    await expect(page.locator(".sidebar")).toBeHidden();
-    await expect(page.locator(".top-nav")).toBeHidden();
-    await expect(page.getByRole("button", { name: "Export PDF" })).toBeHidden();
+  test("default print preview contains core CV sections", async ({ page }) => {
+    await signIn(page, "cv.print.layout@example.test");
+    const session = await currentSession(page);
+    await writeCandidate(session, importedCandidate());
+    await page.reload();
+    await expect(page.getByRole("button", { name: "Print" })).toBeVisible();
+    await page.getByRole("button", { name: "Print" }).click();
+
+    const printLayout = page.frameLocator("iframe[title='CV print preview']").getByLabel("Printable CV default");
+    await expect(printLayout).toBeVisible();
+    await expect(printLayout).toContainText("Ada Lovelace");
+    await expect(printLayout).toContainText("ada@example.test");
+    await expect(printLayout).toContainText("Analytical engineer.");
+    await expect(printLayout.getByRole("heading", { name: "Experience" })).toBeVisible();
+    await expect(printLayout).toContainText("Engines Ltd");
+    await expect(printLayout.getByRole("heading", { name: "Education" })).toBeVisible();
+    await expect(printLayout).toContainText("Mathematics");
+    await expect(printLayout.getByRole("heading", { name: "Skills" })).toBeVisible();
+    await expect(printLayout).toContainText("Go");
+  });
+
+  test("ATS template can be selected inside the preview dialog", async ({ page }) => {
+    await signIn(page, "cv.print.ats@example.test");
+    const session = await currentSession(page);
+    await writeCandidate(session, importedCandidate());
+    await page.reload();
+    await expect(page.getByRole("button", { name: "Print" })).toBeVisible();
+
+    await page.getByRole("button", { name: "Print" }).click();
+    const dialog = page.getByRole("dialog", { name: "CV print preview" });
+    await dialog.getByLabel("Print template").selectOption("ats");
+    const printLayout = page.frameLocator("iframe[title='CV print preview']").getByLabel("Printable CV ATS");
+    await expect(printLayout).toContainText("Ada Lovelace");
+    await expect(printLayout.getByRole("heading", { name: "Summary" })).toBeVisible();
+  });
+
+  test("print templates list work experience newest first", async ({ page }) => {
+    await signIn(page, "cv.print.order@example.test");
+    const session = await currentSession(page);
+    await writeCandidate(session, multiEntryCandidate());
+    await page.reload();
+
+    await page.getByRole("button", { name: "Print" }).click();
+    const frame = page.frameLocator("iframe[title='CV print preview']");
+    const defaultLayout = frame.getByLabel("Printable CV default");
+    await expect(defaultLayout).toBeVisible();
+    await expectTextBefore(defaultLayout, "Second Company", "First Company");
+
+    const dialog = page.getByRole("dialog", { name: "CV print preview" });
+    await dialog.getByLabel("Print template").selectOption("ats");
+    const atsLayout = frame.getByLabel("Printable CV ATS");
+    await expect(atsLayout).toBeVisible();
+    await expectTextBefore(atsLayout, "Second Company", "First Company");
+  });
+
+  test("ATS preview uses the same A4 page frame as the default template", async ({ page }) => {
+    await signIn(page, "cv.print.ats.frame@example.test");
+    const session = await currentSession(page);
+    await writeCandidate(session, importedCandidate());
+    await page.reload();
+
+    await page.getByRole("button", { name: "Print" }).click();
+    const dialog = page.getByRole("dialog", { name: "CV print preview" });
+    await dialog.getByLabel("Print template").selectOption("ats");
+
+    const frame = page.frameLocator("iframe[title='CV print preview']");
+    const pageFrame = frame.locator(".cv-print-page");
+    await expect(frame.getByLabel("Printable CV ATS")).toBeVisible();
+
+    const frameStyles = await pageFrame.evaluate((element) => {
+      const bodyStyle = getComputedStyle(document.body);
+      const pageStyle = getComputedStyle(element);
+      return {
+        bodyBackground: bodyStyle.backgroundColor,
+        boxShadow: pageStyle.boxShadow,
+        paddingLeft: parseFloat(pageStyle.paddingLeft),
+        width: parseFloat(pageStyle.width),
+      };
+    });
+
+    expect(frameStyles.bodyBackground).toBe("rgb(232, 237, 242)");
+    expect(frameStyles.boxShadow).not.toBe("none");
+    expect(frameStyles.paddingLeft).toBeGreaterThan(60);
+    expect(frameStyles.width).toBeGreaterThan(750);
+    expect(frameStyles.width).toBeLessThan(850);
+  });
+
+  test("app and modal chrome are absent from the iframe print document", async ({ page }) => {
+    await signIn(page, "cv.print.chrome@example.test");
+    const session = await currentSession(page);
+    await writeCandidate(session, importedCandidate());
+    await page.reload();
+    await expect(page.getByRole("button", { name: "Print" })).toBeVisible();
+    await page.getByRole("button", { name: "Print" }).click();
+
+    const frame = page.frameLocator("iframe[title='CV print preview']");
+    const printLayout = frame.getByLabel("Printable CV default");
+    await expect(printLayout).toBeVisible();
+    await expect(printLayout.locator(".sidebar")).toHaveCount(0);
+    await expect(printLayout.locator(".top-nav")).toHaveCount(0);
+    await expect(printLayout.getByRole("button")).toHaveCount(0);
+    await expect(frame.getByText("Close")).toHaveCount(0);
+    await expect(frame.getByText("Template")).toHaveCount(0);
   });
 });
 
@@ -499,6 +604,15 @@ async function signIn(page: Page, email: string) {
 
 async function openCVSection(page: Page, name: string) {
   await page.getByRole("button", { name, exact: true }).click();
+}
+
+async function expectTextBefore(locator: ReturnType<Page["locator"]>, earlier: string, later: string) {
+  await expect
+    .poll(async () => {
+      const text = (await locator.textContent()) ?? "";
+      return text.indexOf(earlier) >= 0 && text.indexOf(later) >= 0 && text.indexOf(earlier) < text.indexOf(later);
+    })
+    .toBe(true);
 }
 
 async function saveVisibleSection(page: Page) {

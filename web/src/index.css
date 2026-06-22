@@ -690,6 +690,84 @@ button:disabled {
   justify-content: flex-end;
 }
 
+.cv-template-control {
+  align-items: center;
+  color: var(--text-2);
+  display: flex;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.cv-template-control select {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-1);
+  font-weight: 400;
+  min-height: 32px;
+  padding: 5px 8px;
+  text-transform: none;
+}
+
+.cv-print-preview-backdrop {
+  align-items: stretch;
+  padding: 16px;
+}
+
+.cv-print-preview-dialog {
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  color: var(--text-1);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  max-width: 1180px;
+  min-height: 0;
+  width: min(100%, 1180px);
+}
+
+.cv-print-preview-toolbar {
+  align-items: center;
+  border-bottom: 1px solid var(--panel-border);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 12px;
+}
+
+.cv-print-preview-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.cv-print-preview-frame {
+  background: #e8edf2;
+  border: 0;
+  height: 100%;
+  min-height: min(74vh, 920px);
+  width: 100%;
+}
+
+.cv-print-actions {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-bottom: 16px;
+}
+
+.cv-print-missing {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  display: grid;
+  gap: 12px;
+  margin: 40px auto;
+  max-width: 520px;
+  padding: 20px;
+}
+
 .account-cv-completeness {
   color: inherit;
   display: grid;
@@ -1027,4 +1105,10 @@ button:disabled {
     display: grid;
   }
 
+}
+
+@media print {
+  .cv-print-preview-backdrop {
+    display: none;
+  }
 }

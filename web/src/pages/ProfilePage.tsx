@@ -9,7 +9,8 @@ import {
 } from "react";
 import { NavLink, useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "@/components/AuthProvider";
-import { CVPrintLayout } from "@/components/CVPrintLayout";
+import type { CVPrintTemplate } from "@/components/CVPrintTemplates";
+import { CVPrintPreviewDialog } from "@/components/CVPrintPreviewDialog";
 import { ImportCVModal } from "@/components/ImportCVModal";
 import { ThinkButton } from "@/components/ThinkButton";
 import {
@@ -211,6 +212,8 @@ function CVProfile({
   const [started, setStarted] = useState(false);
   const [activeSection, setActiveSection] = useState<CVSection>("personal");
   const [importOpen, setImportOpen] = useState(false);
+  const [printOpen, setPrintOpen] = useState(false);
+  const [printTemplate, setPrintTemplate] = useState<CVPrintTemplate>("default");
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
   const cv = useMemo(() => normaliseCV(candidate), [candidate]);
@@ -269,8 +272,8 @@ function CVProfile({
       ) : (
         <div className="tab-content cv-panel">
           <div className="cv-panel-actions">
-            <button type="button" className="secondary-button" onClick={() => window.print()}>
-              Export PDF
+            <button type="button" className="secondary-button" onClick={() => setPrintOpen(true)}>
+              Print
             </button>
             <ThinkButton completionScore={2} variant="ghost" onClick={() => setImportOpen(true)}>
               Import from PDF
@@ -330,7 +333,6 @@ function CVProfile({
               )}
             </CVSectionPanel>
           </div>
-          <CVPrintLayout cv={cv} />
         </div>
       )}
 
@@ -341,6 +343,14 @@ function CVProfile({
             setStarted(true);
           }}
           replacingExisting={hasExistingCV}
+        />
+      )}
+      {printOpen && (
+        <CVPrintPreviewDialog
+          cv={cv}
+          template={printTemplate}
+          onTemplateChange={setPrintTemplate}
+          onClose={() => setPrintOpen(false)}
         />
       )}
     </>
