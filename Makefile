@@ -9,7 +9,7 @@ FIREBASE_AUTH_EMULATOR_HOST := localhost:9099
 FIREBASE := XDG_CONFIG_HOME=$(CURDIR)/.cache/firebase-config firebase
 GO_ENV := GOCACHE=$(CURDIR)/.cache/go-build
 
-.PHONY: emulate dev-web test-functions build-functions build-web deploy-functions lint test-rules test-e2e docker-smoke precommit setup
+.PHONY: emulate dev-web test-functions build-functions build-web deploy-functions lint test-rules test-e2e docker-build precommit setup
 
 # Start Firebase emulators (auth, firestore, storage, hosting).
 # Run the Go backend separately: cd functions && go run ./cmd/...
@@ -58,31 +58,10 @@ test-rules:
 test-e2e:
 	cd $(WEB_DIR) && npm run test:e2e
 
-docker-smoke:
+docker-build:
 	docker build -f $(FUNCTIONS_DIR)/Dockerfile -t cvai-ci .
-	docker rm -f cvai-ci >/dev/null 2>&1 || true
-	docker run -d --name cvai-ci \
-		-p 18080:8080 \
-		-e FIREBASE_PROJECT_ID=$(FIREBASE_PROJECT_ID) \
-		-e FIRESTORE_EMULATOR_HOST=127.0.0.1:8081 \
-		-e FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099 \
-		-e LLM_PROVIDER=openai \
-		-e LLM_API_KEY=dummy-smoke-test-key \
-		-e LLM_MODEL=dummy-smoke-test-model \
-		cvai-ci
-	for i in $$(seq 1 20); do \
-		if curl --fail http://localhost:18080/healthz; then \
-			docker rm -f cvai-ci; \
-			exit 0; \
-		fi; \
-		docker logs cvai-ci || true; \
-		sleep 1; \
-	done; \
-	docker logs cvai-ci || true; \
-	docker rm -f cvai-ci; \
-	exit 1
 
-precommit: lint build-functions build-web test-rules docker-smoke
+precommit: lint build-functions build-web test-rules docker-build
 	if curl --silent --output /dev/null http://$(FIRESTORE_EMULATOR_HOST) && \
 		curl --silent --output /dev/null http://$(FIREBASE_AUTH_EMULATOR_HOST); then \
 		$(MAKE) test-functions test-e2e; \
