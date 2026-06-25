@@ -6,7 +6,7 @@
 
 CVAI is an AI-assisted job application management system. It helps a job seeker build a structured CV, track roles, generate role-specific analysis and application bundles, manage gap tasks, and keep application work in one focused workspace.
 
-The hosted product is available at https://seekvit.com/.
+A hosted version is available at https://cvirgil.com/.
 
 ## What It Does
 
@@ -23,7 +23,6 @@ The hosted product is available at https://seekvit.com/.
 - Backend: Go HTTP service
 - Auth and data: Firebase Auth and Firestore
 - AI: OpenAI API
-- Billing: Stripe Checkout
 
 ## Repository Layout
 
@@ -36,7 +35,7 @@ web/                    Vite React SPA
   e2e/                  Playwright end-to-end tests
 schemas/                JSON schemas copied from the legacy reference
 docs/                   Architecture, UX, domain, and use-case docs
-firebase.json           Firebase hosting, rules, and emulator config
+firebase.json           Firebase rules and emulator config
 firestore.rules         Firestore Security Rules
 Makefile                Common contributor commands
 ```

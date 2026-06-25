@@ -99,22 +99,10 @@ func TestActionProgressValidateRejectsPercentOutOfRange(t *testing.T) {
 	assertValidationErrorContains(t, progress.Validate(), "action_progress.percent must be between 0 and 100")
 }
 
-func TestAccountAndPurchaseValidateInvariants(t *testing.T) {
-	account := Account{
-		UID:           "uid-1",
-		CreditBalance: -1,
-		Purchases: []PurchaseRecord{
-			{
-				ID:           "purchase-1",
-				Provider:     PurchaseProviderStripe,
-				CreditAmount: 0,
-			},
-		},
-	}
+func TestAccountValidateRequiresUID(t *testing.T) {
+	account := Account{}
 
-	err := account.Validate()
-	assertValidationErrorContains(t, err, "account.credit_balance must be >= 0")
-	assertValidationErrorContains(t, err, "purchase_record.credit_amount must be > 0")
+	assertValidationErrorContains(t, account.Validate(), "account.uid is required")
 }
 
 func TestCalibrationPatternValidateRejectsUnknownType(t *testing.T) {

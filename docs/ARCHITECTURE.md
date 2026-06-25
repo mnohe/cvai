@@ -6,7 +6,8 @@ _Living document — updated as stages are implemented._
 
 ## Overview
 
-CVAI is a hosted consumer SaaS application for AI-assisted job application management. Each Firebase Auth account belongs to exactly one job seeker — there is no organisation or team sharing model. Multiple users share the same infrastructure (Cloud Run, Firestore), isolated by UID.
+CVAI is an application for AI-assisted job application management. It is designed
+to run locally or in a homelab with Firebase emulators.
 
 ```mermaid
 graph TD
@@ -14,8 +15,8 @@ graph TD
         SPA["Vite + React 19\n+ Firebase JS SDK"]
     end
 
-    subgraph GCP ["Google Cloud (europe-west1)"]
-        CR["Go HTTP service\n(Cloud Run Gen 2)"]
+    subgraph Runtime ["Local / self-hosted runtime"]
+        CR["Go HTTP service"]
         FS["Firestore"]
         FA["Firebase Auth"]
         GCS["Cloud Storage"]
@@ -23,7 +24,6 @@ graph TD
 
     subgraph External
         OpenAI["OpenAI API"]
-        Stripe["Stripe\nCheckout + Webhooks"]
     end
 
     SPA -- "REST JSON\nAuthorization: Bearer" --> CR
@@ -34,19 +34,17 @@ graph TD
     CR --> FA
     CR --> GCS
     CR --> OpenAI
-    CR --> Stripe
 ```
 
 ### Stack
 
 | Layer | Choice | Rationale |
 |---|---|---|
-| Backend runtime | Go — Cloud Run Gen 2 | Statically compiled; cold start <200 ms; scales to zero |
-| Database | Firestore | Document model maps to domain aggregates; `onSnapshot` replaces polling |
-| Auth | Firebase Auth | Managed OAuth (Google, GitHub); ID token verification in middleware; no session state |
+| Backend runtime | Go HTTP service | Statically compiled; simple container deployment |
+| Database | Firestore emulator | Document model maps to domain aggregates; `onSnapshot` replaces polling |
+| Auth | Firebase Auth emulator | ID token verification in middleware; no hosted OAuth credentials needed for local development |
 | LLM | Provider-configurable API dialect (`anthropic` or `openai`) | Direct HTTP client (no SDK); structured output for extraction. Provider, model, compatible OpenAI host, and timeout are configured via `LLM_PROVIDER`, `LLM_MODEL`, `LLM_BASE_URL`, and `LLM_TIMEOUT_SECONDS`. |
-| Billing | Stripe Checkout | Hosted payment page; webhook-driven credit fulfilment; idempotent session tracking |
-| Frontend | Vite + React 19 + Tailwind | SPA served from Firebase Hosting; every request carries `Authorization: Bearer <idToken>` |
+| Frontend | Vite + React 19 + Tailwind | SPA served by the local web container; every request carries `Authorization: Bearer <idToken>` |
 | PDF export | Browser `window.print()` | Zero backend cost; A4 CSS print layout; no server-side renderer needed |
 
 ---
@@ -63,7 +61,6 @@ functions/
     repo/                # Repository interfaces + Firestore implementations
     llm/                 # OpenAI HTTP client; SSRF-safe URL fetcher; prompt templates
     handlers/            # One file per endpoint group
-    billing/             # Stripe client
     calibration/         # Deterministic pattern detection (no I/O)
     middleware/          # Logging, panic recovery, rate limiting, CORS
 ```
@@ -76,7 +73,7 @@ Two mux instances are composed at startup, making it structurally impossible to 
 graph LR
     Req["HTTP request"] --> Router
 
-    Router -->|"public paths\n/healthz\n/webhooks/stripe"| PublicMux
+    Router -->|"public paths\n/healthz"| PublicMux
     Router -->|"all other paths"| AuthMux
 
     AuthMux -->|"RequireAuth\nverifies Bearer token\nplaces UID in context"| Handler
@@ -118,7 +115,6 @@ erDiagram
     CANDIDATE ||--o{ EVIDENCE_ITEM : has
     CANDIDATE ||--o{ STORY : has
 
-    ACCOUNT ||--o{ PURCHASE_RECORD : has
 ```
 
 **Collection paths:**
@@ -126,14 +122,12 @@ erDiagram
 ```
 users/{uid}/
   candidate          (single doc)  CV, EvidenceLibrary, StoryBank
-  account            (single doc)  credit balance, Stripe customer ID, purchase history
+  account            (single doc)  identity profile
   roles/{roleId}                   Role metadata and status
   roles/{roleId}/bundle/data       Bundle = Job + Analysis + Outcome
   tasks/{taskId}                   Task (optionally linked to a roleId)
   events/{eventId}                 Append-only event log
   actions/{actionId}               Async operation state machine
-
-_admin/deleted_accounts/{uid}      PII-free tombstone; no client access
 ```
 
 ### Repository pattern
@@ -144,19 +138,15 @@ Interface constraints enforced structurally (not by convention):
 
 - `EventRepository` — no `Update` or `Delete`; append-only at the type level
 - `CalibrationRepository` — no write methods; read-only at the type level
-- `AccountRepository.DeductCredit` — Firestore transaction; returns `ErrInsufficientCredits` when balance is zero
 
 ---
 
 ## Async action pattern
 
-Every LLM-backed endpoint treats a credit deduction as a reservation for costly
-model work. The reservation happens before the provider call to prevent
-concurrent overspend: a user with one credit must not be able to start several
-paid Actions at the same time. The credit is kept when the program completes
-successfully, and also when the Action fails for a clearly user-caused input
-problem after the paid workflow has started. The credit is refunded when the
-program, provider, persistence layer, or infrastructure fails.
+Every LLM-backed endpoint is wired through an injectable external-request gate
+before provider work. In CVAI, the default gate is a no-op. Deployments may
+replace it with rate limiting, provider-budget enforcement, or temporary
+external API disablement.
 
 Every LLM-backed endpoint follows this lifecycle without exception:
 
@@ -169,7 +159,7 @@ sequenceDiagram
     participant OpenAI
 
     Client->>Handler: POST /import-cv (or any LLM endpoint)
-    Handler->>Firestore: DeductCredit (transactional reservation)
+    Handler->>Gate: Reserve external request (default no-op)
     Handler->>Firestore: Write Action {status: pending}
     Handler-->>Client: 202 {actionId}
 
@@ -183,7 +173,7 @@ sequenceDiagram
         Goroutine->>Firestore: Write results
         Goroutine->>Firestore: Update Action {status: complete}
     else system/provider/program failure
-        Goroutine->>Firestore: RefundCredit (best-effort)
+        Goroutine->>Gate: Release external request (default no-op)
         Goroutine->>Firestore: Update Action {status: failed, reason}
     else clearly user-caused input failure
         Goroutine->>Firestore: Update Action {status: failed, reason}
@@ -194,17 +184,9 @@ sequenceDiagram
     Client->>Firestore: re-read affected resource
 ```
 
-Preflight validation must run before credit deduction, so malformed requests that
-can be rejected synchronously never reserve a credit. Examples: missing upload,
-wrong content type, oversized upload, and insufficient credits. After deduction,
-do not refund for failures that can be confidently tied to user input, such as
-an unreadable or unsupported document. Do refund for provider 5xx, timeout,
-rate-limit exhaustion, provider auth/configuration problems, malformed provider
-responses, schema mismatches, save failures, and other program-caused errors.
-
-Charging only after successful completion is intentionally avoided: it permits
-concurrent overspend and creates harder-to-reconcile cases where external model
-cost is incurred but the later credit charge fails.
+Preflight validation must run before the gate call, so malformed requests can be
+rejected synchronously. CVAI's no-op gate preserves a single handler shape while
+leaving external API control to deployment-specific adapters.
 
 The default LLM timeout ceiling is 180 s, configurable via `LLM_TIMEOUT_SECONDS`; CV import processing is separately bounded by `CV_IMPORT_TIMEOUT_SECONDS`. Blocking the HTTP handler on an LLM call would exhaust Cloud Run concurrency.
 
@@ -276,7 +258,7 @@ Ingested source material (URLs, PDFs, pasted text) is always passed as delimited
 
 ### Disallowed LLM uses
 
-The LLM must never be called for: dashboard ordering, credit balance display, status or verdict rendering, or any deterministic read operation.
+The LLM must never be called for: dashboard ordering, status or verdict rendering, or any deterministic read operation.
 
 ---
 
@@ -312,7 +294,6 @@ Calibration blocks are computed at request time from `CalibrationRepository` (re
 | SSRF | `FetchURL` resolves DNS before connecting and checks all resolved IPs against a blocklist (RFC 1918, loopback, link-local, GCP metadata endpoint). DNS rebinding is mitigated by checking IPs, not the original hostname. |
 | Prompt injection | Source material is passed as delimited evidence with an explicit instruction that embedded directives have no authority. Output validation catches injection artefacts; correctness does not depend on detecting every attack string. |
 | PII in logs | Structured logging middleware hashes the UID (SHA-256) for correlation. Prompt content, CV text, job descriptions, and email addresses must never appear in any log line. |
-| Account deletion | `RequireRecentAuth(300)` enforced server-side. Cascade deletes all Firestore subcollections and Cloud Storage objects. A PII-free tombstone is written to `_admin/deleted_accounts/{uid}`. |
 
 ---
 
@@ -324,7 +305,7 @@ _Fully implemented in Stage 22. Stubs noted here._
 - LLM calls log `{tokenCount, latencyMs, model}` — nothing else
 - Cloud Error Reporting for panics and 5xx errors
 - `/healthz` deep check probes Firestore with a 1 s timeout; returns `{"status":"degraded","detail":"firestore"}` on failure
-- Alert policies: error rate > 1 %, P99 latency > 5 s, credit deduction failure rate > 0
+- Alert policies: error rate > 1 %, P99 latency > 5 s, async Action failure rate > 0
 
 See `docs/ops.adoc` (Stage 22) for alert configuration commands.
 
@@ -346,8 +327,6 @@ See `docs/ops.adoc` (Stage 22) for alert configuration commands.
 | `ANTHROPIC_MODEL` | Anthropic model fallback when `LLM_MODEL` is unset | Functions |
 | `OPENAI_API_KEY` | OpenAI API key fallback when `LLM_API_KEY` is unset | Functions (production), live eval |
 | `OPENAI_MODEL` | OpenAI model fallback when `LLM_MODEL` is unset | Functions |
-| `STRIPE_SECRET_KEY` | Stripe API key | Functions |
-| `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret | Functions |
 | `VITE_FIREBASE_API_KEY` | Firebase JS SDK config | Web SPA |
 | `VITE_FIREBASE_AUTH_DOMAIN` | Firebase JS SDK config | Web SPA |
 | `VITE_FIREBASE_PROJECT_ID` | Firebase JS SDK config | Web SPA |

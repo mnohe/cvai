@@ -63,15 +63,11 @@ const (
 	EventGapTaskCompleted        = "GapTaskCompleted"
 	EventCVImported              = "CVImported"
 	EventCVUpdated               = "CVUpdated"
-	EventCreditsDeducted         = "CreditsDeducted"
-	EventCreditsPurchased        = "CreditsPurchased"
 	EventAccountDeleted          = "AccountDeleted"
 
 	OutcomeAccepted = "accepted"
 	OutcomeRejected = "rejected"
 	OutcomeClosed   = "closed"
-
-	PurchaseProviderStripe = "stripe"
 
 	CalibrationPatternOverconfidence = "overconfidence_bias"
 	CalibrationPatternBlindSpot      = "blind_spot"

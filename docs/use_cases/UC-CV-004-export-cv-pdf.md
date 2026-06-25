@@ -5,7 +5,7 @@
 | **Actor** | User |
 | **Preconditions** | Signed in; CV has at least one section populated; `cv_validation_errors` is empty |
 | **Milestone** | M1 |
-| **Credit cost** | None |
+| **External request** | None |
 | **LLM** | No |
 
 ## Flow
@@ -20,7 +20,7 @@
    - `@page { size: A4 portrait; margin: 15mm 20mm; }`
 5. User selects "Save as PDF" in the print dialog.
 
-No backend call. No credit. No Cloud Storage involved.
+No backend call, external request, or Cloud Storage object is involved.
 
 ## Notes
 

@@ -3,6 +3,7 @@
 emulator-data
 firebase-debug.log
 firestore-debug.log
+storage-debug.log
 functions/coverage.out
 node_modules
 web/dist

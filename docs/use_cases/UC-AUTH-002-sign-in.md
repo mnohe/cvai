@@ -5,7 +5,7 @@
 | **Actor** | User (returning) |
 | **Preconditions** | User has an existing CVAI account |
 | **Milestone** | M1 |
-| **Credit cost** | None |
+| **External request** | None |
 | **LLM** | No |
 
 ## Flow

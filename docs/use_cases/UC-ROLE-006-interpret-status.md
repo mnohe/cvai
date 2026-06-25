@@ -3,9 +3,9 @@
 | | |
 |---|---|
 | **Actor** | User |
-| **Preconditions** | Signed in; role exists; ≥ 1 credit |
+| **Preconditions** | Signed in; role exists; external requests available |
 | **Milestone** | M3 |
-| **Credit cost** | 1 |
+| **External request** | 1 |
 | **LLM** | Yes — prompt interpretation (streaming) |
 
 ## Context
@@ -26,7 +26,7 @@ sequenceDiagram
 
     User->>SPA: Click "Interpret update", type free-form prompt
     SPA->>Backend: POST /roles/{roleId}/events {prompt}
-    Backend->>Firestore: DeductCredit(uid)
+    Backend->>Firestore: Reserve external request
     Backend->>Firestore: Create Action {status: pending}
     Backend-->>SPA: 202 {actionId}
     SPA->>Firestore: onSnapshot(Action)
@@ -43,11 +43,11 @@ sequenceDiagram
 ## Postconditions
 
 - Same as [UC-ROLE-005](UC-ROLE-005-record-status.md).
-- 1 credit deducted.
+- 1 external request reserved.
 
 ## E2E scenarios
 
 | Scenario | File | Describe block |
 |---|---|---|
 | Free-form prompt updates status and appends event | `e2e/roles.spec.ts` | `UC-ROLE-006 interpret status` |
-| Credit deducted on success | `e2e/roles.spec.ts` | `UC-ROLE-006 credit deducted` |
+| External request reserved on success | `e2e/roles.spec.ts` | `UC-ROLE-006 external request reserved` |

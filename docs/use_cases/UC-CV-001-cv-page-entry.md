@@ -5,14 +5,14 @@
 | **Actor** | User |
 | **Preconditions** | Signed in |
 | **Milestone** | M1 |
-| **Credit cost** | None |
+| **External request** | None |
 | **LLM** | No |
 
 ## Context
 
 `/profile/cv` is the user's first meaningful destination after signing up. When no CV exists the
 page offers two starting points: filling in sections manually, or importing from a PDF
-(which is a separate, credit-consuming use case — see [UC-CV-002](UC-CV-002-import-cv.md)).
+(which is a separate, external-request use case — see [UC-CV-002](UC-CV-002-import-cv.md)).
 
 When a CV already exists, the page shows the populated editor instead (see
 [UC-CV-003](UC-CV-003-edit-cv.md)).
@@ -35,7 +35,7 @@ When a CV already exists, the page shows the populated editor instead (see
 ```
 
 **Start from scratch** opens the section editor with all sections empty.  
-**Import from PDF** opens the PDF upload modal; the right-edge diamond marks it as a credit-consuming action (UC-CV-002).
+**Import from PDF** opens the PDF upload modal; the right-edge diamond marks it as a external-request action (UC-CV-002).
 
 ## Flow: start from scratch
 
@@ -52,7 +52,7 @@ sequenceDiagram
     SPA-->>User: Section saved, completeness advances
 ```
 
-No backend call, no credit. Handled entirely by the Firestore client SDK under the
+No backend call, no external request. Handled entirely by the Firestore client SDK under the
 Security Rules that permit `users/{uid}/candidate` writes by the owning user.
 
 ## Analytics gate

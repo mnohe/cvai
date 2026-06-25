@@ -5,18 +5,19 @@
 | **Actor** | User |
 | **Preconditions** | Signed in; profile at ≥ 2/5 completion |
 | **Milestone** | M3 |
-| **Credit cost** | None (rate-limited per UID) |
+| **External request** | 1 |
 | **LLM** | Yes — lightweight suitability assessment |
 
 ## Context
 
-Quick Analysis is a free pre-ingestion pass that lets the user evaluate fit before
-committing a credit to full bundle generation. The result is ephemeral — no Role
+Quick Analysis is a pre-ingestion LLM pass that lets the user evaluate fit before
+running the full bundle generation workflow. The result is ephemeral — no Role
 document is written. If the user continues to full ingestion, the source text captured
 here is reused so the URL is not fetched a second time.
 
-Rate limit: backend enforces a per-UID cap to prevent abuse. A rate limit token is not
-consumed when a URL fetch fails — only when the LLM call is initiated.
+Rate limit: backend enforces a per-UID cap to control external API use. A rate
+limit token is not counted when a URL fetch fails — only when the LLM call is
+initiated.
 
 ## Flow
 

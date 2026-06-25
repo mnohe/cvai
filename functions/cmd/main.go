@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/mnohe/cvai/functions/internal/auth"
+	"github.com/mnohe/cvai/functions/internal/gate"
 	"github.com/mnohe/cvai/functions/internal/handlers"
 	"github.com/mnohe/cvai/functions/internal/llm"
 	"github.com/mnohe/cvai/functions/internal/observability"
@@ -47,7 +48,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("llm client: %v", err)
 	}
-	importHandler := handlers.NewImportCVHandler(accounts, actions, candidates, llmClient)
+	importHandler := handlers.NewImportCVHandler(accounts, actions, candidates, gate.NoopExternalRequestGate{}, llmClient)
 
 	// Two mux instances enforce auth coverage at the structural level.
 	// Any route not registered on either mux returns 404 — not a silent auth bypass.
@@ -60,7 +61,6 @@ func main() {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 	})))
-	publicMux.Handle("POST /webhooks/stripe", auth.PublicHandler(stub501("StripeWebhook")))
 
 	// Authenticated routes — RequireAuth is applied to the entire authMux below.
 	authMux.HandleFunc("GET /account", accountHandler.GetAccount)
@@ -72,7 +72,6 @@ func main() {
 	authMux.Handle("POST /roles/{roleId}/events", stub501("RecordRoleEvent"))
 	authMux.Handle("POST /roles/{roleId}/gap-tasks", stub501("CreateGapTasks"))
 	authMux.Handle("POST /tasks/{taskId}/reassess", stub501("ReassessGapTask"))
-	authMux.Handle("POST /billing/checkout", stub501("CreateCheckoutSession"))
 	authMux.Handle("POST /account/export", stub501("ExportUserData"))
 	// DELETE /account also requires RequireRecentAuth(300) — chained inside the auth mux.
 	authMux.Handle("DELETE /account", authMW.RequireRecentAuth(300)(stub501("DeleteAccount")))

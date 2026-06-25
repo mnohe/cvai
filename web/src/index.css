@@ -655,6 +655,84 @@ button:disabled {
   margin: 0;
 }
 
+.credit-pack-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.credit-pack {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-1);
+  display: grid;
+  gap: 5px;
+  justify-items: start;
+  min-height: 92px;
+  padding: 12px;
+  text-align: left;
+}
+
+.credit-pack:hover:not(:disabled) {
+  border-color: var(--coral);
+}
+
+.credit-pack:disabled {
+  cursor: progress;
+  opacity: 0.7;
+}
+
+.credit-pack span {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.credit-pack small {
+  color: var(--text-2);
+}
+
+.status-banner {
+  border: 1px solid var(--panel-border);
+  margin: 0;
+  padding: 10px 12px;
+}
+
+.status-banner.success {
+  background: #edf8f0;
+  border-color: #a9d9b4;
+}
+
+.status-banner.neutral {
+  background: #f3f4f6;
+}
+
+.error-text {
+  color: var(--danger);
+  margin: 0;
+}
+
+.purchase-history {
+  display: grid;
+  gap: 8px;
+}
+
+.purchase-history h3 {
+  font-size: 15px;
+  margin: 0;
+}
+
+.purchase-history table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.purchase-history th,
+.purchase-history td {
+  border-bottom: 1px solid var(--panel-border);
+  padding: 8px 0;
+  text-align: left;
+}
+
 .empty-actions {
   align-items: center;
   display: flex;

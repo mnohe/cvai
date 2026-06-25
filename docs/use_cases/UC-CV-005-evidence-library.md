@@ -5,7 +5,7 @@
 | **Actor** | User |
 | **Preconditions** | Signed in |
 | **Milestone** | M2 |
-| **Credit cost** | None |
+| **External request** | None |
 | **LLM** | No |
 
 ## Context
@@ -14,7 +14,7 @@ The Evidence Library is a collection of the user's proof points — quantified o
 certifications, publications, project results — that the LLM draws on when assessing
 Requirement Coverage during bundle generation.
 
-All writes go directly to Firestore. No backend call, no credit.
+All writes go directly to Firestore. No backend call, no external request.
 
 ## Flow
 

@@ -136,7 +136,7 @@ When a domain type or enum changes, update both sides in the same change.
 ## Security And Privacy
 
 - Treat user CVs, account data, role history, and evidence library content as sensitive.
-- Do not log raw CV content, job application details, tokens, or billing identifiers unless the log is explicitly designed for that purpose.
+- Do not log raw CV content, job application details, tokens, or provider identifiers unless the log is explicitly designed for that purpose.
 - Firestore Security Rules must deny cross-user reads and writes.
 - Use recent-auth checks for destructive account actions.
 

@@ -16,6 +16,7 @@ import (
 
 	"github.com/mnohe/cvai/functions/internal/auth"
 	"github.com/mnohe/cvai/functions/internal/domain"
+	"github.com/mnohe/cvai/functions/internal/gate"
 	"github.com/mnohe/cvai/functions/internal/llm"
 	"github.com/mnohe/cvai/functions/internal/llm/prompts"
 	"github.com/mnohe/cvai/functions/internal/repo"
@@ -65,16 +66,18 @@ type ImportCVHandler struct {
 	accounts   repo.AccountRepository
 	actions    repo.ActionRepository
 	candidates repo.CandidateRepository
+	gate       gate.ExternalRequestGate
 	llm        cvImporter
 	schemaPath string
 }
 
 // NewImportCVHandler creates an ImportCVHandler.
-func NewImportCVHandler(accounts repo.AccountRepository, actions repo.ActionRepository, candidates repo.CandidateRepository, importer cvImporter) *ImportCVHandler {
+func NewImportCVHandler(accounts repo.AccountRepository, actions repo.ActionRepository, candidates repo.CandidateRepository, externalGate gate.ExternalRequestGate, importer cvImporter) *ImportCVHandler {
 	return &ImportCVHandler{
 		accounts:   accounts,
 		actions:    actions,
 		candidates: candidates,
+		gate:       externalGate,
 		llm:        importer,
 		schemaPath: filepath.Join("..", "schemas", "cv.schema.json"),
 	}
@@ -116,12 +119,17 @@ func (h *ImportCVHandler) ImportCV(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.accounts.DeductCredit(r.Context(), uid); err != nil {
-		if errors.Is(err, repo.ErrInsufficientCredits) {
-			writeJSONError(w, http.StatusPaymentRequired, "not enough credits")
+	if err := h.gate.Reserve(r.Context(), uid); err != nil {
+		var gateErr *gate.ExternalRequestError
+		if errors.As(err, &gateErr) {
+			writeJSONError(w, gateErr.Status, gateErr.Message)
 			return
 		}
-		writeJSONError(w, http.StatusInternalServerError, "failed to deduct credit")
+		if errors.Is(err, gate.ErrExternalRequestUnavailable) {
+			writeJSONError(w, http.StatusServiceUnavailable, "external request unavailable")
+			return
+		}
+		writeJSONError(w, http.StatusInternalServerError, "failed to reserve external request")
 		return
 	}
 
@@ -134,9 +142,7 @@ func (h *ImportCVHandler) ImportCV(w http.ResponseWriter, r *http.Request) {
 		},
 	})
 	if err != nil {
-		if refundErr := h.accounts.RefundCredit(context.Background(), uid); refundErr != nil {
-			log.Printf("credit_refund_failed uid_set=true reason=action_create")
-		}
+		h.gate.Release(context.Background(), uid)
 		writeJSONError(w, http.StatusInternalServerError, "failed to create import action")
 		return
 	}
@@ -198,7 +204,7 @@ func (h *ImportCVHandler) runImport(uid string, actionID string, pdfBytes []byte
 	if err != nil {
 		if llm.IsUserInputError(err) {
 			log.Printf("cv_import_user_input_failed uid_set=true action_id=%s reason=%v", actionID, err)
-			h.failImportWithoutRefund(uid, actionID, "The PDF could not be read.")
+			h.failImportWithoutRelease(uid, actionID, "The PDF could not be read.")
 			h.recordImportFailure(ctx, span, start, "user_input")
 			return
 		}
@@ -347,13 +353,11 @@ func importCVTimeout() time.Duration {
 }
 
 func (h *ImportCVHandler) failImport(uid string, actionID string, reason string) {
-	if refundErr := h.accounts.RefundCredit(context.Background(), uid); refundErr != nil {
-		log.Printf("credit_refund_failed uid_set=true action_id=%s", actionID)
-	}
-	h.failImportWithoutRefund(uid, actionID, reason)
+	h.gate.Release(context.Background(), uid)
+	h.failImportWithoutRelease(uid, actionID, reason)
 }
 
-func (h *ImportCVHandler) failImportWithoutRefund(uid string, actionID string, reason string) {
+func (h *ImportCVHandler) failImportWithoutRelease(uid string, actionID string, reason string) {
 	if err := h.actions.Fail(context.Background(), uid, actionID, reason); err != nil {
 		log.Printf("action_fail_failed uid_set=true action_id=%s", actionID)
 	}

@@ -5,7 +5,7 @@
 | **Actor** | User |
 | **Preconditions** | Signed in; profile at ≥ 2/5 completion |
 | **Milestone** | M3 |
-| **Credit cost** | None |
+| **External request** | None |
 | **LLM** | No |
 
 ## Context
@@ -55,7 +55,7 @@ Text exceeding 32 KB is truncated at the backend. A warning is shown in the UI.
 
 - `users/{uid}/roles/{roleId}` exists with `status: interested` and `sourceText`.
 - No Bundle document exists yet.
-- No credits consumed.
+- No external request made.
 
 ## E2E scenarios
 

@@ -119,8 +119,6 @@ export const EventGapTaskCreated = "GapTaskCreated";
 export const EventGapTaskCompleted = "GapTaskCompleted";
 export const EventCVImported = "CVImported";
 export const EventCVUpdated = "CVUpdated";
-export const EventCreditsDeducted = "CreditsDeducted";
-export const EventCreditsPurchased = "CreditsPurchased";
 export const EventAccountDeleted = "AccountDeleted";
 
 export type EventType =
@@ -138,8 +136,6 @@ export type EventType =
   | typeof EventGapTaskCompleted
   | typeof EventCVImported
   | typeof EventCVUpdated
-  | typeof EventCreditsDeducted
-  | typeof EventCreditsPurchased
   | typeof EventAccountDeleted;
 
 export const OutcomeAccepted = "accepted";
@@ -150,10 +146,6 @@ export type OutcomeValue =
   | typeof OutcomeAccepted
   | typeof OutcomeRejected
   | typeof OutcomeClosed;
-
-export const PurchaseProviderStripe = "stripe";
-
-export type PurchaseProvider = typeof PurchaseProviderStripe;
 
 export const CalibrationPatternOverconfidence = "overconfidence_bias";
 export const CalibrationPatternBlindSpot = "blind_spot";
@@ -495,23 +487,8 @@ export interface ActionProgress {
 export interface Account {
   uid: string;
   email?: string;
-  stripe_customer_id?: string;
-  credit_balance: number;
-  has_ever_purchased: boolean;
-  purchases?: PurchaseRecord[];
   created_at: FirestoreTimestamp;
   updated_at: FirestoreTimestamp;
-}
-
-export interface PurchaseRecord {
-  id: string;
-  provider: PurchaseProvider;
-  checkout_session_id?: string;
-  payment_intent_id?: string;
-  credit_amount: number;
-  amount_total?: number;
-  currency?: string;
-  purchased_at: FirestoreTimestamp;
 }
 
 export interface Outcome {

@@ -328,25 +328,10 @@ type ActionProgress struct {
 }
 
 type Account struct {
-	UID              string           `firestore:"uid"`
-	Email            string           `firestore:"email,omitempty"`
-	StripeCustomerID string           `firestore:"stripe_customer_id,omitempty"`
-	CreditBalance    int              `firestore:"credit_balance"`
-	HasEverPurchased bool             `firestore:"has_ever_purchased"`
-	Purchases        []PurchaseRecord `firestore:"purchases,omitempty"`
-	CreatedAt        time.Time        `firestore:"created_at"`
-	UpdatedAt        time.Time        `firestore:"updated_at"`
-}
-
-type PurchaseRecord struct {
-	ID                string    `firestore:"id"`
-	Provider          string    `firestore:"provider"`
-	CheckoutSessionID string    `firestore:"checkout_session_id,omitempty"`
-	PaymentIntentID   string    `firestore:"payment_intent_id,omitempty"`
-	CreditAmount      int       `firestore:"credit_amount"`
-	AmountTotal       int64     `firestore:"amount_total,omitempty"`
-	Currency          string    `firestore:"currency,omitempty"`
-	PurchasedAt       time.Time `firestore:"purchased_at"`
+	UID       string    `firestore:"uid"`
+	Email     string    `firestore:"email,omitempty"`
+	CreatedAt time.Time `firestore:"created_at"`
+	UpdatedAt time.Time `firestore:"updated_at"`
 }
 
 type Outcome struct {
