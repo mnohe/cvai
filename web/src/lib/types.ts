@@ -487,8 +487,22 @@ export interface ActionProgress {
 export interface Account {
   uid: string;
   email?: string;
-  created_at: FirestoreTimestamp;
-  updated_at: FirestoreTimestamp;
+  creditBalance?: number;
+  hasEverPurchased?: boolean;
+  purchaseHistory?: PurchaseRecord[];
+  createdAt?: FirestoreTimestamp | string;
+  updatedAt?: FirestoreTimestamp | string;
+  created_at?: FirestoreTimestamp;
+  updated_at?: FirestoreTimestamp;
+}
+
+export interface PurchaseRecord {
+  id: string;
+  provider: string;
+  creditAmount?: number;
+  credit_amount?: number;
+  purchasedAt?: FirestoreTimestamp | string;
+  purchased_at?: FirestoreTimestamp | string;
 }
 
 export interface Outcome {

@@ -100,10 +100,10 @@ func TestImportCVSavesIncompleteCV(t *testing.T) {
 		"experience":[{"company":"Engines Ltd","positions":[{"roles":["Engineer"],"start":"2021","location":"","tasks":["Built systems"]}]}],
 		"projects":{"items":[]}
 	}`)
-	accounts := &fakeAccounts{credits: 1}
+	externalGate := &fakeExternalRequestGate{permits: 1}
 	actions := newFakeActions()
 	candidates := &fakeCandidates{}
-	handler := NewImportCVHandler(accounts, actions, candidates, &fakeImporter{raw: incompleteCV})
+	handler := NewImportCVHandler(&fakeAccounts{}, actions, candidates, externalGate, &fakeImporter{raw: incompleteCV})
 
 	rec := httptest.NewRecorder()
 	handler.ImportCV(rec, importRequest(t, smallPDF()))
@@ -116,8 +116,8 @@ func TestImportCVSavesIncompleteCV(t *testing.T) {
 		action, _ := actions.Get(context.Background(), "uid-1", body["actionId"])
 		return action != nil && action.Status == domain.ActionComplete
 	})
-	if accounts.credits != 0 {
-		t.Fatalf("credits = %d, want 0 (no refund for incomplete CV)", accounts.credits)
+	if externalGate.permits != 0 {
+		t.Fatalf("permits = %d, want 0 (no release for incomplete but successful CV)", externalGate.permits)
 	}
 	if candidates.cv == nil {
 		t.Fatal("cv was not written")

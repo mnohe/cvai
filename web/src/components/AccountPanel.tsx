@@ -3,14 +3,16 @@ import { doc, onSnapshot } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/components/AuthProvider";
+import { apiFetch } from "@/lib/api";
 import { auth, db } from "@/lib/firebase";
 import { getCVCompleteness, normaliseCV } from "@/lib/cv";
-import type { Candidate } from "@/lib/types";
+import type { Account, Candidate } from "@/lib/types";
 
 export function AccountPanel({ onClose }: { onClose: () => void }) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [candidate, setCandidate] = useState<Partial<Candidate> | null>(null);
+  const [account, setAccount] = useState<Account | null>(null);
 
   useEffect(() => {
     if (!user) {
@@ -27,7 +29,27 @@ export function AccountPanel({ onClose }: { onClose: () => void }) {
         setCandidate(null);
       },
     );
-  }, [user]);
+  }, [user?.uid]);
+
+  useEffect(() => {
+    if (!user) {
+      setAccount(null);
+      return;
+    }
+
+    let cancelled = false;
+    void apiFetch<Account>("/account")
+      .then((nextAccount) => {
+        if (!cancelled) setAccount(nextAccount);
+      })
+      .catch(() => {
+        if (!cancelled) setAccount(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.uid]);
 
   if (!user) {
     return null;
@@ -35,6 +57,7 @@ export function AccountPanel({ onClose }: { onClose: () => void }) {
 
   const providerNames = getProviderNames(user.providerData.map((p) => p.providerId));
   const cvCompleteness = getCVCompleteness(normaliseCV(candidate));
+  const creditBalance = typeof account?.creditBalance === "number" ? account.creditBalance : null;
 
   return (
     <div className="account-panel">
@@ -55,7 +78,7 @@ export function AccountPanel({ onClose }: { onClose: () => void }) {
           </button>
         </div>
 
-        <div className="panel-section">
+        <div className="panel-section panel-section-compact">
           <p className="label">Profile</p>
           <a
             className="account-cv-completeness"
@@ -85,10 +108,22 @@ export function AccountPanel({ onClose }: { onClose: () => void }) {
           </a>
         </div>
 
-        <div className="panel-section">
-          <p className="label">Connected providers</p>
-          <p>{providerNames.length > 0 ? providerNames.join(", ") : "Firebase Auth"}</p>
-        </div>
+        {creditBalance !== null && (
+          <div className="panel-section panel-section-compact">
+            <p className="label">Billing</p>
+            <a
+              className="account-credit-link"
+              href="/settings#billing"
+              onClick={(event) => {
+                event.preventDefault();
+                onClose();
+                navigate("/settings#billing");
+              }}
+            >
+              <strong>{creditBalance} credits</strong>
+            </a>
+          </div>
+        )}
 
         <div className="panel-actions">
           <button
@@ -103,7 +138,7 @@ export function AccountPanel({ onClose }: { onClose: () => void }) {
           </button>
           <button
             type="button"
-            className="danger-button"
+            className="danger-link-button"
             onClick={async () => {
               await signOut(auth);
               onClose();

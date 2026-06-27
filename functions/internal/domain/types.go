@@ -328,10 +328,20 @@ type ActionProgress struct {
 }
 
 type Account struct {
-	UID       string    `firestore:"uid"`
-	Email     string    `firestore:"email,omitempty"`
-	CreatedAt time.Time `firestore:"created_at"`
-	UpdatedAt time.Time `firestore:"updated_at"`
+	UID              string           `firestore:"uid" json:"uid"`
+	Email            string           `firestore:"email,omitempty" json:"email,omitempty"`
+	CreditBalance    *int             `firestore:"-" json:"creditBalance,omitempty"`
+	HasEverPurchased *bool            `firestore:"-" json:"hasEverPurchased,omitempty"`
+	PurchaseHistory  []PurchaseRecord `firestore:"-" json:"purchaseHistory,omitempty"`
+	CreatedAt        time.Time        `firestore:"created_at" json:"createdAt"`
+	UpdatedAt        time.Time        `firestore:"updated_at" json:"updatedAt"`
+}
+
+type PurchaseRecord struct {
+	ID           string    `json:"id"`
+	Provider     string    `json:"provider"`
+	CreditAmount int       `json:"creditAmount"`
+	PurchasedAt  time.Time `json:"purchasedAt"`
 }
 
 type Outcome struct {

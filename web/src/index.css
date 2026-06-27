@@ -171,6 +171,7 @@ button:disabled {
 .primary-rect-button,
 .secondary-button,
 .danger-button,
+.danger-link-button,
 .icon-button,
 .avatar-button,
 .mobile-link,
@@ -190,6 +191,7 @@ button:disabled {
 .primary-rect-button:hover,
 .secondary-button:hover,
 .danger-button:hover,
+.danger-link-button:hover,
 .icon-button:hover,
 .avatar-button:hover,
 .mobile-link:hover,
@@ -201,6 +203,7 @@ button:disabled {
 .primary-rect-button:active,
 .secondary-button:active,
 .danger-button:active,
+.danger-link-button:active,
 .icon-button:active,
 .avatar-button:active,
 .mobile-link:active,
@@ -212,6 +215,7 @@ button:disabled {
 .primary-rect-button:disabled,
 .secondary-button:disabled,
 .danger-button:disabled,
+.danger-link-button:disabled,
 .icon-button:disabled,
 .avatar-button:disabled {
   filter: none;
@@ -272,6 +276,25 @@ button:disabled {
 
 .danger-button:hover {
   background: var(--danger-action-bg-hover);
+}
+
+.danger-link-button {
+  background: transparent;
+  color: var(--danger);
+  filter: none;
+  font-size: 12px;
+  justify-self: start;
+  min-height: 24px;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.danger-link-button:hover,
+.danger-link-button:active {
+  background: transparent;
+  filter: none;
+  transform: none;
 }
 
 .icon-button,
@@ -655,40 +678,34 @@ button:disabled {
   margin: 0;
 }
 
-.credit-pack-grid {
-  display: grid;
-  gap: 10px;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+.billing-settings-section {
+  align-self: start;
 }
 
-.credit-pack {
+.account-settings-section {
+  align-self: start;
+}
+
+.billing-summary {
+  align-items: end;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(120px, auto) minmax(0, 1fr);
+}
+
+.credit-purchase-control {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.credit-purchase-control select {
   background: var(--surface);
   border: 1px solid var(--border);
   color: var(--text-1);
-  display: grid;
-  gap: 5px;
-  justify-items: start;
-  min-height: 92px;
-  padding: 12px;
-  text-align: left;
-}
-
-.credit-pack:hover:not(:disabled) {
-  border-color: var(--coral);
-}
-
-.credit-pack:disabled {
-  cursor: progress;
-  opacity: 0.7;
-}
-
-.credit-pack span {
-  font-size: 20px;
-  font-weight: 700;
-}
-
-.credit-pack small {
-  color: var(--text-2);
+  min-height: 32px;
+  min-width: 0;
+  padding: 0 8px;
 }
 
 .status-banner {
@@ -709,28 +726,6 @@ button:disabled {
 .error-text {
   color: var(--danger);
   margin: 0;
-}
-
-.purchase-history {
-  display: grid;
-  gap: 8px;
-}
-
-.purchase-history h3 {
-  font-size: 15px;
-  margin: 0;
-}
-
-.purchase-history table {
-  border-collapse: collapse;
-  width: 100%;
-}
-
-.purchase-history th,
-.purchase-history td {
-  border-bottom: 1px solid var(--panel-border);
-  padding: 8px 0;
-  text-align: left;
 }
 
 .empty-actions {
@@ -875,6 +870,20 @@ button:disabled {
 
 .account-cv-completeness:hover .cv-progress {
   background: color-mix(in srgb, var(--section-control-bg) 72%, var(--text-1) 12%);
+}
+
+.account-credit-link {
+  align-items: baseline;
+  color: inherit;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: space-between;
+  text-decoration: none;
+}
+
+.account-credit-link:hover strong {
+  text-decoration: underline;
 }
 
 .cv-completeness-copy {
@@ -1296,15 +1305,14 @@ button:disabled {
 .account-panel-card {
   background: var(--surface);
   border-left: 1px solid var(--border);
-  bottom: 0;
   color: var(--text-1);
   display: grid;
-  gap: 18px;
+  gap: 14px;
   max-width: 380px;
-  padding: 24px;
+  padding: 18px;
   position: absolute;
   right: 0;
-  top: 0;
+  top: 12px;
   width: min(92vw, 380px);
 }
 
@@ -1318,6 +1326,17 @@ button:disabled {
 .panel-section {
   border-top: 1px solid var(--border);
   padding-top: 14px;
+}
+
+.panel-section-compact {
+  padding-top: 10px;
+}
+
+.panel-actions {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
 }
 
 @media (min-width: 768px) {
@@ -1339,12 +1358,23 @@ button:disabled {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .billing-settings-section {
+    grid-row: span 2;
+  }
+
   .cv-form-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .position-date-row {
     grid-template-columns: minmax(130px, 180px) minmax(130px, 180px) auto;
+  }
+}
+
+@media (max-width: 640px) {
+  .billing-summary,
+  .credit-purchase-control {
+    grid-template-columns: 1fr;
   }
 }
 
