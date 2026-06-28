@@ -385,3 +385,21 @@ Components are Vite + React 19 + TypeScript + Tailwind.
 | `<TabFilterBar>` | Horizontal scrollable filter tabs (role list) | M3
 | `<Timeline>` | Vertical event list with date, dot, and status tag | M3
 |===
+
+---
+
+== Development conventions
+
+=== Testing selectors
+
+Every HTML element that renders a discrete data value must carry a stable `id` or semantic `class` attribute so it can be targeted by automated tests without relying on text content or DOM position.
+
+Apply this rule to all new elements going forward.
+Do not apply it retroactively to existing markup unless the element is already being touched by the change at hand.
+
+Guidelines:
+
+* Prefer a `class` for repeated patterns (e.g. `.role-title`, `.verdict-label`, `.position-period`).
+* Use `id` only when an element is guaranteed to be unique on the page (e.g. `id="profile-completion-meter"`).
+* Avoid encoding state or value into the selector name — select *what* the element is, not *what it contains* (`.company-name`, not `.company-acme`).
+* Attribute the class at the element that owns the data, not a layout wrapper around it.

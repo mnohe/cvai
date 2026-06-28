@@ -81,10 +81,13 @@ rawCV, err = llm.NormalizeStructuredOutput(rawCV)
 
 ## Tests
 
+Every change, be it a new feature, a UX adjustment, or a bug fix, must involve new or updated tests.
+This is the default for all work. The Maintainer may waive it for a specific item, but the waiver must be explicit; silence means tests are required.
+
 - Add focused tests for behaviour changes.
 - Prefer mock or in-process HTTP tests for provider clients; CI must not call real LLM providers.
 - E2E tests should reference use-case IDs in their describe names.
-- Pure-function utilities in `web/src/lib/` must have Vitest unit tests. The web project has no test runner configured yet; add one before writing the first test.
+- Pure-function utilities in `web/src/lib/` must have Vitest unit tests.
 - LLM golden and eval tests live under `eval/`. They are opt-in (`make test-eval`) and must not block CI, because they may require a live API key or produce non-deterministic output. Fixtures go in `eval/fixtures/`.
 - API contract validation between the frontend and backend is schema-based: `schemas/cv.schema.json` is the source of truth. A separate contract test suite is not needed; validate the schema itself at build time rather than duplicating its assertions in tests.
 
