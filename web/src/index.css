@@ -55,6 +55,7 @@
   --modal-backdrop-bg: rgba(7, 22, 34, 0.42);
   --account-panel-backdrop-bg: rgba(7, 22, 34, 0.38);
   --default-button-shadow: var(--secondary-action-bg);
+  --list-marker: color-mix(in srgb, var(--text-2) 62%, var(--surface) 38%);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -84,6 +85,15 @@ body {
   background: var(--bg);
   color: var(--text-1);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+}
+
+ul {
+  list-style-type: "◆ ";
+}
+
+li::marker {
+  color: var(--list-marker);
+  font-size: 0.82em;
 }
 
 button,
@@ -348,7 +358,6 @@ button:disabled {
 
 .sidebar-user {
   border-top: 1px solid var(--sidebar-border-subtle);
-  cursor: pointer;
   padding-top: 14px;
   text-align: left;
 }
@@ -379,15 +388,17 @@ button:disabled {
 }
 
 .user-account-trigger {
+  align-items: center;
   background: transparent;
   border: 0;
   color: var(--sidebar-text);
+  cursor: pointer;
+  display: grid;
+  flex: 1;
   min-width: 0;
   overflow: hidden;
   padding: 0;
   text-align: left;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .settings-trigger {
@@ -533,11 +544,10 @@ button:disabled {
   gap: 10px;
 }
 
-.completion-panel ul,
 .completion-list {
-  list-style: none;
   margin: 0;
-  padding: 0;
+  padding-left: 20px;
+  list-style: none;
 }
 
 .completion-heading {
@@ -569,6 +579,16 @@ button:disabled {
   padding: 8px 10px;
   text-align: left;
   width: 100%;
+}
+
+.completion-link-complete {
+  background: #ecfdf3;
+  border-color: #bbf7d0;
+}
+
+.completion-link-incomplete {
+  background: #fff7ed;
+  border-color: #fed7aa;
 }
 
 .completion-link .muted {
@@ -850,6 +870,31 @@ button:disabled {
   grid-column: 1 / -1;
 }
 
+.position-date-row {
+  align-items: end;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 1fr;
+}
+
+.checkbox-field {
+  align-items: center;
+  color: var(--text-2);
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 700;
+  gap: 8px;
+  min-height: 38px;
+  text-transform: uppercase;
+}
+
+.checkbox-field input {
+  accent-color: var(--primary-action-bg);
+  height: 16px;
+  margin: 0;
+  width: 16px;
+}
+
 .editable-list {
   display: grid;
   gap: 10px;
@@ -862,38 +907,178 @@ button:disabled {
   grid-template-columns: minmax(0, 1fr) auto;
 }
 
-.entry-controls {
-  align-items: end;
+.editable-list-row-three {
+  grid-template-columns: minmax(0, 0.4fr) minmax(0, 1fr) auto;
+}
+
+.draggable-list-row {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.draggable-list-row.editable-list-row-three {
+  grid-template-columns: auto minmax(0, 0.4fr) minmax(0, 1fr) auto;
+}
+
+.drag-handle {
+  align-items: center;
+  align-self: center;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-2);
+  cursor: grab;
+  display: inline-flex;
+  font-weight: 700;
+  height: 34px;
+  justify-content: center;
+  line-height: 1;
+  padding: 0;
+  width: 28px;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+.drag-handle:hover,
+.drag-handle:focus-visible {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.field-group-title {
+  color: var(--text-2);
+  font-size: 12px;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.entry-panel-section {
   display: grid;
-  gap: 8px;
+  gap: 14px;
+}
+
+.entry-panel-heading {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.entry-panel-heading h2,
+.entry-panel h3,
+.modal-card h2 {
+  margin: 0;
+}
+
+.entry-panel-list {
+  display: grid;
+  gap: 12px;
+}
+
+.entry-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  display: grid;
+  gap: 14px;
+  padding: 14px;
+}
+
+.entry-panel-summary {
+  align-items: center;
+  display: grid;
+  gap: 10px;
   grid-template-columns: minmax(0, 1fr) auto;
 }
 
-.entry-controls select {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  color: var(--text-1);
+.entry-panel-summary-draggable {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.entry-panel h3 {
+  font-size: 16px;
   font-weight: 400;
-  min-height: 38px;
-  padding: 9px 10px;
+  overflow-wrap: anywhere;
 }
 
-.entry-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.save-message {
+.entry-panel-summary p {
   color: var(--text-2);
+  font-size: 12px;
+  margin: 3px 0 0;
+}
+
+.entry-panel-actions,
+.entry-panel-edit-actions,
+.modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.entry-panel-editor {
+  display: grid;
+  gap: 14px;
+}
+
+.form-save-row {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.save-inline-message {
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 700;
+  min-height: 18px;
+}
+
+.save-inline-error {
+  color: var(--danger);
+}
+
+.cv-validation-notice {
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  color: var(--text-1);
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+}
+
+.cv-validation-notice h4 {
   margin: 0;
+}
+
+.cv-validation-notice p {
+  margin: 0;
+}
+
+.cv-validation-notice p.notice {
+  font-style: italic;
+  font-size: 75%;
+  margin-bottom: 1rem;
+}
+
+.cv-validation-notice ul {
+  margin: 0;
+  padding-left: 20px;
 }
 
 .preference-count {
   color: var(--text-2);
   font-size: 12px;
   font-weight: 700;
-  justify-self: end;
   text-transform: none;
+}
+
+.preference-footer {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  min-height: 18px;
 }
 
 .preference-count-warning {
@@ -1078,6 +1263,10 @@ button:disabled {
 
   .cv-form-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .position-date-row {
+    grid-template-columns: minmax(130px, 180px) minmax(130px, 180px) auto;
   }
 }
 

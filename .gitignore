@@ -44,3 +44,4 @@ objects/
 refs/
 logs/
 info/
+functions/coverage.out

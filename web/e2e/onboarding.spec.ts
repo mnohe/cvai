@@ -27,9 +27,10 @@ test.describe("UC-ONBOARD-001", () => {
     await page.getByLabel("Email").fill("mary@example.test");
     await page.getByRole("button", { name: "Save section" }).click();
     await page.getByRole("button", { name: "Experience", exact: true }).click();
-    await page.getByLabel("Company").fill("Orbital Mechanics Inc");
+    await page.getByRole("button", { name: "Add", exact: true }).click();
+    await page.getByRole("textbox", { name: "Company" }).fill("Orbital Mechanics Inc");
     await page.getByLabel("Roles, one per line").fill("Analyst");
-    await page.getByRole("button", { name: "Save section" }).click();
+    await page.getByRole("button", { name: "Save", exact: true }).click();
     await expect(page.getByRole("button", { name: "Profile completion 2 of 5" })).toBeVisible();
   });
 
@@ -94,7 +95,7 @@ async function seedCompleteCandidate(uid: string) {
         name: "Complete",
         surname: "User",
         email: "complete@example.test",
-        linkedin: "",
+        links: [],
         phone: { prefix: "", number: "" },
       },
       summary: "Complete profile",

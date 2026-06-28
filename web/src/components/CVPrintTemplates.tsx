@@ -1,4 +1,4 @@
-import type { CV, CVProjectItem, Certification, Education, Experience } from "@/lib/types";
+import type { CV, CVPosition, CVProjectItem, Certification, Education, Experience } from "@/lib/types";
 import {
   hasCertificationContent,
   hasEducationContent,
@@ -299,14 +299,8 @@ function getPrintData(cv: CV): PrintData {
       ],
       " ",
     ),
-    links: [cv.contact.linkedin, cv.contact.github, cv.contact.www].filter(hasText),
-    experience: [...cv.experience]
-      .filter(hasExperienceContent)
-      .map((item) => ({
-        ...item,
-        positions: [...item.positions].sort((a, b) => startYear(b.start) - startYear(a.start)),
-      }))
-      .sort((a, b) => latestStartYear(b) - latestStartYear(a)),
+    links: cv.contact.links.map((link) => link.url).filter(hasText),
+    experience: sortExperienceEntries(cv.experience.filter(hasExperienceContent)),
     education: [...cv.education].filter(hasEducationContent).sort((a, b) => compareYear(a, b)),
     skills: cv.skills?.filter(hasText) ?? [],
     certifications: [...cv.certifications]
@@ -323,6 +317,7 @@ function joinText(parts: Array<string | undefined>, separator = " ") {
 }
 
 function displayPeriod(start: string, end?: string) {
+  if (hasText(start) && isCurrentPosition(end)) return `${start} - Present`;
   return joinText([start, end], " - ");
 }
 
@@ -341,16 +336,50 @@ function hasProjectContent(project: CVProjectItem) {
   );
 }
 
-function latestStartYear(experience: Experience) {
-  const years = experience.positions
-    .map((position) => startYear(position.start))
-    .filter((year) => Number.isFinite(year));
-  return years.length ? Math.max(...years) : Number.NEGATIVE_INFINITY;
+function sortExperienceEntries(items: Experience[]) {
+  return [...items]
+    .map((item) => ({ ...item, positions: [...item.positions].sort(comparePositionRecency) }))
+    .sort(compareExperienceRecency);
 }
 
-function startYear(value: string) {
+function compareExperienceRecency(a: Experience, b: Experience) {
+  return comparePositionRecency(a.positions[0] ?? emptyPosition(), b.positions[0] ?? emptyPosition());
+}
+
+function comparePositionRecency(a: CVPosition, b: CVPosition) {
+  const aCurrent = isCurrentPosition(a.end);
+  const bCurrent = isCurrentPosition(b.end);
+  if (aCurrent !== bCurrent) return aCurrent ? -1 : 1;
+
+  const primary = aCurrent
+    ? dateRank(b.start) - dateRank(a.start)
+    : dateRank(b.end) - dateRank(a.end);
+  if (primary !== 0) return primary;
+
+  return dateRank(b.start) - dateRank(a.start);
+}
+
+function dateRank(value?: string) {
+  if (!hasText(value)) return 0;
   const year = Number.parseInt(value.slice(0, 4), 10);
-  return Number.isFinite(year) ? year : Number.NEGATIVE_INFINITY;
+  const month = Number.parseInt(value.slice(5, 7), 10) || 1;
+  const day = Number.parseInt(value.slice(8, 10), 10) || 1;
+  return Number.isFinite(year) ? year * 372 + month * 31 + day : 0;
+}
+
+function isCurrentPosition(value?: string) {
+  return !hasText(value) || /present|current|now/i.test(value);
+}
+
+function emptyPosition(): CVPosition {
+  return {
+    id: "",
+    roles: [],
+    start: "",
+    end: "",
+    location: "",
+    tasks: [],
+  };
 }
 
 function compareYear(a: Education | Certification, b: Education | Certification) {

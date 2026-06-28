@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Actor** | User |
-| **Preconditions** | Signed in; CV has at least one section populated |
+| **Preconditions** | Signed in; CV has at least one section populated; `cv_validation_errors` is empty |
 | **Milestone** | M1 |
 | **Credit cost** | None |
 | **LLM** | No |
@@ -24,7 +24,9 @@ No backend call. No credit. No Cloud Storage involved.
 
 ## Notes
 
-The Export PDF button itself is hidden in print (`@media print { display: none }`).
+The Print button is disabled when `candidate.cv_validation_errors` is non-empty. The list is generated after PDF import and recomputed on every manual CV save, so print/export re-enables only after the saved CV validates cleanly.
+
+The Print button itself is hidden in print (`@media print { display: none }`).
 The print layout component (`<CVPrintLayout>`) is screen-hidden and print-visible —
 `@media screen { display: none }`.
 

@@ -109,6 +109,13 @@ func UIDFromContext(ctx context.Context) string {
 	return uid
 }
 
+// TokenFromContext retrieves the verified Firebase token stored by RequireAuth.
+// Returns nil if the request has not passed through RequireAuth.
+func TokenFromContext(ctx context.Context) *firebaseauth.Token {
+	tok, _ := ctx.Value(tokenKey).(*firebaseauth.Token)
+	return tok
+}
+
 type authErr struct {
 	status int
 	msg    string

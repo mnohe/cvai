@@ -62,7 +62,7 @@
         "surname",
         "phone",
         "email",
-        "linkedin"
+        "links"
       ],
       "properties": {
         "name": {
@@ -80,18 +80,11 @@
           "type": "string",
           "format": "email"
         },
-        "linkedin": {
-          "type": "string",
-          "minLength": 1
-        },
-        "github": {
-          "type": "string",
-          "minLength": 1
-        },
-        "www": {
-          "type": "string",
-          "format": "uri",
-          "minLength": 1
+        "links": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/link"
+          }
         }
       }
     },

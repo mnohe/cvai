@@ -144,7 +144,7 @@ func (c Contact) Validate() error {
 		required("contact.surname", c.Surname),
 		c.Phone.Validate(),
 		required("contact.email", c.Email),
-		required("contact.linkedin", c.LinkedIn),
+		validateSlice("contact.links", c.Links),
 	)
 }
 

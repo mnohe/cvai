@@ -272,6 +272,7 @@ export interface EvidenceRef {
 export interface Candidate {
   id: string;
   cv: CV;
+  cv_validation_errors?: string[];
   context: CandidateContext;
   preferences?: string;
   evidence_library?: EvidenceItem[];
@@ -296,7 +297,8 @@ export interface Contact {
   surname: string;
   phone: Phone;
   email: string;
-  linkedin: string;
+  links: Link[];
+  linkedin?: string;
   github?: string;
   www?: string;
 }

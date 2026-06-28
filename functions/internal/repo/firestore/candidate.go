@@ -51,15 +51,19 @@ func (r *CandidateRepo) GetCV(ctx context.Context, uid string) (*domain.CV, erro
 	return &c.CV, nil
 }
 
-// WriteCV persists the CV into the candidate profile document using a merge update.
+// WriteCV persists the CV and validation errors into the candidate profile document using a merge update.
 // It does not overwrite fields outside the cv subtree.
-func (r *CandidateRepo) WriteCV(ctx context.Context, uid string, cv domain.CV) error {
+func (r *CandidateRepo) WriteCV(ctx context.Context, uid string, cv domain.CV, validationErrors []string) error {
 	ref := candidateDoc(r.client, uid)
 	now := time.Now()
+	if validationErrors == nil {
+		validationErrors = []string{}
+	}
 	return r.client.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
 		updates := map[string]any{
-			"cv":         cv,
-			"updated_at": now,
+			"cv":                   cv,
+			"cv_validation_errors": validationErrors,
+			"updated_at":           now,
 		}
 		_, err := tx.Get(ref)
 		if err != nil {

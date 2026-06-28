@@ -106,7 +106,7 @@ These are the data access contracts. Handler code must not hold a `*firestore.Cl
 |---|---|
 | `RoleRepository` | `List(uid)`, `Get(uid, roleId)`, `Create(uid, metadata)`, `Update(uid, roleId, changes)`, `Delete(uid, roleId)`, `ListWithOutcomes(uid)` |
 | `BundleRepository` | `Get(uid, roleId)` (returns job + analysis + artefacts as one bundle), `Write(uid, roleId, bundle)`, `WriteOutcome(uid, roleId, outcome)` |
-| `CandidateRepository` | `GetCV(uid)`, `WriteCV(uid, cv)`, `GetContext(uid)`, `WriteContext(uid, context)`, `GetLibrary(uid)`, `WriteLibrary(uid, library)` |
+| `CandidateRepository` | `GetCV(uid)`, `WriteCV(uid, cv, validationErrors)`, `GetContext(uid)`, `WriteContext(uid, context)`, `GetLibrary(uid)`, `WriteLibrary(uid, library)` |
 | `TaskRepository` | `List(uid, filters?)`, `ListByRole(uid, roleId)`, `Create(uid, task)`, `Complete(uid, taskId)`, `Delete(uid, taskId)`, `TaskCalibration(uid)` (omits result when fewer than 3 eligible tasks) |
 | `EventRepository` | `List(uid, filters?)`, `ListByRole(uid, roleId)`, `Append(uid, event)` — no Update or Delete |
 | `ActionRepository` | `Create(uid, action)`, `Update(uid, actionId, progress)`, `Complete(uid, actionId, result)`, `Fail(uid, actionId, error)`, `Get(uid, actionId)` |
@@ -114,6 +114,9 @@ These are the data access contracts. Handler code must not hold a `*firestore.Cl
 | `CalibrationRepository` | `AssessmentCalibration(uid)` (read-only; omits result when fewer than 3 data points per verdict group). Source of truth is the raw Outcome and Verdict data in `BundleRepository` — `CalibrationRepository` never writes. |
 
 Structural invariants enforced at the interface level (not by convention):
+
+- Every persisted CV write stores the CV and the current `cv_validation_errors` list together. Imports compute it in the backend domain validator; direct editor writes compute the same required-field list in the SPA before writing.
+- CV-dependent actions must treat a non-empty `cv_validation_errors` list as a validity gate and refuse to run until a subsequent CV save produces an empty list.
 - `EventRepository` has no `Update` or `Delete` — append-only at the type level.
 - `CalibrationRepository` has no write methods — read-only at the type level.
 - The handler layer reads the calibration dict and passes it into the LLM client. The LLM client does not query the repository.

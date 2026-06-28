@@ -43,7 +43,7 @@ test.describe("UC-AUTH-003", () => {
   test("account panel opens and shows name/email", async ({ page }) => {
     await page.setViewportSize({ width: 1100, height: 800 });
     await signIn(page, "Google", "panel.user@example.test");
-    await page.getByRole("button", { name: "Open account panel" }).click();
+    await page.getByText("panel.user@example.test").click();
     const panel = page.getByRole("dialog", { name: "Account panel" });
     await expect(panel).toBeVisible();
     await expect(panel.getByRole("heading", { name: "New User" })).toBeVisible();

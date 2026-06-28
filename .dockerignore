@@ -1,0 +1,12 @@
+.git
+.cache
+emulator-data
+firebase-debug.log
+firestore-debug.log
+functions/coverage.out
+node_modules
+web/dist
+web/node_modules
+web/test-results
+web/playwright-report
+**/.DS_Store

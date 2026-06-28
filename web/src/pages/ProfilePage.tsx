@@ -2,8 +2,10 @@ import { doc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
 import {
   useEffect,
   useMemo,
+  useId,
   useRef,
   useState,
+  type DragEvent,
   type FormEvent,
   type ReactNode,
 } from "react";
@@ -15,18 +17,14 @@ import { ImportCVModal } from "@/components/ImportCVModal";
 import { ThinkButton } from "@/components/ThinkButton";
 import {
   emptyCandidateContext,
-  hasCertificationContent,
-  hasContactContent,
   hasCVContent,
-  hasEducationContent,
-  hasExperienceContent,
-  hasLanguageContent,
   hasText,
   joinLines,
   makeExperience,
   makePosition,
   normaliseCV,
   splitLines,
+  validateCV,
 } from "@/lib/cv";
 import { db } from "@/lib/firebase";
 import {
@@ -68,6 +66,11 @@ const cvSections: { id: CVSection; label: string }[] = [
   { id: "certifications", label: "Certifications" },
   { id: "languages", label: "Languages" },
 ];
+
+type SaveState = {
+  status: "idle" | "saving" | "saved" | "error";
+  message?: string;
+};
 
 export function ProfilePage() {
   const { section = "cv" } = useParams();
@@ -214,11 +217,13 @@ function CVProfile({
   const [importOpen, setImportOpen] = useState(false);
   const [printOpen, setPrintOpen] = useState(false);
   const [printTemplate, setPrintTemplate] = useState<CVPrintTemplate>("default");
-  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [saveState, setSaveState] = useState<SaveState>({ status: "idle" });
+  const saveStateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const cv = useMemo(() => normaliseCV(candidate), [candidate]);
   const hasExistingCV = candidate?.cv ? hasCVContent(cv) : false;
   const showEditor = started || hasExistingCV;
+  const cvValidationErrors = candidate?.cv_validation_errors ?? [];
 
   useEffect(() => {
     if (!requestedSection) return;
@@ -227,16 +232,30 @@ function CVProfile({
     onRequestedSectionHandled();
   }, [onRequestedSectionHandled, requestedSection]);
 
-  async function saveCV(nextCV: CV, sectionHasMeaningfulContent: boolean) {
-    if (!user || !sectionHasMeaningfulContent) {
-      setSaveMessage("Add some content before saving this section.");
+  useEffect(() => {
+    return () => {
+      if (saveStateTimer.current) {
+        clearTimeout(saveStateTimer.current);
+      }
+    };
+  }, []);
+
+  async function saveCV(nextCV: CV) {
+    if (saveStateTimer.current) {
+      clearTimeout(saveStateTimer.current);
+      saveStateTimer.current = null;
+    }
+    if (!user) {
       return;
     }
 
+    const validationErrors = validateCV(nextCV);
+    setSaveState({ status: "saving" });
     await setDoc(
       doc(db, "users", user.uid, "candidate", "profile"),
       {
         cv: nextCV,
+        cv_validation_errors: validationErrors,
         context: candidate?.context ?? emptyCandidateContext,
         created_at: candidate?.created_at ?? serverTimestamp(),
         updated_at: serverTimestamp(),
@@ -244,11 +263,19 @@ function CVProfile({
       { merge: true },
     );
     setStarted(true);
-    setSaveMessage("Saved");
+    setSaveState({ status: "saved" });
+    saveStateTimer.current = setTimeout(() => {
+      setSaveState({ status: "idle" });
+      saveStateTimer.current = null;
+    }, 1400);
   }
 
   useEffect(() => {
-    setSaveMessage(null);
+    if (saveStateTimer.current) {
+      clearTimeout(saveStateTimer.current);
+      saveStateTimer.current = null;
+    }
+    setSaveState({ status: "idle" });
   }, [activeSection]);
 
   if (!snapshotReady) {
@@ -271,8 +298,25 @@ function CVProfile({
         </div>
       ) : (
         <div className="tab-content cv-panel">
+          {cvValidationErrors.length > 0 && (
+            <div className="cv-validation-notice" role="alert">
+              <h4>These fields are missing</h4>
+              <p className="notice">Please be aware that features requiring the CV will be disabled until they are provided.</p>
+              <ul>
+                {formatCVValidationErrors(cv, cvValidationErrors).map((error, index) => (
+                  <li key={index}>{error}</li>
+                ))}
+              </ul>
+            </div>
+          )}
           <div className="cv-panel-actions">
-            <button type="button" className="secondary-button" onClick={() => setPrintOpen(true)}>
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => setPrintOpen(true)}
+              disabled={cvValidationErrors.length > 0}
+              title={cvValidationErrors.length > 0 ? "Fix the incomplete fields before printing" : undefined}
+            >
               Print
             </button>
             <ThinkButton completionScore={2} variant="ghost" onClick={() => setImportOpen(true)}>
@@ -280,7 +324,7 @@ function CVProfile({
             </ThinkButton>
           </div>
 
-          <div className="cv-section">
+          <div className="cv-section" data-save-status={saveState.status}>
 
             <nav className="section-tabs section-tabs-small" aria-label="CV editor sections">
               {cvSections.map((tab) => (
@@ -295,40 +339,45 @@ function CVProfile({
               ))}
             </nav>
 
-            {saveMessage && <p className="save-message">{saveMessage}</p>}
-
-            <CVSectionPanel section={activeSection}>
+            <CVSectionPanel
+              section={activeSection}
+              showHeading={!["experience", "education", "certifications", "languages"].includes(activeSection)}
+            >
               {activeSection === "personal" && (
-                <PersonalForm cv={cv} onSave={(next) => void saveCV(next, hasContactContent(next))} />
+                <PersonalForm cv={cv} saveState={saveState} onSave={(next) => void saveCV(next)} />
               )}
               {activeSection === "summary" && (
-                <SummaryForm cv={cv} onSave={(next) => void saveCV(next, hasText(next.summary))} />
+                <SummaryForm cv={cv} saveState={saveState} onSave={(next) => void saveCV(next)} />
               )}
               {activeSection === "experience" && (
                 <ExperienceForm
                   cv={cv}
-                  onSave={(next) => void saveCV(next, next.experience.some(hasExperienceContent))}
+                  saveState={saveState}
+                  onSave={(next) => void saveCV(next)}
                 />
               )}
               {activeSection === "education" && (
                 <EducationForm
                   cv={cv}
-                  onSave={(next) => void saveCV(next, next.education.some(hasEducationContent))}
+                  saveState={saveState}
+                  onSave={(next) => void saveCV(next)}
                 />
               )}
               {activeSection === "skills" && (
-                <SkillsForm cv={cv} onSave={(next) => void saveCV(next, (next.skills ?? []).length > 0)} />
+                <SkillsForm cv={cv} saveState={saveState} onSave={(next) => void saveCV(next)} />
               )}
               {activeSection === "certifications" && (
                 <CertificationsForm
                   cv={cv}
-                  onSave={(next) => void saveCV(next, next.certifications.some(hasCertificationContent))}
+                  saveState={saveState}
+                  onSave={(next) => void saveCV(next)}
                 />
               )}
               {activeSection === "languages" && (
                 <LanguagesForm
                   cv={cv}
-                  onSave={(next) => void saveCV(next, next.languages.some(hasLanguageContent))}
+                  saveState={saveState}
+                  onSave={(next) => void saveCV(next)}
                 />
               )}
             </CVSectionPanel>
@@ -365,10 +414,16 @@ function PreferencesProfile({
   snapshotReady: boolean;
 }) {
   const { user } = useAuth();
-  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [saveState, setSaveState] = useState<SaveState>({ status: "idle" });
+  const saveStateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   async function savePreferences(preferences: string) {
     if (!user) return;
+    if (saveStateTimer.current) {
+      clearTimeout(saveStateTimer.current);
+      saveStateTimer.current = null;
+    }
+    setSaveState({ status: "saving" });
     try {
       await setDoc(
         doc(db, "users", user.uid, "candidate", "profile"),
@@ -378,11 +433,23 @@ function PreferencesProfile({
         },
         { merge: true },
       );
-      setSaveMessage("Saved");
+      setSaveState({ status: "saved" });
+      saveStateTimer.current = setTimeout(() => {
+        setSaveState({ status: "idle" });
+        saveStateTimer.current = null;
+      }, 1400);
     } catch {
-      setSaveMessage("Could not save preferences.");
+      setSaveState({ status: "error", message: "Could not save preferences." });
     }
   }
+
+  useEffect(() => {
+    return () => {
+      if (saveStateTimer.current) {
+        clearTimeout(saveStateTimer.current);
+      }
+    };
+  }, []);
 
   if (!snapshotReady) {
     return <div className="tab-content empty-panel">Loading preferences...</div>;
@@ -390,10 +457,10 @@ function PreferencesProfile({
 
   return (
     <section className="tab-content preferences-panel" aria-labelledby="preferences-heading">
-      {saveMessage && <p className="save-message">{saveMessage}</p>}
       <h2 id="preferences-heading">Preferences</h2>
       <PreferencesForm
         preferences={candidate?.preferences ?? ""}
+        saveState={saveState}
         onSave={(preferences) => void savePreferences(preferences)}
       />
     </section>
@@ -429,12 +496,12 @@ function ProfileCompletionPanel({
           <li key={segment.id}>
             <button
               type="button"
-              className="completion-link"
+              className={segment.complete ? "completion-link completion-link-complete" : "completion-link completion-link-incomplete"}
               onClick={() => onSection(segmentToSection(segment.id))}
             >
               <span aria-hidden="true">{segment.complete ? "✓" : "○"}</span>
               <span>{segment.label}</span>
-              <span className="muted">{segment.complete ? "already filled" : segmentCTA(segment.id)}</span>
+              <span className="muted">{segment.complete ? "complete" : segmentCTA(segment.id)}</span>
             </button>
           </li>
         ))}
@@ -468,206 +535,393 @@ function isCompletionOpenNavigation(state: unknown): state is { openCompletionPa
   );
 }
 
-function CVSectionPanel({ section, children }: { section: CVSection; children: ReactNode }) {
+function CVSectionPanel({
+  section,
+  children,
+  showHeading = true,
+}: {
+  section: CVSection;
+  children: ReactNode;
+  showHeading?: boolean;
+}) {
+  const label = cvSections.find((item) => item.id === section)?.label ?? section;
   return (
-    <section className="section-panel cv-section-panel" aria-labelledby={`cv-${section}-heading`}>
-      <h2 id={`cv-${section}-heading`}>{cvSections.find((item) => item.id === section)?.label}</h2>
+    <section
+      className="section-panel cv-section-panel"
+      aria-label={showHeading ? undefined : label}
+      aria-labelledby={showHeading ? `cv-${section}-heading` : undefined}
+    >
+      {showHeading && <h2 id={`cv-${section}-heading`}>{label}</h2>}
       {children}
     </section>
   );
 }
 
-function PersonalForm({ cv, onSave }: { cv: CV; onSave: (cv: CV) => void }) {
+function PersonalForm({ cv, saveState, onSave }: { cv: CV; saveState: SaveState; onSave: (cv: CV) => void }) {
   const [draft, setDraft] = useState(cv.contact);
+  const [draggedLinkIndex, setDraggedLinkIndex] = useState<number | null>(null);
   useEffect(() => setDraft(cv.contact), [cv.contact]);
 
+  function reorderLinks(from: number | null, to: number) {
+    if (from === null) return;
+    setDraft((current) => ({ ...current, links: moveItem(current.links, from, to) }));
+  }
+
   return (
-    <FormShell onSubmit={() => onSave({ ...cv, contact: draft })}>
+    <FormShell
+      saveState={saveState}
+      onSubmit={() =>
+        onSave({
+          ...cv,
+          contact: {
+            name: draft.name,
+            surname: draft.surname,
+            phone: draft.phone,
+            email: draft.email,
+            links: draft.links.filter((link) => hasText(link.label) || hasText(link.url)),
+          },
+        })
+      }
+    >
       <Field label="First name" value={draft.name} onChange={(name) => setDraft({ ...draft, name })} />
       <Field label="Surname" value={draft.surname} onChange={(surname) => setDraft({ ...draft, surname })} />
       <Field label="Email" type="email" value={draft.email} onChange={(email) => setDraft({ ...draft, email })} />
       <Field label="Phone prefix" value={draft.phone.prefix} onChange={(prefix) => setDraft({ ...draft, phone: { ...draft.phone, prefix } })} />
       <Field label="Phone number" value={draft.phone.number} onChange={(number) => setDraft({ ...draft, phone: { ...draft.phone, number } })} />
-      <Field label="LinkedIn" value={draft.linkedin} onChange={(linkedin) => setDraft({ ...draft, linkedin })} />
-      <Field label="GitHub" value={draft.github ?? ""} onChange={(github) => setDraft({ ...draft, github })} />
-      <Field label="Website" value={draft.www ?? ""} onChange={(www) => setDraft({ ...draft, www })} />
+      <div className="editable-list field-wide">
+        <h3 className="field-group-title">Links</h3>
+        {draft.links.map((link, index) => (
+          <div
+            className="editable-list-row editable-list-row-three draggable-list-row"
+            key={index}
+            onDragOver={(event) => event.preventDefault()}
+            onDrop={() => reorderLinks(draggedLinkIndex, index)}
+          >
+            <DragHandle
+              label={`Move link entry ${index + 1}`}
+              onDragStart={(event) => {
+                startDrag(event, index);
+                setDraggedLinkIndex(index);
+              }}
+              onDragEnd={() => setDraggedLinkIndex(null)}
+            />
+            <Field
+              label="Label"
+              accessibleLabel={`Link ${index + 1} label`}
+              name={`contact-link-${index + 1}-label`}
+              value={link.label}
+              placeholder="LinkedIn, My portfolio, GitHub"
+              onChange={(label) =>
+                setDraft({
+                  ...draft,
+                  links: draft.links.map((item, itemIndex) => (itemIndex === index ? { ...item, label } : item)),
+                })
+              }
+            />
+            <Field
+              label="URL"
+              accessibleLabel={`Link ${index + 1} URL`}
+              name={`contact-link-${index + 1}-url`}
+              value={link.url}
+              placeholder="https://linkedin.com/in/my-user"
+              onChange={(url) =>
+                setDraft({
+                  ...draft,
+                  links: draft.links.map((item, itemIndex) => (itemIndex === index ? { ...item, url } : item)),
+                })
+              }
+            />
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => setDraft({ ...draft, links: draft.links.filter((_, linkIndex) => linkIndex !== index) })}
+            >
+              Remove
+            </button>
+          </div>
+        ))}
+        <button
+          type="button"
+          className="secondary-button"
+          onClick={() => setDraft({ ...draft, links: [{ label: "", url: "" }, ...draft.links] })}
+        >
+          Add link
+        </button>
+      </div>
     </FormShell>
   );
 }
 
-function SummaryForm({ cv, onSave }: { cv: CV; onSave: (cv: CV) => void }) {
+function SummaryForm({ cv, saveState, onSave }: { cv: CV; saveState: SaveState; onSave: (cv: CV) => void }) {
   const [summary, setSummary] = useState(cv.summary);
   useEffect(() => setSummary(cv.summary), [cv.summary]);
 
   return (
-    <FormShell onSubmit={() => onSave({ ...cv, summary })}>
+    <FormShell saveState={saveState} onSubmit={() => onSave({ ...cv, summary })}>
       <Textarea label="Summary" value={summary} onChange={setSummary} rows={7} />
     </FormShell>
   );
 }
 
-function ExperienceForm({ cv, onSave }: { cv: CV; onSave: (cv: CV) => void }) {
+function ExperienceForm({ cv, saveState, onSave }: { cv: CV; saveState: SaveState; onSave: (cv: CV) => void }) {
   const [items, setItems] = useState(() => normaliseExperienceList(cv.experience));
-  const [selectedIndex, setSelectedIndex] = useState(0);
-  const [selectedPositionIndex, setSelectedPositionIndex] = useState(0);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [draft, setDraft] = useState<Experience | null>(null);
+  const [removeIndex, setRemoveIndex] = useState<number | null>(null);
 
   useEffect(() => {
-    setItems(normaliseExperienceList(cv.experience));
-    setSelectedIndex(0);
-    setSelectedPositionIndex(0);
+    setItems(sortExperienceEntries(normaliseExperienceList(cv.experience)));
+    setEditingIndex(null);
+    setDraft(null);
   }, [cv.experience]);
 
-  const selectedExperience = items[selectedIndex] ?? makeExperience();
-  const selectedPosition = selectedExperience.positions[selectedPositionIndex] ?? makePosition();
+  const editingExisting = editingIndex !== null && editingIndex >= 0 && editingIndex < items.length;
+  const selectedExperience = draft ?? makeExperience();
 
   function updateSelectedExperience(next: Experience) {
-    setItems((current) => current.map((item, index) => (index === selectedIndex ? next : item)));
+    setDraft(next);
   }
 
-  function updateSelectedPosition(nextPosition: CVPosition) {
+  function updatePosition(positionIndex: number, nextPosition: CVPosition) {
     updateSelectedExperience({
       ...selectedExperience,
       positions: selectedExperience.positions.map((position, index) =>
-        index === selectedPositionIndex ? nextPosition : position,
+        index === positionIndex ? nextPosition : position,
       ),
     });
   }
 
   function addExperience() {
-    setItems((current) => [...current, makeExperience()]);
-    setSelectedIndex(items.length);
-    setSelectedPositionIndex(0);
+    setEditingIndex(-1);
+    setDraft(makeExperience());
   }
 
-  function removeExperience() {
-    if (items.length === 1) return;
-    const nextItems = items.filter((_, index) => index !== selectedIndex);
+  function editExperience(index: number) {
+    setEditingIndex(index);
+    setDraft(items[index] ?? makeExperience());
+  }
+
+  function saveExperience() {
+    if (editingIndex === null || !draft) return;
+    const nextItems = editingExisting
+      ? items.map((item, index) => (index === editingIndex ? draft : item))
+      : [draft, ...items];
+    const sortedItems = sortExperienceEntries(nextItems);
+    setItems(sortedItems);
+    setEditingIndex(null);
+    setDraft(null);
+    onSave({ ...cv, experience: sortedItems });
+  }
+
+  function cancelExperience() {
+    setEditingIndex(null);
+    setDraft(null);
+  }
+
+  function removeExperience(index: number) {
+    const nextItems = sortExperienceEntries(items.filter((_, itemIndex) => itemIndex !== index));
     setItems(nextItems);
-    setSelectedIndex(Math.max(0, selectedIndex - 1));
-    setSelectedPositionIndex(0);
+    setRemoveIndex(null);
+    if (editingIndex === index) cancelExperience();
+    onSave({ ...cv, experience: nextItems });
   }
 
   function addPosition() {
     updateSelectedExperience({
       ...selectedExperience,
-      positions: [...selectedExperience.positions, makePosition()],
+      positions: [makePosition(), ...selectedExperience.positions],
     });
-    setSelectedPositionIndex(selectedExperience.positions.length);
   }
 
-  function removePosition() {
+  function removePosition(positionIndex: number) {
     if (selectedExperience.positions.length === 1) return;
     updateSelectedExperience({
       ...selectedExperience,
-      positions: selectedExperience.positions.filter((_, index) => index !== selectedPositionIndex),
+      positions: selectedExperience.positions.filter((_, index) => index !== positionIndex),
     });
-    setSelectedPositionIndex(Math.max(0, selectedPositionIndex - 1));
   }
 
   return (
-    <FormShell onSubmit={() => onSave({ ...cv, experience: items })}>
-      <EntryControls
-        label="Experience entry"
-        entries={items}
-        selectedIndex={selectedIndex}
-        onSelect={(index) => {
-          setSelectedIndex(index);
-          setSelectedPositionIndex(0);
-        }}
-        onAdd={addExperience}
-        onRemove={removeExperience}
-        renderLabel={(experience, index) =>
-          entryLabel("Experience", index, joinText([experience.company, experience.positions[0]?.roles?.[0]], " - "))
-        }
-      />
-      <Field
-        label="Company"
-        value={selectedExperience.company}
-        onChange={(company) => updateSelectedExperience({ ...selectedExperience, company })}
-      />
-      <EntryControls
-        label="Position"
-        entries={selectedExperience.positions}
-        selectedIndex={selectedPositionIndex}
-        onSelect={setSelectedPositionIndex}
-        onAdd={addPosition}
-        onRemove={removePosition}
-        renderLabel={(position, index) => entryLabel("Position", index, joinText(position.roles))}
-      />
-      <Textarea
-        label="Roles, one per line"
-        value={joinLines(selectedPosition.roles)}
-        onChange={(roles) => updateSelectedPosition({ ...selectedPosition, roles: splitLines(roles) })}
-        rows={3}
-      />
-      <Field
-        label="Start"
-        value={selectedPosition.start}
-        onChange={(start) => updateSelectedPosition({ ...selectedPosition, start })}
-        placeholder="2022-01"
-      />
-      <Field
-        label="End"
-        value={selectedPosition.end ?? ""}
-        onChange={(end) => updateSelectedPosition({ ...selectedPosition, end })}
-        placeholder="Present"
-      />
-      <Field
-        label="Location"
-        value={selectedPosition.location}
-        onChange={(location) => updateSelectedPosition({ ...selectedPosition, location })}
-      />
-      <Textarea
-        label="Tasks and outcomes, one per line"
-        value={joinLines(selectedPosition.tasks)}
-        onChange={(tasks) => updateSelectedPosition({ ...selectedPosition, tasks: splitLines(tasks) })}
-        rows={6}
-      />
-    </FormShell>
+    <EntryPanelList
+      title="Experience"
+      addLabel="Add"
+      items={sortExperienceEntries(items)}
+      editingIndex={editingIndex}
+      removeIndex={removeIndex}
+      onAdd={addExperience}
+      onEdit={editExperience}
+      onCancel={cancelExperience}
+      onSave={saveExperience}
+      onRemoveRequest={setRemoveIndex}
+      onRemoveCancel={() => setRemoveIndex(null)}
+      onRemoveConfirm={removeExperience}
+      saveState={saveState}
+      renderTitle={(experience) => experience.company || "Experience"}
+      renderSubtitle={(experience) => {
+        const position = sortPositionsByEnd(experience.positions)[0];
+        return joinText([joinText(position?.roles ?? [], " / "), displayPeriodYear(position?.start ?? "", position?.end)]);
+      }}
+      renderEditor={() => (
+        <>
+          <Field
+            label="Company"
+            value={selectedExperience.company}
+            onChange={(company) => updateSelectedExperience({ ...selectedExperience, company })}
+          />
+          <div className="entry-panel-section field-wide">
+            <div className="entry-panel-heading">
+              <h3>Positions</h3>
+              <button type="button" className="secondary-button" onClick={addPosition}>
+                Add
+              </button>
+            </div>
+            <div className="entry-panel-list">
+              {selectedExperience.positions.map((position, positionIndex) => (
+                <section className="entry-panel" aria-label={positionPanelName(position)} key={position.id}>
+                  <div className="entry-panel-summary">
+                    <div>
+                      <h3>{joinText(position.roles, " / ") || "Position"}</h3>
+                      {hasText(displayPeriodYear(position.start, position.end)) && <p>{displayPeriodYear(position.start, position.end)}</p>}
+                    </div>
+                    <button
+                      type="button"
+                      className="danger-button"
+                      onClick={() => removePosition(positionIndex)}
+                      disabled={selectedExperience.positions.length === 1}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                  <div className="cv-form-grid">
+                    <Textarea
+                      label="Roles, one per line"
+                      value={joinLines(position.roles)}
+                      onChange={(roles) => updatePosition(positionIndex, { ...position, roles: splitLines(roles) })}
+                      rows={3}
+                    />
+                    <div className="position-date-row field-wide">
+                      <Field
+                        label="Start"
+                        type="date"
+                        value={dateInputValue(position.start)}
+                        onChange={(start) => updatePosition(positionIndex, { ...position, start })}
+                      />
+                      <CheckboxField
+                        label="Current position"
+                        checked={isCurrentPosition(position.end)}
+                        onChange={(checked) => updatePosition(positionIndex, { ...position, end: checked ? "Present" : todayISODate() })}
+                      />
+                      <Field
+                        label="End"
+                        type="date"
+                        value={dateInputValue(position.end ?? "")}
+                        onChange={(end) => updatePosition(positionIndex, { ...position, end: end || undefined })}
+                        hidden={isCurrentPosition(position.end)}
+                        disabled={isCurrentPosition(position.end)}
+                      />
+                    </div>
+                    <Field
+                      label="Location"
+                      value={position.location}
+                      onChange={(location) => updatePosition(positionIndex, { ...position, location })}
+                    />
+                    <Textarea
+                      label="Tasks and outcomes, one per line"
+                      value={joinLines(position.tasks)}
+                      onChange={(tasks) => updatePosition(positionIndex, { ...position, tasks: splitLines(tasks) })}
+                      rows={6}
+                    />
+                  </div>
+                </section>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+    />
   );
 }
 
-function EducationForm({ cv, onSave }: { cv: CV; onSave: (cv: CV) => void }) {
-  const [items, setItems] = useState<Education[]>(cv.education.length ? cv.education : [emptyEducation()]);
-  const [selectedIndex, setSelectedIndex] = useState(0);
+function EducationForm({ cv, saveState, onSave }: { cv: CV; saveState: SaveState; onSave: (cv: CV) => void }) {
+  const [items, setItems] = useState<Education[]>(cv.education);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [draft, setDraft] = useState<Education | null>(null);
+  const [removeIndex, setRemoveIndex] = useState<number | null>(null);
   useEffect(() => {
-    setItems(cv.education.length ? cv.education : [emptyEducation()]);
-    setSelectedIndex(0);
+    setItems(sortEducationEntries(cv.education));
+    setEditingIndex(null);
+    setDraft(null);
   }, [cv.education]);
-  const draft = items[selectedIndex] ?? emptyEducation();
+
+  const editingExisting = editingIndex !== null && editingIndex >= 0 && editingIndex < items.length;
+  const currentDraft = draft ?? emptyEducation();
 
   function updateDraft(next: Education) {
-    setItems((current) => current.map((item, index) => (index === selectedIndex ? next : item)));
+    setDraft(next);
+  }
+
+  function saveEntry() {
+    if (editingIndex === null || !draft) return;
+    const nextItems = editingExisting
+      ? items.map((item, index) => (index === editingIndex ? draft : item))
+      : [draft, ...items];
+    const sortedItems = sortEducationEntries(nextItems);
+    setItems(sortedItems);
+    setEditingIndex(null);
+    setDraft(null);
+    onSave({ ...cv, education: sortedItems });
+  }
+
+  function removeEntry(index: number) {
+    const nextItems = sortEducationEntries(items.filter((_, itemIndex) => itemIndex !== index));
+    setItems(nextItems);
+    setRemoveIndex(null);
+    setEditingIndex(null);
+    setDraft(null);
+    onSave({ ...cv, education: nextItems });
   }
 
   return (
-    <FormShell onSubmit={() => onSave({ ...cv, education: items })}>
-      <EntryControls
-        label="Education entry"
-        entries={items}
-        selectedIndex={selectedIndex}
-        onSelect={setSelectedIndex}
-        onAdd={() => {
-          setItems((current) => [...current, emptyEducation()]);
-          setSelectedIndex(items.length);
-        }}
-        onRemove={() => {
-          if (items.length === 1) return;
-          setItems((current) => current.filter((_, index) => index !== selectedIndex));
-          setSelectedIndex(Math.max(0, selectedIndex - 1));
-        }}
-        renderLabel={(education, index) => entryLabel("Education", index, joinText([education.name, education.issuer]))}
-      />
-      <Field label="Qualification" value={draft.name} onChange={(name) => updateDraft({ ...draft, name })} />
-      <Field label="Type" value={draft.type ?? ""} onChange={(type) => updateDraft({ ...draft, type })} />
-      <Field label="Issuer" value={draft.issuer} onChange={(issuer) => updateDraft({ ...draft, issuer })} />
-      <Field label="Year" type="number" value={draft.year ? String(draft.year) : ""} onChange={(year) => updateDraft({ ...draft, year: Number(year) || 0 })} />
-    </FormShell>
+    <EntryPanelList
+      title="Education"
+      addLabel="Add"
+      items={sortEducationEntries(items)}
+      editingIndex={editingIndex}
+      removeIndex={removeIndex}
+      onAdd={() => {
+        setEditingIndex(-1);
+        setDraft(emptyEducation());
+      }}
+      onEdit={(index) => {
+        setEditingIndex(index);
+        setDraft(items[index] ?? emptyEducation());
+      }}
+      onCancel={() => {
+        setEditingIndex(null);
+        setDraft(null);
+      }}
+      onSave={saveEntry}
+      onRemoveRequest={setRemoveIndex}
+      onRemoveCancel={() => setRemoveIndex(null)}
+      onRemoveConfirm={removeEntry}
+      saveState={saveState}
+      renderTitle={(education) => education.name || "Education"}
+      renderSubtitle={(education) => joinText([education.issuer, education.year > 0 ? String(education.year) : ""])}
+      renderEditor={() => (
+        <>
+          <Field label="Qualification" value={currentDraft.name} onChange={(name) => updateDraft({ ...currentDraft, name })} />
+          <Field label="Type" value={currentDraft.type ?? ""} onChange={(type) => updateDraft({ ...currentDraft, type })} />
+          <Field label="Issuer" value={currentDraft.issuer} onChange={(issuer) => updateDraft({ ...currentDraft, issuer })} />
+          <Field label="Year" type="number" value={currentDraft.year ? String(currentDraft.year) : ""} onChange={(year) => updateDraft({ ...currentDraft, year: Number(year) || 0 })} />
+        </>
+      )}
+    />
   );
 }
 
-function SkillsForm({ cv, onSave }: { cv: CV; onSave: (cv: CV) => void }) {
+function SkillsForm({ cv, saveState, onSave }: { cv: CV; saveState: SaveState; onSave: (cv: CV) => void }) {
   const [skills, setSkills] = useState<string[]>(cv.skills?.length ? cv.skills : [""]);
+  const [draggedSkillIndex, setDraggedSkillIndex] = useState<number | null>(null);
   useEffect(() => setSkills(cv.skills?.length ? cv.skills : [""]), [cv.skills]);
 
   function updateSkill(index: number, value: string) {
@@ -678,18 +932,36 @@ function SkillsForm({ cv, onSave }: { cv: CV; onSave: (cv: CV) => void }) {
     setSkills((current) => current.filter((_, skillIndex) => skillIndex !== index));
   }
 
+  function reorderSkills(from: number | null, to: number) {
+    if (from === null) return;
+    setSkills((current) => moveItem(current, from, to));
+  }
+
   return (
-    <FormShell onSubmit={() => onSave({ ...cv, skills: skills.map((skill) => skill.trim()).filter(Boolean) })}>
+    <FormShell saveState={saveState} onSubmit={() => onSave({ ...cv, skills: skills.map((skill) => skill.trim()).filter(Boolean) })}>
       <div className="editable-list field-wide">
         {skills.map((skill, index) => (
-          <div className="editable-list-row" key={index}>
+          <div
+            className="editable-list-row draggable-list-row"
+            key={index}
+            onDragOver={(event) => event.preventDefault()}
+            onDrop={() => reorderSkills(draggedSkillIndex, index)}
+          >
+            <DragHandle
+              label={`Move skill entry ${index + 1}`}
+              onDragStart={(event) => {
+                startDrag(event, index);
+                setDraggedSkillIndex(index);
+              }}
+              onDragEnd={() => setDraggedSkillIndex(null)}
+            />
             <Field label={`Skill ${index + 1}`} value={skill} onChange={(value) => updateSkill(index, value)} />
             <button type="button" className="secondary-button" onClick={() => removeSkill(index)} disabled={skills.length === 1}>
               Remove
             </button>
           </div>
         ))}
-        <button type="button" className="secondary-button" onClick={() => setSkills((current) => [...current, ""])}>
+        <button type="button" className="secondary-button" onClick={() => setSkills((current) => ["", ...current])}>
           Add skill
         </button>
       </div>
@@ -709,89 +981,172 @@ function emptyLanguage(): Language {
   return { name: "", level: "" };
 }
 
-function CertificationsForm({ cv, onSave }: { cv: CV; onSave: (cv: CV) => void }) {
-  const [items, setItems] = useState<Certification[]>(cv.certifications.length ? cv.certifications : [emptyCertification()]);
-  const [selectedIndex, setSelectedIndex] = useState(0);
+function CertificationsForm({ cv, saveState, onSave }: { cv: CV; saveState: SaveState; onSave: (cv: CV) => void }) {
+  const [items, setItems] = useState<Certification[]>(cv.certifications);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [draft, setDraft] = useState<Certification | null>(null);
+  const [removeIndex, setRemoveIndex] = useState<number | null>(null);
   useEffect(() => {
-    setItems(cv.certifications.length ? cv.certifications : [emptyCertification()]);
-    setSelectedIndex(0);
+    setItems(sortCertificationEntries(cv.certifications));
+    setEditingIndex(null);
+    setDraft(null);
   }, [cv.certifications]);
-  const draft = items[selectedIndex] ?? emptyCertification();
+
+  const editingExisting = editingIndex !== null && editingIndex >= 0 && editingIndex < items.length;
+  const currentDraft = draft ?? emptyCertification();
 
   function updateDraft(next: Certification) {
-    setItems((current) => current.map((item, index) => (index === selectedIndex ? next : item)));
+    setDraft(next);
+  }
+
+  function saveEntry() {
+    if (editingIndex === null || !draft) return;
+    const nextItems = editingExisting
+      ? items.map((item, index) => (index === editingIndex ? draft : item))
+      : [draft, ...items];
+    const sortedItems = sortCertificationEntries(nextItems);
+    setItems(sortedItems);
+    setEditingIndex(null);
+    setDraft(null);
+    onSave({ ...cv, certifications: sortedItems });
+  }
+
+  function removeEntry(index: number) {
+    const nextItems = sortCertificationEntries(items.filter((_, itemIndex) => itemIndex !== index));
+    setItems(nextItems);
+    setRemoveIndex(null);
+    setEditingIndex(null);
+    setDraft(null);
+    onSave({ ...cv, certifications: nextItems });
   }
 
   return (
-    <FormShell onSubmit={() => onSave({ ...cv, certifications: items })}>
-      <EntryControls
-        label="Certification entry"
-        entries={items}
-        selectedIndex={selectedIndex}
-        onSelect={setSelectedIndex}
-        onAdd={() => {
-          setItems((current) => [...current, emptyCertification()]);
-          setSelectedIndex(items.length);
-        }}
-        onRemove={() => {
-          if (items.length === 1) return;
-          setItems((current) => current.filter((_, index) => index !== selectedIndex));
-          setSelectedIndex(Math.max(0, selectedIndex - 1));
-        }}
-        renderLabel={(certification, index) =>
-          entryLabel("Certification", index, joinText([certification.name, certification.issuer]))
-        }
-      />
-      <Field label="Certification" value={draft.name} onChange={(name) => updateDraft({ ...draft, name })} />
-      <Field label="Credential ID" value={draft.id} onChange={(id) => updateDraft({ ...draft, id })} />
-      <Field label="Issuer" value={draft.issuer} onChange={(issuer) => updateDraft({ ...draft, issuer })} />
-      <Field label="Year" type="number" value={draft.year ? String(draft.year) : ""} onChange={(year) => updateDraft({ ...draft, year: Number(year) || 0 })} />
-    </FormShell>
+    <EntryPanelList
+      title="Certifications"
+      addLabel="Add"
+      items={sortCertificationEntries(items)}
+      editingIndex={editingIndex}
+      removeIndex={removeIndex}
+      onAdd={() => {
+        setEditingIndex(-1);
+        setDraft(emptyCertification());
+      }}
+      onEdit={(index) => {
+        setEditingIndex(index);
+        setDraft(items[index] ?? emptyCertification());
+      }}
+      onCancel={() => {
+        setEditingIndex(null);
+        setDraft(null);
+      }}
+      onSave={saveEntry}
+      onRemoveRequest={setRemoveIndex}
+      onRemoveCancel={() => setRemoveIndex(null)}
+      onRemoveConfirm={removeEntry}
+      saveState={saveState}
+      renderTitle={(certification) => certification.name || "Certification"}
+      renderSubtitle={(certification) => joinText([certification.issuer, certification.year > 0 ? String(certification.year) : ""])}
+      renderEditor={() => (
+        <>
+          <Field label="Certification" value={currentDraft.name} onChange={(name) => updateDraft({ ...currentDraft, name })} />
+          <Field label="Credential ID" value={currentDraft.id} onChange={(id) => updateDraft({ ...currentDraft, id })} />
+          <Field label="Issuer" value={currentDraft.issuer} onChange={(issuer) => updateDraft({ ...currentDraft, issuer })} />
+          <Field label="Year" type="number" value={currentDraft.year ? String(currentDraft.year) : ""} onChange={(year) => updateDraft({ ...currentDraft, year: Number(year) || 0 })} />
+        </>
+      )}
+    />
   );
 }
 
-function LanguagesForm({ cv, onSave }: { cv: CV; onSave: (cv: CV) => void }) {
-  const [items, setItems] = useState<Language[]>(cv.languages.length ? cv.languages : [emptyLanguage()]);
-  const [selectedIndex, setSelectedIndex] = useState(0);
+function LanguagesForm({ cv, saveState, onSave }: { cv: CV; saveState: SaveState; onSave: (cv: CV) => void }) {
+  const [items, setItems] = useState<Language[]>(cv.languages);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [draft, setDraft] = useState<Language | null>(null);
+  const [removeIndex, setRemoveIndex] = useState<number | null>(null);
   useEffect(() => {
-    setItems(cv.languages.length ? cv.languages : [emptyLanguage()]);
-    setSelectedIndex(0);
+    setItems(cv.languages);
+    setEditingIndex(null);
+    setDraft(null);
   }, [cv.languages]);
-  const draft = items[selectedIndex] ?? emptyLanguage();
+
+  const editingExisting = editingIndex !== null && editingIndex >= 0 && editingIndex < items.length;
+  const currentDraft = draft ?? emptyLanguage();
 
   function updateDraft(next: Language) {
-    setItems((current) => current.map((item, index) => (index === selectedIndex ? next : item)));
+    setDraft(next);
+  }
+
+  function saveEntry() {
+    if (editingIndex === null || !draft) return;
+    const nextItems = editingExisting
+      ? items.map((item, index) => (index === editingIndex ? draft : item))
+      : [draft, ...items];
+    setItems(nextItems);
+    setEditingIndex(null);
+    setDraft(null);
+    onSave({ ...cv, languages: nextItems });
+  }
+
+  function removeEntry(index: number) {
+    const nextItems = items.filter((_, itemIndex) => itemIndex !== index);
+    setItems(nextItems);
+    setRemoveIndex(null);
+    setEditingIndex(null);
+    setDraft(null);
+    onSave({ ...cv, languages: nextItems });
+  }
+
+  function moveEntry(from: number, to: number) {
+    const nextItems = moveItem(items, from, to);
+    setItems(nextItems);
+    onSave({ ...cv, languages: nextItems });
   }
 
   return (
-    <FormShell onSubmit={() => onSave({ ...cv, languages: items })}>
-      <EntryControls
-        label="Language entry"
-        entries={items}
-        selectedIndex={selectedIndex}
-        onSelect={setSelectedIndex}
-        onAdd={() => {
-          setItems((current) => [...current, emptyLanguage()]);
-          setSelectedIndex(items.length);
-        }}
-        onRemove={() => {
-          if (items.length === 1) return;
-          setItems((current) => current.filter((_, index) => index !== selectedIndex));
-          setSelectedIndex(Math.max(0, selectedIndex - 1));
-        }}
-        renderLabel={(language, index) => entryLabel("Language", index, joinText([language.name, language.level]))}
-      />
-      <Field label="Language" value={draft.name} onChange={(name) => updateDraft({ ...draft, name })} />
-      <Field label="Level" value={draft.level} onChange={(level) => updateDraft({ ...draft, level })} />
-    </FormShell>
+    <EntryPanelList
+      title="Languages"
+      addLabel="Add"
+      items={items}
+      editingIndex={editingIndex}
+      removeIndex={removeIndex}
+      dragLabel="language"
+      onMove={moveEntry}
+      onAdd={() => {
+        setEditingIndex(-1);
+        setDraft(emptyLanguage());
+      }}
+      onEdit={(index) => {
+        setEditingIndex(index);
+        setDraft(items[index] ?? emptyLanguage());
+      }}
+      onCancel={() => {
+        setEditingIndex(null);
+        setDraft(null);
+      }}
+      onSave={saveEntry}
+      onRemoveRequest={setRemoveIndex}
+      onRemoveCancel={() => setRemoveIndex(null)}
+      onRemoveConfirm={removeEntry}
+      saveState={saveState}
+      renderTitle={(language) => language.name || "Language"}
+      renderSubtitle={(language) => language.level}
+      renderEditor={() => (
+        <>
+          <Field label="Language" value={currentDraft.name} onChange={(name) => updateDraft({ ...currentDraft, name })} />
+          <Field label="Level" value={currentDraft.level} onChange={(level) => updateDraft({ ...currentDraft, level })} />
+        </>
+      )}
+    />
   );
 }
 
 function PreferencesForm({
   preferences,
+  saveState,
   onSave,
 }: {
   preferences: string;
+  saveState: SaveState;
   onSave: (preferences: string) => void;
 }) {
   const [draft, setDraft] = useState(preferences);
@@ -806,9 +1161,11 @@ function PreferencesForm({
   const count = draft.length;
 
   return (
-    <label className="field field-wide">
-      <span>Preferences and constraints</span>
+    <div className="field field-wide" data-save-status={saveState.status}>
+      <label htmlFor="candidate-preferences">Preferences and constraints</label>
       <textarea
+        id="candidate-preferences"
+        name="candidate-preferences"
         value={draft}
         rows={8}
         placeholder="What matters to you in your next role? Remote work, salary range, sectors you prefer or avoid, anything else the AI should know when assessing roles."
@@ -821,55 +1178,234 @@ function PreferencesForm({
           onSave(draft);
         }}
       />
-      <span className={count > 1800 ? "preference-count preference-count-warning" : "preference-count"}>
-        {count}/2000
+      <span className="preference-footer">
+        <span className={saveState.status === "error" ? "save-inline-message save-inline-error" : "save-inline-message"} role="status">
+          {preferenceSaveLabel(saveState)}
+        </span>
+        <span className={count > 1800 ? "preference-count preference-count-warning" : "preference-count"}>
+          {count}/2000
+        </span>
       </span>
-    </label>
+    </div>
   );
 }
 
-function EntryControls<T>({
-  label,
-  entries,
-  selectedIndex,
-  onSelect,
+function preferenceSaveLabel(saveState: SaveState) {
+  if (saveState.status === "saving") return "Saving";
+  if (saveState.status === "error") return saveState.message ?? "Could not save preferences.";
+  return "";
+}
+
+function EntryPanelList<T>({
+  title,
+  addLabel,
+  items,
+  editingIndex,
+  removeIndex,
+  saveState,
   onAdd,
-  onRemove,
-  renderLabel,
+  onEdit,
+  onCancel,
+  onSave,
+  onRemoveRequest,
+  onRemoveCancel,
+  onRemoveConfirm,
+  dragLabel,
+  onMove,
+  renderTitle,
+  renderSubtitle,
+  renderEditor,
+}: {
+  title: string;
+  addLabel: string;
+  items: T[];
+  editingIndex: number | null;
+  removeIndex: number | null;
+  saveState: SaveState;
+  onAdd: () => void;
+  onEdit: (index: number) => void;
+  onCancel: () => void;
+  onSave: () => void;
+  onRemoveRequest: (index: number) => void;
+  onRemoveCancel: () => void;
+  onRemoveConfirm: (index: number) => void;
+  dragLabel?: string;
+  onMove?: (from: number, to: number) => void;
+  renderTitle: (entry: T) => string;
+  renderSubtitle: (entry: T) => string;
+  renderEditor: () => ReactNode;
+}) {
+  const adding = editingIndex === -1 || editingIndex === items.length;
+  const addingAtTop = editingIndex === -1;
+  const panelCount = adding ? items.length + 1 : items.length;
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const canMove = Boolean(onMove) && editingIndex === null;
+
+  return (
+    <div className="entry-panel-section">
+      <div className="entry-panel-heading">
+        <h2>{title}</h2>
+        <button type="button" className="secondary-button" onClick={onAdd} disabled={editingIndex !== null}>
+          {addLabel}
+        </button>
+      </div>
+
+      {panelCount === 0 ? (
+        <p className="muted">No entries yet.</p>
+      ) : (
+        <div className="entry-panel-list">
+          {Array.from({ length: panelCount }, (_, index) => {
+            const itemIndex = addingAtTop ? index - 1 : index;
+            const item = itemIndex >= 0 ? items[itemIndex] : undefined;
+            const isEditing = addingAtTop ? index === 0 : editingIndex === index;
+            const panelTitle = item ? renderTitle(item) : `New ${title.toLowerCase()} entry`;
+            const panelSubtitle = item ? renderSubtitle(item) : "";
+            const accessibleName = joinText([panelTitle, panelSubtitle], " ");
+            const isMovable = canMove && Boolean(item);
+
+            return (
+              <section
+                className="entry-panel"
+                aria-label={accessibleName}
+                key={index}
+                onDragOver={isMovable ? (event) => event.preventDefault() : undefined}
+                onDrop={isMovable ? () => {
+                  if (draggedIndex !== null && itemIndex >= 0) onMove?.(draggedIndex, itemIndex);
+                } : undefined}
+              >
+                <div className={isMovable ? "entry-panel-summary entry-panel-summary-draggable" : "entry-panel-summary"}>
+                  {isMovable && (
+                    <DragHandle
+                      label={`Move ${dragLabel ?? title.toLowerCase()} entry ${index + 1}`}
+                      onDragStart={(event) => {
+                        startDrag(event, itemIndex);
+                        setDraggedIndex(itemIndex);
+                      }}
+                      onDragEnd={() => setDraggedIndex(null)}
+                    />
+                  )}
+                  <div>
+                    <h3>{panelTitle}</h3>
+                    {hasText(panelSubtitle) && <p>{panelSubtitle}</p>}
+                  </div>
+                  {!isEditing && (
+                    <div className="entry-panel-actions">
+                      <button
+                        type="button"
+                        className="secondary-button"
+                        onClick={() => onEdit(itemIndex)}
+                        disabled={editingIndex !== null}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        className="danger-button"
+                        onClick={() => onRemoveRequest(itemIndex)}
+                        disabled={editingIndex !== null}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  )}
+                </div>
+                {isEditing && (
+                  <form
+                    className="entry-panel-editor"
+                    onSubmit={(event: FormEvent) => {
+                      event.preventDefault();
+                      onSave();
+                    }}
+                  >
+                    <div className="cv-form-grid">{renderEditor()}</div>
+                    <div className="entry-panel-edit-actions">
+                      <button type="submit" className="primary-rect-button">
+                        {saveButtonLabel(saveState, "Save")}
+                      </button>
+                      {saveState.status === "error" && saveState.message && (
+                        <span className="save-inline-message" role="status">
+                          {saveState.message}
+                        </span>
+                      )}
+                      <button type="button" className="secondary-button" onClick={onCancel}>
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </section>
+            );
+          })}
+        </div>
+      )}
+
+      {removeIndex !== null && (
+        <ConfirmRemoveDialog
+          title={`Remove ${title.toLowerCase()} entry?`}
+          onCancel={onRemoveCancel}
+          onConfirm={() => onRemoveConfirm(removeIndex)}
+        />
+      )}
+    </div>
+  );
+}
+
+function DragHandle({
+  label,
+  onDragStart,
+  onDragEnd,
 }: {
   label: string;
-  entries: T[];
-  selectedIndex: number;
-  onSelect: (index: number) => void;
-  onAdd: () => void;
-  onRemove: () => void;
-  renderLabel: (entry: T, index: number) => string;
+  onDragStart: (event: DragEvent<HTMLButtonElement>) => void;
+  onDragEnd: () => void;
 }) {
   return (
-    <div className="entry-controls field-wide">
-      <label className="field">
-        <span>{label}</span>
-        <select value={selectedIndex} onChange={(event) => onSelect(Number(event.target.value))}>
-          {entries.map((entry, index) => (
-            <option value={index} key={index}>
-              {renderLabel(entry, index)}
-            </option>
-          ))}
-        </select>
-      </label>
-      <div className="entry-actions">
-        <button type="button" className="secondary-button" onClick={onAdd}>
-          Add
-        </button>
-        <button type="button" className="secondary-button" onClick={onRemove} disabled={entries.length === 1}>
-          Remove
-        </button>
+    <button
+      type="button"
+      className="drag-handle"
+      aria-label={label}
+      draggable
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+    >
+      <span aria-hidden="true">::</span>
+    </button>
+  );
+}
+
+function startDrag(event: DragEvent<HTMLElement>, index: number) {
+  event.dataTransfer.effectAllowed = "move";
+  event.dataTransfer.setData("text/plain", String(index));
+}
+
+function ConfirmRemoveDialog({
+  title,
+  onCancel,
+  onConfirm,
+}: {
+  title: string;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div className="modal-backdrop" role="presentation">
+      <div className="modal-card" role="dialog" aria-modal="true" aria-labelledby="remove-entry-title">
+        <h2 id="remove-entry-title">{title}</h2>
+        <p className="muted">This entry will be removed from your CV.</p>
+        <div className="modal-actions">
+          <button type="button" className="danger-button" onClick={onConfirm}>
+            Remove
+          </button>
+          <button type="button" className="secondary-button" onClick={onCancel}>
+            Cancel
+          </button>
+        </div>
       </div>
     </div>
   );
 }
 
-function FormShell({ children, onSubmit }: { children: ReactNode; onSubmit: () => void }) {
+function FormShell({ children, saveState, onSubmit }: { children: ReactNode; saveState: SaveState; onSubmit: () => void }) {
   return (
     <form
       className="cv-form"
@@ -879,24 +1415,185 @@ function FormShell({ children, onSubmit }: { children: ReactNode; onSubmit: () =
       }}
     >
       <div className="cv-form-grid">{children}</div>
-      <button type="submit" className="primary-rect-button">
-        Save section
-      </button>
+      <div className="form-save-row">
+        <button type="submit" className="primary-rect-button" disabled={saveState.status === "saving"}>
+          {saveButtonLabel(saveState, "Save section")}
+        </button>
+        {saveState.status === "error" && saveState.message && (
+          <span className="save-inline-message" role="status">
+            {saveState.message}
+          </span>
+        )}
+      </div>
     </form>
   );
+}
+
+function saveButtonLabel(saveState: SaveState, idleLabel: string) {
+  if (saveState.status === "saving") return "Saving";
+  return idleLabel;
 }
 
 function joinText(parts: Array<string | undefined>, separator = " | ") {
   return parts.filter(hasText).join(separator);
 }
 
-function entryLabel(fallback: string, index: number, label: string) {
-  return `${index + 1}. ${hasText(label) ? label : fallback}`;
+function formatCVValidationErrors(cv: CV, errors: string[]) {
+  return errors.map((error) => formatCVValidationError(cv, error));
+}
+
+function formatCVValidationError(cv: CV, error: string) {
+  if (error.includes("cv.summary")) return "Summary";
+  if (error.includes("contact.name")) return "First name";
+  if (error.includes("contact.surname")) return "Surname";
+  if (error.includes("contact.email")) return "Email";
+  if (error.includes("contact.linkedin") || error.includes("contact.github") || error.includes("contact.www") || error.includes("contact.links")) return "Links";
+  if (error.includes("phone.prefix")) return "Phone prefix";
+  if (error.includes("phone.number")) return "Phone number";
+  if (error.includes("cv.languages")) return "Languages";
+  if (error.includes("cv.education")) return "Education";
+  if (error.includes("cv.experience must contain")) return "Experience";
+
+  const certificationMatch = error.match(/cv\.certifications\[(\d+)\].*certification\.(\w+)/);
+  if (certificationMatch) {
+    const certification = cv.certifications[Number(certificationMatch[1])];
+    const field = certificationMatch[2] === "issuer" ? "Provider" : humaniseField(certificationMatch[2]);
+    return joinText([field, certification?.name ? `for ${certification.name}` : "for certification"]);
+  }
+
+  const educationMatch = error.match(/cv\.education\[(\d+)\].*education\.(\w+)/);
+  if (educationMatch) {
+    const education = cv.education[Number(educationMatch[1])];
+    const field = educationMatch[2] === "issuer" ? "Institution" : humaniseField(educationMatch[2]);
+    return joinText([field, education?.name ? `for ${education.name}` : "for education"]);
+  }
+
+  const experienceMatch = error.match(/cv\.experience\[(\d+)\].*experience\.positions\[(\d+)\].*cv_position\.(\w+)/);
+  if (experienceMatch) {
+    const experience = cv.experience[Number(experienceMatch[1])];
+    const position = experience?.positions[Number(experienceMatch[2])];
+    const role = joinText(position?.roles ?? [], " / ") || "position";
+    const company = experience?.company || "company";
+    return positionFieldError(experienceMatch[3], company, role);
+  }
+
+  const experienceEntryMatch = error.match(/cv\.experience\[(\d+)\].*experience\.(\w+)/);
+  if (experienceEntryMatch) {
+    const experience = cv.experience[Number(experienceEntryMatch[1])];
+    return joinText([humaniseField(experienceEntryMatch[2]), experience?.company ? `for ${experience.company}` : "for experience"]);
+  }
+
+  return sentenceField(error.split(" is required")[0].split(" must contain")[0].split(".").pop() ?? error);
+}
+
+function humaniseField(value: string) {
+  if (value === "roles") return "role";
+  if (value === "tasks") return "tasks and outcomes";
+  return value
+    .replace(/^cv_/, "")
+    .replace(/_/g, " ")
+    .toLowerCase();
+}
+
+function sentenceField(value: string) {
+  const field = humaniseField(value);
+  return field.charAt(0).toUpperCase() + field.slice(1);
+}
+
+function positionFieldError(field: string, company: string, role: string) {
+  return (
+    <>
+      {humaniseField(field)} for <strong>{role}</strong> at {company}
+    </>
+  );
+}
+
+function sortExperienceEntries(items: Experience[]) {
+  return [...items]
+    .map((item) => ({ ...item, positions: sortPositionsByEnd(item.positions) }))
+    .sort(compareExperienceRecency);
+}
+
+function sortPositionsByEnd(items: CVPosition[]) {
+  return [...items].sort(comparePositionRecency);
+}
+
+function sortEducationEntries(items: Education[]) {
+  return [...items].sort((a, b) => yearRank(b.year) - yearRank(a.year));
+}
+
+function sortCertificationEntries(items: Certification[]) {
+  return [...items].sort((a, b) => yearRank(b.year) - yearRank(a.year));
+}
+
+function compareExperienceRecency(a: Experience, b: Experience) {
+  return comparePositionRecency(a.positions[0] ?? makePosition(), b.positions[0] ?? makePosition());
+}
+
+function comparePositionRecency(a: CVPosition, b: CVPosition) {
+  const aCurrent = isCurrentPosition(a.end);
+  const bCurrent = isCurrentPosition(b.end);
+  if (aCurrent !== bCurrent) return aCurrent ? -1 : 1;
+
+  const primary = aCurrent
+    ? dateRank(b.start) - dateRank(a.start)
+    : dateRank(b.end) - dateRank(a.end);
+  if (primary !== 0) return primary;
+
+  return dateRank(b.start) - dateRank(a.start);
+}
+
+function dateRank(value?: string) {
+  if (!hasText(value)) return 0;
+  const year = Number.parseInt(value.slice(0, 4), 10);
+  const month = Number.parseInt(value.slice(5, 7), 10) || 1;
+  const day = Number.parseInt(value.slice(8, 10), 10) || 1;
+  return Number.isFinite(year) ? year * 372 + month * 31 + day : 0;
+}
+
+function yearRank(value: number) {
+  return value > 0 ? value : Number.MIN_SAFE_INTEGER;
+}
+
+function moveItem<T>(items: T[], from: number, to: number) {
+  if (from === to || from < 0 || to < 0 || from >= items.length || to >= items.length) return items;
+  const next = [...items];
+  const [item] = next.splice(from, 1);
+  next.splice(to, 0, item);
+  return next;
+}
+
+function displayPeriod(start: string, end?: string) {
+  if (hasText(start) && isCurrentPosition(end)) return `${start} - Present`;
+  return joinText([start, end], " - ");
+}
+
+function displayPeriodYear(start: string, end?: string) {
+  const startYear = /^(\d{4})/.exec(start)?.[1];
+  if (!startYear) return "";
+  if (isCurrentPosition(end)) return `Since ${startYear}`;
+  const endYear = /^(\d{4})/.exec(end ?? "")?.[1];
+  return endYear && endYear !== startYear ? `${startYear} – ${endYear}` : startYear;
+}
+
+function positionPanelName(position: CVPosition) {
+  return joinText([joinText(position.roles, " / ") || "Position", displayPeriod(position.start, position.end)], " ");
+}
+
+function isCurrentPosition(value?: string) {
+  return !hasText(value) || /present|current|now/i.test(value);
+}
+
+function dateInputValue(value: string) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : "";
+}
+
+function todayISODate() {
+  return new Date().toISOString().slice(0, 10);
 }
 
 function normaliseExperienceList(experience: Experience[]) {
-  const items = experience.length ? experience : [makeExperience()];
-  return items.map((item) => ({
+  return experience.map((item) => ({
     ...item,
     positions: item.positions.length ? item.positions : [makePosition()],
   }));
@@ -904,45 +1601,96 @@ function normaliseExperienceList(experience: Experience[]) {
 
 function Field({
   label,
+  accessibleLabel,
+  name,
   value,
   onChange,
   type = "text",
   placeholder,
+  disabled = false,
+  hidden = false,
 }: {
   label: string;
+  accessibleLabel?: string;
+  name?: string;
   value: string;
   onChange: (value: string) => void;
   type?: string;
   placeholder?: string;
+  disabled?: boolean;
+  hidden?: boolean;
 }) {
+  const generatedId = useId();
+  const inputId = name ?? generatedId;
+
   return (
-    <label className="field">
-      <span>{label}</span>
+    <div className="field" hidden={hidden} style={hidden ? { display: "none" } : undefined}>
+      <label htmlFor={inputId}>{label}</label>
       <input
+        id={inputId}
+        name={name ?? inputId}
         type={type}
         value={value}
         placeholder={placeholder}
+        aria-label={accessibleLabel}
+        disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
       />
-    </label>
+    </div>
+  );
+}
+
+function CheckboxField({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  const generatedId = useId();
+
+  return (
+    <div className="checkbox-field">
+      <input
+        id={generatedId}
+        name={generatedId}
+        type="checkbox"
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+      />
+      <label htmlFor={generatedId}>{label}</label>
+    </div>
   );
 }
 
 function Textarea({
   label,
+  name,
   value,
   onChange,
   rows,
 }: {
   label: string;
+  name?: string;
   value: string;
   onChange: (value: string) => void;
   rows: number;
 }) {
+  const generatedId = useId();
+  const textareaId = name ?? generatedId;
+
   return (
-    <label className="field field-wide">
-      <span>{label}</span>
-      <textarea value={value} rows={rows} onChange={(event) => onChange(event.target.value)} />
-    </label>
+    <div className="field field-wide">
+      <label htmlFor={textareaId}>{label}</label>
+      <textarea
+        id={textareaId}
+        name={name ?? textareaId}
+        value={value}
+        rows={rows}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    </div>
   );
 }

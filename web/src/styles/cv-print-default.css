@@ -293,6 +293,6 @@
   }
 
   .cv-default-section {
-    break-inside: auto;
+    break-inside: avoid;
   }
 }

@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	fsrepo "github.com/mnohe/cvai/functions/internal/repo/firestore"
 	"github.com/mnohe/cvai/functions/internal/domain"
+	fsrepo "github.com/mnohe/cvai/functions/internal/repo/firestore"
 )
 
 func TestCandidateRepo_GetCandidate_NotFound(t *testing.T) {
@@ -50,7 +50,8 @@ func TestCandidateRepo_WriteAndGetCV(t *testing.T) {
 			Email:   "test@example.com",
 		},
 	}
-	if err := r.WriteCV(ctx, uid, cv); err != nil {
+	validationErrors := []string{"cv.summary is required"}
+	if err := r.WriteCV(ctx, uid, cv, validationErrors); err != nil {
 		t.Fatalf("WriteCV: %v", err)
 	}
 
@@ -67,6 +68,16 @@ func TestCandidateRepo_WriteAndGetCV(t *testing.T) {
 	if got.Contact.Name != cv.Contact.Name {
 		t.Errorf("Contact.Name = %q, want %q", got.Contact.Name, cv.Contact.Name)
 	}
+	candidate, err := r.GetCandidate(ctx, uid)
+	if err != nil {
+		t.Fatalf("GetCandidate: %v", err)
+	}
+	if candidate == nil {
+		t.Fatal("GetCandidate returned nil after write")
+	}
+	if len(candidate.CVValidationErrors) != 1 || candidate.CVValidationErrors[0] != validationErrors[0] {
+		t.Errorf("CVValidationErrors = %#v, want %#v", candidate.CVValidationErrors, validationErrors)
+	}
 }
 
 func TestCandidateRepo_WriteCV_MergePreservesOtherFields(t *testing.T) {
@@ -77,13 +88,13 @@ func TestCandidateRepo_WriteCV_MergePreservesOtherFields(t *testing.T) {
 
 	// Write initial CV.
 	cv := domain.CV{Summary: "Initial"}
-	if err := r.WriteCV(ctx, uid, cv); err != nil {
+	if err := r.WriteCV(ctx, uid, cv, nil); err != nil {
 		t.Fatalf("first WriteCV: %v", err)
 	}
 
 	// Update with different summary; other candidate fields (e.g., evidenceLibrary) should not be clobbered.
 	cv.Summary = "Updated"
-	if err := r.WriteCV(ctx, uid, cv); err != nil {
+	if err := r.WriteCV(ctx, uid, cv, nil); err != nil {
 		t.Fatalf("second WriteCV: %v", err)
 	}
 

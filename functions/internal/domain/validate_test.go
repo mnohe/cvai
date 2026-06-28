@@ -57,11 +57,11 @@ func TestRoleValidateRejectsInvalidStatus(t *testing.T) {
 
 func TestCVValidateEnforcesSchemaRequiredFields(t *testing.T) {
 	cv := validCV()
-	cv.Contact.LinkedIn = ""
+	cv.Contact.Links = []Link{{Label: "LinkedIn"}}
 	cv.Projects.Items[0].Links = []Link{{Label: "Demo"}}
 
 	err := cv.Validate()
-	assertValidationErrorContains(t, err, "contact.linkedin is required")
+	assertValidationErrorContains(t, err, "contact.links[0]: link.url is required")
 	assertValidationErrorContains(t, err, "cv_project.links[0]: link.url is required")
 }
 
@@ -135,7 +135,7 @@ func validCV() CV {
 			Surname:  "Lovelace",
 			Phone:    Phone{Prefix: "+1", Number: "5551234"},
 			Email:    "ada@example.com",
-			LinkedIn: "https://linkedin.example/ada",
+			Links:    []Link{{Label: "LinkedIn", URL: "https://linkedin.example/ada"}},
 		},
 		Languages: []Language{
 			{Name: "English", Level: "Native"},
