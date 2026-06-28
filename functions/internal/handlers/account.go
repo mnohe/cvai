@@ -19,7 +19,7 @@ func NewAccountHandler(accounts repo.AccountRepository) *AccountHandler {
 }
 
 // GetAccount handles GET /account.
-// Creates the account document on first read (zero credits, has_ever_purchased: false).
+// Creates the account document on first read.
 func (h *AccountHandler) GetAccount(w http.ResponseWriter, r *http.Request) {
 	uid := auth.UIDFromContext(r.Context())
 	acc, err := h.accounts.GetProfile(r.Context(), uid)

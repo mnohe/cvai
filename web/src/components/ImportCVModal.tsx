@@ -47,7 +47,7 @@ export function ImportCVModal({
       setMessage("Import started.");
     } catch (error) {
       if (error instanceof ApiError && error.status === 402) {
-        setMessage("You need at least 1 credit to import a CV.");
+        setMessage("This action is not available.");
       } else {
         setMessage("Import could not be started.");
       }
@@ -79,7 +79,7 @@ export function ImportCVModal({
         <div className="panel-row">
           <div>
             <h2>Import from PDF</h2>
-            <p className="muted">Upload a PDF CV. This uses 1 credit.</p>
+            <p className="muted">Upload a PDF CV.</p>
             {replacingExisting && <p className="form-error">Importing a PDF will replace the current CV.</p>}
           </div>
           <button type="button" className="icon-button" aria-label="Close import modal" onClick={onClose}>

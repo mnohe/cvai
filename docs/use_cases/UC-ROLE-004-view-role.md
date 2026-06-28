@@ -5,7 +5,7 @@
 | **Actor** | User |
 | **Preconditions** | Signed in; role exists |
 | **Milestone** | M3 |
-| **Credit cost** | None |
+| **External request** | None |
 | **LLM** | No |
 
 ## Bundle state machine

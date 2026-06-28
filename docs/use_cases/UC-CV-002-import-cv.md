@@ -3,9 +3,9 @@
 | | |
 |---|---|
 | **Actor** | User |
-| **Preconditions** | Signed in; ≥ 1 credit |
+| **Preconditions** | Signed in; external requests available |
 | **Milestone** | M1 |
-| **Credit cost** | 1 |
+| **External request** | 1 |
 | **LLM** | Yes — CV extraction (structured output) |
 
 ## Context
@@ -29,7 +29,7 @@ sequenceDiagram
 
     User->>SPA: Click Import from PDF, select file (PDF ≤ 10 MB)
     SPA->>Backend: PUT /cv (Content-Type: application/pdf)
-    Backend->>Firestore: DeductCredit(uid) — transactional; fails if balance = 0
+    Backend->>Firestore: Reserve external request
     Backend->>Firestore: Create Action {status: pending}
     Backend-->>SPA: 202 {actionId}
     SPA->>Firestore: onSnapshot(users/{uid}/actions/{actionId})
@@ -56,7 +56,7 @@ When the editor reads imported experience dates, year-only values are completed 
 
 When `cv_validation_errors` is non-empty, the SPA shows an amber notice at the top of the CV editor. The notice translates validator paths into user-recognisable fields such as "Summary" or "Location for Senior Operations Manager at Paragon Global Brands". Print/export is disabled until a subsequent CV save recomputes an empty validation-error list.
 
-A hard failure, i.e. action `failed` and credit refund, only occurs when:
+A hard failure, i.e. action `failed` and external-request release, only occurs when:
 - The PDF cannot be sent to or parsed by the LLM (`user_input` / `provider_*` failure).
 - The LLM output cannot be decoded into the CV struct (unknown fields, malformed JSON).
 
@@ -65,17 +65,18 @@ A hard failure, i.e. action `failed` and credit refund, only occurs when:
 ### PDF too large
 
 File picker enforces 10 MB client-side. If bypassed, backend returns `400` before
-deducting any credit.
+reserving an external request.
 
-### Insufficient credits
+### External request unavailable
 
-`DeductCredit` returns `ErrInsufficientCredits`; backend returns `402`. SPA shows
-"Buy credits" prompt. No Action document is created.
+The external-request gate reports the request unavailable. The backend returns a
+user-safe error before creating an Action. The SPA shows a "try again later"
+prompt.
 
 ### LLM extraction failure or structurally undecodable output
 
-Goroutine refunds credit (best-effort), sets Action to `{status: failed, reason}`.
-SPA shows error toast. No CV data is written.
+Goroutine releases the external request (best-effort), sets Action to `{status: failed, reason}`.
+SPA shows error toast. Partial data is never written.
 
 ## Postconditions
 
@@ -83,7 +84,7 @@ SPA shows error toast. No CV data is written.
 - `users/{uid}/candidate.cv_validation_errors` is set: empty array if CV is fully valid,
   otherwise a list of human-readable field errors.
 - Profile completion segments 1 and 2 may now be satisfied (meter advances).
-- 1 credit deducted (no refund on success, even if `cv_validation_errors` is non-empty).
+- 1 external request reserved.
 
 ## E2E scenarios
 
@@ -92,6 +93,6 @@ SPA shows error toast. No CV data is written.
 | PDF upload triggers action progress indicator | `e2e/cv.spec.ts` | `UC-CV-002 progress shown` |
 | CV populated after successful import | `e2e/cv.spec.ts` | `UC-CV-002 cv populated on success` |
 | Validation notice shown when imported CV has missing fields | `e2e/cv.spec.ts` | `UC-CV-002 validation notice on incomplete import` |
-| Error toast shown on LLM failure; credit refunded | `e2e/cv.spec.ts` | `UC-CV-002 error and refund` |
-| Oversized PDF rejected before credit deducted | `e2e/cv.spec.ts` | `UC-CV-002 oversized pdf rejected` |
-| Import blocked when credits = 0 | `e2e/cv.spec.ts` | `UC-CV-002 blocked at zero credits` |
+| Error toast shown on LLM failure; external request released | `e2e/cv.spec.ts` | `UC-CV-002 error and release` |
+| Oversized PDF rejected before external request reserved | `e2e/cv.spec.ts` | `UC-CV-002 oversized pdf rejected` |
+| Import blocked when external request unavailable | `e2e/cv.spec.ts` | `UC-CV-002 blocked at external request unavailable` |

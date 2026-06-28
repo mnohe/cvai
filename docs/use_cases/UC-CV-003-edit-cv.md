@@ -5,13 +5,13 @@
 | **Actor** | User |
 | **Preconditions** | Signed in |
 | **Milestone** | M1 |
-| **Credit cost** | None |
+| **External request** | None |
 | **LLM** | No |
 
 ## Context
 
 The CV editor allows section-by-section editing of the structured CV. All writes go
-directly from the SPA to Firestore — no backend call, no credit. Firestore Security
+directly from the SPA to Firestore — no backend call, no external request. Firestore Security
 Rules permit `users/{uid}/candidate` writes by the owning user.
 
 Sections: Personal details, Summary, Experience, Education, Skills, Certifications,

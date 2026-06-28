@@ -328,25 +328,20 @@ type ActionProgress struct {
 }
 
 type Account struct {
-	UID              string           `firestore:"uid"`
-	Email            string           `firestore:"email,omitempty"`
-	StripeCustomerID string           `firestore:"stripe_customer_id,omitempty"`
-	CreditBalance    int              `firestore:"credit_balance"`
-	HasEverPurchased bool             `firestore:"has_ever_purchased"`
-	Purchases        []PurchaseRecord `firestore:"purchases,omitempty"`
-	CreatedAt        time.Time        `firestore:"created_at"`
-	UpdatedAt        time.Time        `firestore:"updated_at"`
+	UID              string           `firestore:"uid" json:"uid"`
+	Email            string           `firestore:"email,omitempty" json:"email,omitempty"`
+	CreditBalance    *int             `firestore:"-" json:"creditBalance,omitempty"`
+	HasEverPurchased *bool            `firestore:"-" json:"hasEverPurchased,omitempty"`
+	PurchaseHistory  []PurchaseRecord `firestore:"-" json:"purchaseHistory,omitempty"`
+	CreatedAt        time.Time        `firestore:"created_at" json:"createdAt"`
+	UpdatedAt        time.Time        `firestore:"updated_at" json:"updatedAt"`
 }
 
 type PurchaseRecord struct {
-	ID                string    `firestore:"id"`
-	Provider          string    `firestore:"provider"`
-	CheckoutSessionID string    `firestore:"checkout_session_id,omitempty"`
-	PaymentIntentID   string    `firestore:"payment_intent_id,omitempty"`
-	CreditAmount      int       `firestore:"credit_amount"`
-	AmountTotal       int64     `firestore:"amount_total,omitempty"`
-	Currency          string    `firestore:"currency,omitempty"`
-	PurchasedAt       time.Time `firestore:"purchased_at"`
+	ID           string    `json:"id"`
+	Provider     string    `json:"provider"`
+	CreditAmount int       `json:"creditAmount"`
+	PurchasedAt  time.Time `json:"purchasedAt"`
 }
 
 type Outcome struct {

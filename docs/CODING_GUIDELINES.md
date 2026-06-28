@@ -70,7 +70,7 @@ rawCV, err = llm.NormalizeStructuredOutput(rawCV)
   Firestore clients.
 - Return wrapped errors at package boundaries when context helps diagnosis.
 - Do not log prompt content, CV text, job descriptions, tokens, or other sensitive user data.
-- Preserve the LLM-backed Action lifecycle: validate preflight inputs before credit deduction; reserve credit by deducting it transactionally; create Action; return immediately; run model work in a goroutine; complete or fail the Action; and refund only for program, provider, persistence, or infrastructure failures, not for errors clearly tied to user input after the paid workflow starts.
+- Preserve the LLM-backed Action lifecycle: validate preflight inputs before reserving an external request; reserve the request; create Action; return immediately; run model work in a goroutine; complete or fail the Action; and release the request only for program, provider, persistence, or infrastructure failures, not for errors clearly tied to user input after provider work starts.
 
 ## TypeScript and React
 

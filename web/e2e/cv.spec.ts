@@ -84,16 +84,9 @@ test.describe("UC-CV-002 import CV from PDF", () => {
     await expect(page.getByLabel("First name")).toHaveValue("Ada");
   });
 
-  test("error shown on LLM failure and credit refunded", async ({ page }) => {
+  test("error shown on LLM failure", async ({ page }) => {
     await signIn(page, "cv.import.failure@example.test");
     const session = await currentSession(page);
-    await writeFirestore(session, "account", "profile", {
-      uid: session.uid,
-      credit_balance: 0,
-      has_ever_purchased: false,
-      created_at: new Date(),
-      updated_at: new Date(),
-    });
     await page.route("**/api/cv/imports", async (route) => {
       await route.fulfill({
         status: 202,
@@ -106,13 +99,6 @@ test.describe("UC-CV-002 import CV from PDF", () => {
     await choosePDF(page, "%PDF-1.7\nfailure");
     await page.getByRole("button", { name: "Start import" }).click();
     await expect(page.getByRole("progressbar", { name: "CV import progress" })).toBeVisible();
-    await writeFirestore(session, "account", "profile", {
-      uid: session.uid,
-      credit_balance: 1,
-      has_ever_purchased: false,
-      created_at: new Date(),
-      updated_at: new Date(),
-    });
     await writeFirestore(session, "actions", "import-failed", {
       id: "import-failed",
       type: "import_cv",
@@ -128,8 +114,6 @@ test.describe("UC-CV-002 import CV from PDF", () => {
     await expect(page.getByText("Reference ID")).toBeVisible();
     await expect(page.getByText("import-failed")).toBeVisible();
     await expect(page.getByRole("button", { name: "Copy" })).toBeVisible();
-    const creditBalance = await readAccountCredit(session);
-    expect(creditBalance).toBe(1);
   });
 
   test("oversized PDF rejected before API call", async ({ page }) => {
@@ -147,22 +131,21 @@ test.describe("UC-CV-002 import CV from PDF", () => {
     await expect(page.getByText("PDF must be 10 MB or smaller.")).toBeVisible();
     expect(called).toBe(false);
   });
-
-  test("blocked at zero credits", async ({ page }) => {
+  test("blocked when external request unavailable", async ({ page }) => {
     await page.route("**/api/cv/imports", async (route) => {
       await route.fulfill({
-        status: 402,
+        status: 503,
         contentType: "application/json",
-        body: JSON.stringify({ error: "not enough credits" }),
+        body: JSON.stringify({ error: "external request unavailable" }),
       });
     });
 
-    await signIn(page, "cv.import.zero@example.test");
+    await signIn(page, "cv.import.unavailable@example.test");
     await page.getByRole("button", { name: /Import from PDF/ }).click();
-    await choosePDF(page, "%PDF-1.7\nzero");
+    await choosePDF(page, "%PDF-1.7\nunavailable");
     await page.getByRole("button", { name: "Start import" }).click();
 
-    await expect(page.getByText("You need at least 1 credit to import a CV.")).toBeVisible();
+    await expect(page.getByText("Import could not be started.")).toBeVisible();
   });
 
   test("validation notice uses user-recognisable fields", async ({ page }) => {
@@ -857,15 +840,6 @@ async function writeFirestore(session: { uid: string; token: string }, collectio
 
 async function writeCandidate(session: { uid: string; token: string }, candidate: Record<string, unknown>) {
   await writeFirestore(session, "candidate", "profile", candidate);
-}
-
-async function readAccountCredit(session: { uid: string; token: string }): Promise<number> {
-  const response = await fetch(`http://localhost:8080/v1/projects/demo-cvai/databases/(default)/documents/users/${session.uid}/account/profile`, {
-    headers: { "Authorization": `Bearer ${session.token}` },
-  });
-  if (!response.ok) throw new Error(`Firestore read failed ${response.status}: ${await response.text()}`);
-  const body = await response.json();
-  return Number(body.fields.credit_balance.integerValue);
 }
 
 function importedCandidate() {

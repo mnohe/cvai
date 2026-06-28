@@ -3,9 +3,9 @@
 | | |
 |---|---|
 | **Actor** | User |
-| **Preconditions** | Signed in; gap task exists and is linked to a role with a bundle; ≥ 1 credit |
+| **Preconditions** | Signed in; gap task exists and is linked to a role with a bundle; external requests available |
 | **Milestone** | M3 |
-| **Credit cost** | 1 |
+| **External request** | 1 |
 | **LLM** | Yes — gap reassessment |
 
 ## Context
@@ -26,7 +26,7 @@ sequenceDiagram
 
     User->>SPA: Click ✨ Reassess on a completed gap task
     SPA->>Backend: POST /tasks/{taskId}/reassessments
-    Backend->>Firestore: DeductCredit(uid)
+    Backend->>Firestore: Reserve external request
     Backend->>Firestore: Create Action {status: pending}
     Backend-->>SPA: 202 {actionId}
     SPA->>Firestore: onSnapshot(Action)
@@ -51,8 +51,8 @@ sequenceDiagram
 
 ## Postconditions
 
-- If met: gap closed in Analysis; Verdict may have improved; 1 credit deducted.
-- If still open: no Analysis change; 1 credit deducted; reason shown to user.
+- If met: gap closed in Analysis; Verdict may have improved; 1 external request reserved.
+- If still open: no Analysis change; 1 external request reserved; reason shown to user.
 
 ## E2E scenarios
 
@@ -60,4 +60,4 @@ sequenceDiagram
 |---|---|---|
 | Reassess closes gap and updates verdict | `e2e/tasks.spec.ts` | `UC-TASK-002 gap closed` |
 | Reassess returns still-open with reason | `e2e/tasks.spec.ts` | `UC-TASK-002 still open` |
-| Credit deducted in both outcomes | `e2e/tasks.spec.ts` | `UC-TASK-002 credit deducted` |
+| External request reserved in both outcomes | `e2e/tasks.spec.ts` | `UC-TASK-002 external request reserved` |

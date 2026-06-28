@@ -3,9 +3,9 @@
 | | |
 |---|---|
 | **Actor** | User |
-| **Preconditions** | Signed in; role has an existing bundle; ≥ 1 credit |
+| **Preconditions** | Signed in; role has an existing bundle; external requests available |
 | **Milestone** | M3 |
-| **Credit cost** | 1 |
+| **External request** | 1 |
 | **LLM** | Yes — analysis and artifact generation (skips job extraction) |
 
 ## Context
@@ -29,7 +29,7 @@ Returns `409` if no bundle exists (nothing to reassess — use Generate instead)
 
 - Bundle updated with new Analysis and Artifacts; `bundle.generatedAt` refreshed.
 - `bundle.job` unchanged.
-- 1 credit deducted.
+- 1 external request reserved.
 
 ## E2E scenarios
 
@@ -37,4 +37,4 @@ Returns `409` if no bundle exists (nothing to reassess — use Generate instead)
 |---|---|---|
 | Reassess updates analysis, preserves job struct | `e2e/roles.spec.ts` | `UC-ROLE-007 reassess updates analysis` |
 | 409 when no bundle exists | `e2e/roles.spec.ts` | `UC-ROLE-007 409 without bundle` |
-| Credit refunded on failure | `e2e/roles.spec.ts` | `UC-ROLE-007 credit refunded on failure` |
+| External request released on failure | `e2e/roles.spec.ts` | `UC-ROLE-007 external request released on failure` |

@@ -28,16 +28,10 @@ func (s *stubAccountRepo) GetProfile(_ context.Context, uid string) (*domain.Acc
 		return s.profile, nil
 	}
 	return &domain.Account{
-		UID:           uid,
-		CreditBalance: 0,
-		CreatedAt:     time.Now(),
-		UpdatedAt:     time.Now(),
+		UID:       uid,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
 	}, nil
-}
-func (s *stubAccountRepo) DeductCredit(_ context.Context, _ string) error { return nil }
-func (s *stubAccountRepo) RefundCredit(_ context.Context, _ string) error { return nil }
-func (s *stubAccountRepo) GrantCredits(_ context.Context, _ string, _ int, _ string, _ string) error {
-	return nil
 }
 
 var _ repo.AccountRepository = (*stubAccountRepo)(nil)

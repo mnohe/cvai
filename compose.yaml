@@ -1,0 +1,91 @@
+name: cvai-local
+
+services:
+  firebase-emulators:
+    build:
+      context: .
+      dockerfile: docker/firebase-emulators.Dockerfile
+      args:
+        FIREBASE_TOOLS_VERSION: ${FIREBASE_TOOLS_VERSION:-14.18.0}
+    environment:
+      FIREBASE_PROJECT_ID: ${CVAI_FIREBASE_PROJECT_ID:-local-cvai}
+    ports:
+      - "${CVAI_FIRESTORE_PORT:-18080}:8080"
+      - "${CVAI_AUTH_PORT:-19099}:9099"
+      - "${CVAI_STORAGE_PORT:-19199}:9199"
+      - "${CVAI_EMULATOR_UI_PORT:-14000}:4000"
+      - "${CVAI_HUB_PORT:-14400}:4400"
+    volumes:
+      - firebase-emulator-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:4400/emulators >/dev/null 2>&1 && wget -qO- \"http://localhost:9099/emulator/v1/projects/$$FIREBASE_PROJECT_ID/config\" >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 20s
+
+  api:
+    build:
+      context: .
+      dockerfile: functions/Dockerfile
+    environment:
+      PORT: 8080
+      FIREBASE_PROJECT_ID: ${CVAI_FIREBASE_PROJECT_ID:-local-cvai}
+      FIRESTORE_EMULATOR_HOST: firebase-emulators:8080
+      FIREBASE_AUTH_EMULATOR_HOST: firebase-emulators:9099
+      LLM_PROVIDER: ${LLM_PROVIDER:-openai}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-gpt-4o-mini}
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-180}
+      CV_IMPORT_TIMEOUT_SECONDS: ${CV_IMPORT_TIMEOUT_SECONDS:-180}
+      OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-cvai-api}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      OTEL_EXPORTER_OTLP_PROTOCOL: ${OTEL_EXPORTER_OTLP_PROTOCOL:-}
+      OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: ${OTEL_EXPORTER_OTLP_TRACES_ENDPOINT:-}
+      OTEL_EXPORTER_OTLP_TRACES_PROTOCOL: ${OTEL_EXPORTER_OTLP_TRACES_PROTOCOL:-}
+      OTEL_EXPORTER_OTLP_METRICS_ENDPOINT: ${OTEL_EXPORTER_OTLP_METRICS_ENDPOINT:-}
+      OTEL_EXPORTER_OTLP_METRICS_PROTOCOL: ${OTEL_EXPORTER_OTLP_METRICS_PROTOCOL:-}
+      OTEL_TRACES_EXPORTER: ${OTEL_TRACES_EXPORTER:-}
+      OTEL_METRICS_EXPORTER: ${OTEL_METRICS_EXPORTER:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-}
+      ANTHROPIC_BASE_URL: ${ANTHROPIC_BASE_URL:-}
+    depends_on:
+      firebase-emulators:
+        condition: service_healthy
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/healthz >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/web.Dockerfile
+      args:
+        VITE_FIREBASE_API_KEY: ${VITE_FIREBASE_API_KEY:-demo-api-key}
+        VITE_FIREBASE_AUTH_DOMAIN: ${VITE_FIREBASE_AUTH_DOMAIN:-local-cvai.firebaseapp.com}
+        VITE_FIREBASE_PROJECT_ID: ${CVAI_FIREBASE_PROJECT_ID:-local-cvai}
+        VITE_FIREBASE_STORAGE_BUCKET: ${VITE_FIREBASE_STORAGE_BUCKET:-local-cvai.appspot.com}
+        VITE_FIREBASE_MESSAGING_SENDER_ID: ${VITE_FIREBASE_MESSAGING_SENDER_ID:-000000000000}
+        VITE_FIREBASE_APP_ID: ${VITE_FIREBASE_APP_ID:-1:000000000000:web:0000000000000000000000}
+        VITE_API_BASE_URL: /api
+        VITE_USE_EMULATOR: "true"
+        VITE_FIREBASE_AUTH_EMULATOR_URL: http://localhost:${CVAI_AUTH_PORT:-19099}
+        VITE_FIRESTORE_EMULATOR_HOST: localhost
+        VITE_FIRESTORE_EMULATOR_PORT: ${CVAI_FIRESTORE_PORT:-18080}
+    ports:
+      - "${CVAI_WEB_PORT:-15080}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  firebase-emulator-data:

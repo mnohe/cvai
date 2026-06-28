@@ -3,9 +3,9 @@
 | | |
 |---|---|
 | **Actor** | User |
-| **Preconditions** | Signed in; role exists with `sourceText`; ≥ 1 credit; no bundle generation already in progress for this role |
+| **Preconditions** | Signed in; role exists with `sourceText`; external requests available; no bundle generation already in progress for this role |
 | **Milestone** | M3 |
-| **Credit cost** | 1 |
+| **External request** | 1 |
 | **LLM** | Yes — three sequential calls: job extraction, analysis, artifact generation |
 
 ## Context
@@ -30,7 +30,7 @@ sequenceDiagram
     User->>SPA: Click ✨ Generate analysis on role detail page
     SPA->>Backend: POST /roles/{roleId}/bundle
     Backend->>Firestore: Guard: reject 409 if Action in progress for this roleId
-    Backend->>Firestore: DeductCredit(uid)
+    Backend->>Firestore: Reserve external request
     Backend->>Firestore: Create Action {status: pending}
     Backend-->>SPA: 202 {actionId}
     SPA->>Firestore: onSnapshot(Action) — shows Analysing… state
@@ -54,23 +54,24 @@ sequenceDiagram
 
 ### Any LLM call fails
 
-Goroutine refunds credit (best-effort), sets Action to `{status: failed, reason: <step name>}`.
+Goroutine releases the external request (best-effort), sets Action to `{status: failed, reason: <step name>}`.
 SPA shows error toast. No partial Bundle is written.
 
 ### Double-click / duplicate request
 
 `409` returned immediately if an Action with type `bundle_generation` is already in
-progress for this roleId. No credit deducted.
+progress for this roleId. No external request reserved.
 
-### Insufficient credits
+### External request unavailable
 
-`DeductCredit` returns `ErrInsufficientCredits`; backend returns `402`. No Action created.
+The external-request gate reports the request unavailable. The backend returns a
+user-safe error before creating an Action.
 
 ## Postconditions
 
 - `users/{uid}/roles/{roleId}/bundle` written with Job, Analysis, and Artifacts.
 - `bundle.generatedAt` set to current time.
-- 1 credit deducted.
+- 1 external request reserved.
 - Role detail page shows Verdict and full analysis.
 
 ## E2E scenarios
@@ -79,5 +80,5 @@ progress for this roleId. No credit deducted.
 |---|---|---|
 | Generate bundle shows Analysing… then displays verdict | `e2e/roles.spec.ts` | `UC-ROLE-003 bundle generation flow` |
 | Duplicate request returns 409 | `e2e/roles.spec.ts` | `UC-ROLE-003 double click guard` |
-| Credit refunded on LLM failure | `e2e/roles.spec.ts` | `UC-ROLE-003 credit refunded on failure` |
-| Blocked at zero credits | `e2e/roles.spec.ts` | `UC-ROLE-003 blocked at zero credits` |
+| External request released on LLM failure | `e2e/roles.spec.ts` | `UC-ROLE-003 external request released on failure` |
+| Blocked at external request unavailable | `e2e/roles.spec.ts` | `UC-ROLE-003 blocked at external request unavailable` |

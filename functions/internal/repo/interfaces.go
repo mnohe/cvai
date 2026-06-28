@@ -2,26 +2,14 @@ package repo
 
 import (
 	"context"
-	"errors"
 
 	"github.com/mnohe/cvai/functions/internal/domain"
 )
 
-// ErrInsufficientCredits is returned by DeductCredit when the account balance is zero.
-var ErrInsufficientCredits = errors.New("insufficient credits")
-
-// AccountRepository manages account documents and credit balances.
+// AccountRepository manages account documents.
 type AccountRepository interface {
-	// GetProfile returns the account, creating it with zero credits on first call.
+	// GetProfile returns the account, creating it on first call.
 	GetProfile(ctx context.Context, uid string) (*domain.Account, error)
-	// DeductCredit atomically decrements the credit balance by 1.
-	// Returns ErrInsufficientCredits when balance is zero.
-	DeductCredit(ctx context.Context, uid string) error
-	// RefundCredit atomically increments the credit balance by 1.
-	// Best-effort: callers should log but not fail on error.
-	RefundCredit(ctx context.Context, uid string) error
-	// GrantCredits adds amount credits, records a PurchaseRecord, and sets has_ever_purchased.
-	GrantCredits(ctx context.Context, uid string, amount int, source string, ref string) error
 }
 
 // CandidateRepository manages the candidate profile document.

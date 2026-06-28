@@ -5,7 +5,7 @@
 | **Actor** | User |
 | **Preconditions** | Signed in |
 | **Milestone** | M2 |
-| **Credit cost** | None |
+| **External request** | None |
 | **LLM** | No |
 
 ## Context
@@ -14,7 +14,7 @@ The Story Bank holds STAR-format narratives indexed to competencies (leadership,
 technical depth, conflict resolution, etc.). Stories are available as candidate context
 during bundle generation and interview preparation.
 
-All writes go directly to Firestore. No backend call, no credit.
+All writes go directly to Firestore. No backend call, no external request.
 
 ## Flow
 

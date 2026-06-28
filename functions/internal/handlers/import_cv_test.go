@@ -16,16 +16,17 @@ import (
 
 	"github.com/mnohe/cvai/functions/internal/auth"
 	"github.com/mnohe/cvai/functions/internal/domain"
+	"github.com/mnohe/cvai/functions/internal/gate"
 	"github.com/mnohe/cvai/functions/internal/llm"
-	"github.com/mnohe/cvai/functions/internal/repo"
 )
 
 func TestImportCVHappyPath(t *testing.T) {
-	accounts := &fakeAccounts{credits: 1}
+	accounts := &fakeAccounts{}
+	externalGate := &fakeExternalRequestGate{permits: 1}
 	actions := newFakeActions()
 	candidates := &fakeCandidates{}
 	importer := &fakeImporter{raw: validCVJSON()}
-	handler := NewImportCVHandler(accounts, actions, candidates, importer)
+	handler := NewImportCVHandler(accounts, actions, candidates, externalGate, importer)
 
 	rec := httptest.NewRecorder()
 	handler.ImportCV(rec, importRequest(t, smallPDF()))
@@ -40,8 +41,8 @@ func TestImportCVHappyPath(t *testing.T) {
 		action, _ := actions.Get(context.Background(), "uid-1", body["actionId"])
 		return action != nil && action.Status == domain.ActionComplete
 	})
-	if accounts.credits != 0 {
-		t.Fatalf("credits = %d, want 0", accounts.credits)
+	if externalGate.permits != 0 {
+		t.Fatalf("permits = %d, want 0", externalGate.permits)
 	}
 	writtenCV, _ := candidates.GetCV(context.Background(), "uid-1")
 	if writtenCV == nil || writtenCV.Contact.Name != "Ada" {
@@ -53,7 +54,6 @@ func TestImportCVHappyPath(t *testing.T) {
 }
 
 func TestImportCVNormalizesAbsentSourceFacts(t *testing.T) {
-	accounts := &fakeAccounts{credits: 1}
 	actions := newFakeActions()
 	candidates := &fakeCandidates{}
 	importer := &fakeImporter{raw: json.RawMessage(`{
@@ -65,7 +65,7 @@ func TestImportCVNormalizesAbsentSourceFacts(t *testing.T) {
 		"experience":[{"company":"Engines Ltd","positions":[{"roles":["Staff Engineer"],"start":"2021","location":"London","tasks":["Built systems"]}]}],
 		"projects":{"items":[]}
 	}`)}
-	handler := NewImportCVHandler(accounts, actions, candidates, importer)
+	handler := NewImportCVHandler(&fakeAccounts{}, actions, candidates, gate.NoopExternalRequestGate{}, importer)
 
 	rec := httptest.NewRecorder()
 	handler.ImportCV(rec, importRequest(t, smallPDF()))
@@ -100,10 +100,10 @@ func TestImportCVSavesIncompleteCV(t *testing.T) {
 		"experience":[{"company":"Engines Ltd","positions":[{"roles":["Engineer"],"start":"2021","location":"","tasks":["Built systems"]}]}],
 		"projects":{"items":[]}
 	}`)
-	accounts := &fakeAccounts{credits: 1}
+	externalGate := &fakeExternalRequestGate{permits: 1}
 	actions := newFakeActions()
 	candidates := &fakeCandidates{}
-	handler := NewImportCVHandler(accounts, actions, candidates, &fakeImporter{raw: incompleteCV})
+	handler := NewImportCVHandler(&fakeAccounts{}, actions, candidates, externalGate, &fakeImporter{raw: incompleteCV})
 
 	rec := httptest.NewRecorder()
 	handler.ImportCV(rec, importRequest(t, smallPDF()))
@@ -116,8 +116,8 @@ func TestImportCVSavesIncompleteCV(t *testing.T) {
 		action, _ := actions.Get(context.Background(), "uid-1", body["actionId"])
 		return action != nil && action.Status == domain.ActionComplete
 	})
-	if accounts.credits != 0 {
-		t.Fatalf("credits = %d, want 0 (no refund for incomplete CV)", accounts.credits)
+	if externalGate.permits != 0 {
+		t.Fatalf("permits = %d, want 0 (no release for incomplete but successful CV)", externalGate.permits)
 	}
 	if candidates.cv == nil {
 		t.Fatal("cv was not written")
@@ -128,7 +128,6 @@ func TestImportCVSavesIncompleteCV(t *testing.T) {
 }
 
 func TestImportCVInjectsCandidatePreferences(t *testing.T) {
-	accounts := &fakeAccounts{credits: 1}
 	actions := newFakeActions()
 	candidates := &fakeCandidates{
 		candidate: &domain.Candidate{
@@ -137,7 +136,7 @@ func TestImportCVInjectsCandidatePreferences(t *testing.T) {
 		},
 	}
 	importer := &fakeImporter{raw: validCVJSON()}
-	handler := NewImportCVHandler(accounts, actions, candidates, importer)
+	handler := NewImportCVHandler(&fakeAccounts{}, actions, candidates, gate.NoopExternalRequestGate{}, importer)
 
 	rec := httptest.NewRecorder()
 	handler.ImportCV(rec, importRequest(t, smallPDF()))
@@ -163,10 +162,9 @@ func TestImportCVInjectsCandidatePreferences(t *testing.T) {
 }
 
 func TestImportCVContinuesWhenPreferencesReadFails(t *testing.T) {
-	accounts := &fakeAccounts{credits: 1}
 	actions := newFakeActions()
 	importer := &fakeImporter{raw: validCVJSON()}
-	handler := NewImportCVHandler(accounts, actions, &fakeCandidates{candidateErr: errors.New("read failed")}, importer)
+	handler := NewImportCVHandler(&fakeAccounts{}, actions, &fakeCandidates{candidateErr: errors.New("read failed")}, gate.NoopExternalRequestGate{}, importer)
 
 	rec := httptest.NewRecorder()
 	handler.ImportCV(rec, importRequest(t, smallPDF()))
@@ -184,10 +182,10 @@ func TestImportCVContinuesWhenPreferencesReadFails(t *testing.T) {
 	}
 }
 
-func TestImportCVFailureRefundsCredit(t *testing.T) {
-	accounts := &fakeAccounts{credits: 1}
+func TestImportCVFailureReleasesExternalRequest(t *testing.T) {
+	externalGate := &fakeExternalRequestGate{permits: 1}
 	actions := newFakeActions()
-	handler := NewImportCVHandler(accounts, actions, &fakeCandidates{}, &fakeImporter{err: errors.New("boom")})
+	handler := NewImportCVHandler(&fakeAccounts{}, actions, &fakeCandidates{}, externalGate, &fakeImporter{err: errors.New("boom")})
 
 	rec := httptest.NewRecorder()
 	handler.ImportCV(rec, importRequest(t, smallPDF()))
@@ -200,8 +198,8 @@ func TestImportCVFailureRefundsCredit(t *testing.T) {
 		action, _ := actions.Get(context.Background(), "uid-1", body["actionId"])
 		return action != nil && action.Status == domain.ActionFailed
 	})
-	if accounts.credits != 1 {
-		t.Fatalf("credits = %d, want refunded 1", accounts.credits)
+	if externalGate.permits != 1 {
+		t.Fatalf("permits = %d, want released 1", externalGate.permits)
 	}
 	action, _ := actions.Get(context.Background(), "uid-1", body["actionId"])
 	if action.Error != "There was a problem reading your PDF." {
@@ -209,10 +207,10 @@ func TestImportCVFailureRefundsCredit(t *testing.T) {
 	}
 }
 
-func TestImportCVUserInputFailureDoesNotRefundCredit(t *testing.T) {
-	accounts := &fakeAccounts{credits: 1}
+func TestImportCVUserInputFailureDoesNotReleaseExternalRequest(t *testing.T) {
+	externalGate := &fakeExternalRequestGate{permits: 1}
 	actions := newFakeActions()
-	handler := NewImportCVHandler(accounts, actions, &fakeCandidates{}, &fakeImporter{err: llm.StatusError{Provider: llm.ProviderOpenAI, Status: http.StatusBadRequest}})
+	handler := NewImportCVHandler(&fakeAccounts{}, actions, &fakeCandidates{}, externalGate, &fakeImporter{err: llm.StatusError{Provider: llm.ProviderOpenAI, Status: http.StatusBadRequest}})
 
 	rec := httptest.NewRecorder()
 	handler.ImportCV(rec, importRequest(t, smallPDF()))
@@ -225,8 +223,8 @@ func TestImportCVUserInputFailureDoesNotRefundCredit(t *testing.T) {
 		action, _ := actions.Get(context.Background(), "uid-1", body["actionId"])
 		return action != nil && action.Status == domain.ActionFailed
 	})
-	if accounts.credits != 0 {
-		t.Fatalf("credits = %d, want spent 0", accounts.credits)
+	if externalGate.permits != 0 {
+		t.Fatalf("permits = %d, want retained 0", externalGate.permits)
 	}
 	action, _ := actions.Get(context.Background(), "uid-1", body["actionId"])
 	if action.Error != "The PDF could not be read." {
@@ -235,9 +233,9 @@ func TestImportCVUserInputFailureDoesNotRefundCredit(t *testing.T) {
 }
 
 func TestImportCVSchemaFailureUsesGenericUserMessage(t *testing.T) {
-	accounts := &fakeAccounts{credits: 1}
+	externalGate := &fakeExternalRequestGate{permits: 1}
 	actions := newFakeActions()
-	handler := NewImportCVHandler(accounts, actions, &fakeCandidates{}, &fakeImporter{raw: json.RawMessage(`{"workHistory":[]}`)})
+	handler := NewImportCVHandler(&fakeAccounts{}, actions, &fakeCandidates{}, externalGate, &fakeImporter{raw: json.RawMessage(`{"workHistory":[]}`)})
 
 	rec := httptest.NewRecorder()
 	handler.ImportCV(rec, importRequest(t, smallPDF()))
@@ -250,8 +248,8 @@ func TestImportCVSchemaFailureUsesGenericUserMessage(t *testing.T) {
 		action, _ := actions.Get(context.Background(), "uid-1", body["actionId"])
 		return action != nil && action.Status == domain.ActionFailed
 	})
-	if accounts.credits != 1 {
-		t.Fatalf("credits = %d, want refunded 1", accounts.credits)
+	if externalGate.permits != 1 {
+		t.Fatalf("permits = %d, want released 1", externalGate.permits)
 	}
 	action, _ := actions.Get(context.Background(), "uid-1", body["actionId"])
 	if action.Error != importCVParseErrorMessage {
@@ -262,28 +260,28 @@ func TestImportCVSchemaFailureUsesGenericUserMessage(t *testing.T) {
 	}
 }
 
-func TestImportCVRejectsOversizedBeforeCredit(t *testing.T) {
-	accounts := &fakeAccounts{credits: 1}
-	handler := NewImportCVHandler(accounts, newFakeActions(), &fakeCandidates{}, &fakeImporter{raw: validCVJSON()})
+func TestImportCVRejectsOversizedBeforeExternalRequest(t *testing.T) {
+	externalGate := &fakeExternalRequestGate{permits: 1}
+	handler := NewImportCVHandler(&fakeAccounts{}, newFakeActions(), &fakeCandidates{}, externalGate, &fakeImporter{raw: validCVJSON()})
 
 	rec := httptest.NewRecorder()
 	handler.ImportCV(rec, importRequest(t, append(smallPDF(), bytes.Repeat([]byte("x"), maxCVImportBytes)...)))
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d", rec.Code)
 	}
-	if accounts.deducts != 0 {
-		t.Fatalf("deducts = %d, want 0", accounts.deducts)
+	if externalGate.reservations != 0 {
+		t.Fatalf("reservations = %d, want 0", externalGate.reservations)
 	}
 }
 
-func TestImportCVZeroCredits(t *testing.T) {
-	accounts := &fakeAccounts{credits: 0}
+func TestImportCVZeroPermits(t *testing.T) {
+	externalGate := &fakeExternalRequestGate{permits: 0}
 	actions := newFakeActions()
-	handler := NewImportCVHandler(accounts, actions, &fakeCandidates{}, &fakeImporter{raw: validCVJSON()})
+	handler := NewImportCVHandler(&fakeAccounts{}, actions, &fakeCandidates{}, externalGate, &fakeImporter{raw: validCVJSON()})
 
 	rec := httptest.NewRecorder()
 	handler.ImportCV(rec, importRequest(t, smallPDF()))
-	if rec.Code != http.StatusPaymentRequired {
+	if rec.Code != http.StatusServiceUnavailable {
 		t.Fatalf("status = %d", rec.Code)
 	}
 	if len(actions.items) != 0 {
@@ -353,30 +351,34 @@ func (f *fakeImporter) Complete(_ context.Context, systemPrompt string, _ []llm.
 	return f.raw, f.err
 }
 
-type fakeAccounts struct {
-	mu      sync.Mutex
-	credits int
-	deducts int
-}
+type fakeAccounts struct{}
 
 func (f *fakeAccounts) GetProfile(context.Context, string) (*domain.Account, error) { return nil, nil }
-func (f *fakeAccounts) DeductCredit(context.Context, string) error {
+
+type fakeExternalRequestGate struct {
+	mu           sync.Mutex
+	permits      int
+	reservations int
+	releases     int
+}
+
+func (f *fakeExternalRequestGate) Reserve(_ context.Context, _ string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.deducts++
-	if f.credits <= 0 {
-		return repo.ErrInsufficientCredits
+	f.reservations++
+	if f.permits <= 0 {
+		return gate.ErrExternalRequestUnavailable
 	}
-	f.credits--
+	f.permits--
 	return nil
 }
-func (f *fakeAccounts) RefundCredit(context.Context, string) error {
+
+func (f *fakeExternalRequestGate) Release(_ context.Context, _ string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.credits++
-	return nil
+	f.permits++
+	f.releases++
 }
-func (f *fakeAccounts) GrantCredits(context.Context, string, int, string, string) error { return nil }
 
 type fakeActions struct {
 	mu    sync.Mutex

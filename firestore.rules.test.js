@@ -5,7 +5,7 @@ import {
   assertSucceeds,
   assertFails,
 } from '@firebase/rules-unit-testing';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 
 let testEnv;
 
@@ -38,7 +38,7 @@ test('owner can read own account profile', async () => {
 test('owner can write own account profile', async () => {
   const db = testEnv.authenticatedContext('alice').firestore();
   await assertSucceeds(
-    setDoc(doc(db, 'users', 'alice', 'account', 'profile'), { credit_balance: 0 }),
+    setDoc(doc(db, 'users', 'alice', 'account', 'profile'), { uid: 'alice', displayName: 'Alice' }),
   );
 });
 
@@ -71,6 +71,11 @@ test('candidate preferences length is limited to 2000 characters', async () => {
 // --- Cross-user access (must fail) ---
 
 test('authenticated user cannot read another user subtree', async () => {
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), 'users', 'alice', 'account', 'profile'), {
+      uid: 'alice',
+    });
+  });
   const db = testEnv.authenticatedContext('bob').firestore();
   await assertFails(getDoc(doc(db, 'users', 'alice', 'account', 'profile')));
 });
@@ -78,7 +83,7 @@ test('authenticated user cannot read another user subtree', async () => {
 test('authenticated user cannot write another user subtree', async () => {
   const db = testEnv.authenticatedContext('bob').firestore();
   await assertFails(
-    setDoc(doc(db, 'users', 'alice', 'account', 'profile'), { credit_balance: 999 }),
+    setDoc(doc(db, 'users', 'alice', 'account', 'profile'), { uid: 'alice' }),
   );
 });
 
@@ -92,11 +97,11 @@ test('unauthenticated user is denied reading user data', async () => {
 test('unauthenticated user is denied writing user data', async () => {
   const db = testEnv.unauthenticatedContext().firestore();
   await assertFails(
-    setDoc(doc(db, 'users', 'alice', 'account', 'profile'), { credit_balance: 0 }),
+    setDoc(doc(db, 'users', 'alice', 'account', 'profile'), { uid: 'alice' }),
   );
 });
 
-// --- _admin collection (must fail for all clients) ---
+// --- Collections outside user subtree (must fail for all clients) ---
 
 test('authenticated user cannot read _admin', async () => {
   const db = testEnv.authenticatedContext('alice').firestore();

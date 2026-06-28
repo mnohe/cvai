@@ -313,30 +313,9 @@ func (p ActionProgress) Validate() error {
 	return nil
 }
 
-// Validate checks that Account has an owner UID, non-negative credit balance, and valid purchase records.
+// Validate checks that Account has an owner UID.
 func (a Account) Validate() error {
-	var credits error
-	if a.CreditBalance < 0 {
-		credits = fmt.Errorf("account.credit_balance must be >= 0")
-	}
-	return join(
-		required("account.uid", a.UID),
-		credits,
-		validateSlice("account.purchases", a.Purchases),
-	)
-}
-
-// Validate checks that PurchaseRecord has required provider details and a positive credit amount.
-func (p PurchaseRecord) Validate() error {
-	var credits error
-	if p.CreditAmount <= 0 {
-		credits = fmt.Errorf("purchase_record.credit_amount must be > 0")
-	}
-	return join(
-		required("purchase_record.id", p.ID),
-		oneOf("purchase_record.provider", p.Provider, purchaseProviders),
-		credits,
-	)
+	return required("account.uid", a.UID)
 }
 
 // Validate checks that Outcome uses supported terminal result, status, verdict, and recommendation values.
@@ -621,8 +600,6 @@ var eventTypes = enum(
 	EventGapTaskCompleted,
 	EventCVImported,
 	EventCVUpdated,
-	EventCreditsDeducted,
-	EventCreditsPurchased,
 	EventAccountDeleted,
 )
 
@@ -630,10 +607,6 @@ var outcomes = enum(
 	OutcomeAccepted,
 	OutcomeRejected,
 	OutcomeClosed,
-)
-
-var purchaseProviders = enum(
-	PurchaseProviderStripe,
 )
 
 var calibrationPatternTypes = enum(

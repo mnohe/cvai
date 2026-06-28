@@ -5,7 +5,7 @@
 | **Actor** | User |
 | **Preconditions** | Signed in, no imported CV required |
 | **Milestone** | M1 |
-| **Credit cost** | None |
+| **External request** | None |
 | **LLM** | No |
 
 ## Context

@@ -5,7 +5,7 @@
 | **Actor** | User |
 | **Preconditions** | Signed in; profile at ≥ 2/5 completion |
 | **Milestone** | M3 |
-| **Credit cost** | None |
+| **External request** | None |
 | **LLM** | No |
 
 ## Context

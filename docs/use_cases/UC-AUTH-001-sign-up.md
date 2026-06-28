@@ -5,7 +5,7 @@
 | **Actor** | User (new) |
 | **Preconditions** | No CVAI account exists for this identity |
 | **Milestone** | M1 |
-| **Credit cost** | None |
+| **External request** | None |
 | **LLM** | No |
 
 ## Flow
@@ -23,7 +23,7 @@ sequenceDiagram
     Firebase Auth-->>SPA: UserCredential (idToken, uid, displayName, email)
     SPA->>SPA: Store token in memory; attach to all subsequent requests
     SPA->>Backend: Any authenticated request (e.g. GET /account)
-    Backend->>Firestore: Create users/{uid}/account {credits: 0} if absent
+    Backend->>Firestore: Create users/{uid}/account if absent
     Backend->>Firestore: Create users/{uid}/candidate {} if absent
     SPA-->>User: Redirect to /cv (empty state)
 ```
@@ -35,7 +35,7 @@ immediately encounters the profile completion flow.
 ## Postconditions
 
 - Firebase Auth record exists for the uid.
-- `users/{uid}/account` exists with `credit_balance: 0`.
+- `users/{uid}/account` exists.
 - `users/{uid}/candidate` exists (empty).
 - User is on `/cv` (empty state — see [UC-CV-001](UC-CV-001-cv-page-entry.md)).
 

@@ -21,7 +21,7 @@ export default function App() {
           <Route path="/profile/:section" element={<ProfilePage />} />
           <Route path="/tasks" element={<PlaceholderPage name="tasks" />} />
           <Route path="/settings" element={<SettingsPage />} />
-          <Route path="/account" element={<Navigate to="/settings" replace />} />
+          <Route path="/account" element={<SettingsPage />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
