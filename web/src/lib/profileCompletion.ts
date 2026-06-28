@@ -15,6 +15,7 @@ export function getProfileCompletion(candidate?: Partial<Candidate>): Completion
   const cv = candidate?.cv as Record<string, unknown> | undefined;
   const personal = cv?.personal as Record<string, unknown> | undefined;
   const contact = cv?.contact as Record<string, unknown> | undefined;
+  const contactLinks = contact?.links;
 
   const hasPersonalName =
     hasText(personal?.name) ||
@@ -25,7 +26,9 @@ export function getProfileCompletion(candidate?: Partial<Candidate>): Completion
     hasText(personal?.phone) ||
     hasText(contact?.email) ||
     hasText((contact?.phone as Record<string, unknown> | undefined)?.number) ||
-    hasText(contact?.linkedin);
+    hasText(contact?.linkedin) ||
+    (Array.isArray(contactLinks) &&
+      contactLinks.some((link) => hasText((link as Record<string, unknown>).url)));
 
   const segments: CompletionSegment[] = [
     {

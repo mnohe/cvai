@@ -223,16 +223,19 @@ func (h *ImportCVHandler) runImport(uid string, actionID string, pdfBytes []byte
 		return
 	}
 	normalizeImportedCV(&cv)
+	var validationErrors []string
 	if err := cv.Validate(); err != nil {
 		log.Printf("cv_validate_failed uid_set=true action_id=%s: %v", actionID, err)
-		h.failImport(uid, actionID, importCVParseErrorMessage)
-		h.recordImportFailure(ctx, span, start, "parse")
-		return
+		for _, msg := range strings.Split(err.Error(), "\n") {
+			if msg = strings.TrimSpace(msg); msg != "" {
+				validationErrors = append(validationErrors, msg)
+			}
+		}
 	}
 	if err := h.actions.Update(ctx, uid, actionID, domain.ActionProgress{Step: "saving", Message: "Saving CV", Percent: intPtr(85)}); err != nil {
 		log.Printf("action_update_failed uid_set=true action_id=%s", actionID)
 	}
-	if err := h.candidates.WriteCV(ctx, uid, cv); err != nil {
+	if err := h.candidates.WriteCV(ctx, uid, cv, validationErrors); err != nil {
 		h.failImport(uid, actionID, "There was a problem saving the extracted CV.")
 		h.recordImportFailure(ctx, span, start, "save")
 		return

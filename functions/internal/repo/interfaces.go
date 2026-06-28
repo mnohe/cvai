@@ -28,8 +28,9 @@ type AccountRepository interface {
 type CandidateRepository interface {
 	// GetCV returns the CV from the candidate profile. Returns nil, nil if not found.
 	GetCV(ctx context.Context, uid string) (*domain.CV, error)
-	// WriteCV persists the CV in the candidate profile document.
-	WriteCV(ctx context.Context, uid string, cv domain.CV) error
+	// WriteCV persists the CV and any validation errors in the candidate profile document.
+	// Pass an empty slice when the CV is valid.
+	WriteCV(ctx context.Context, uid string, cv domain.CV, validationErrors []string) error
 	// GetCandidate returns the full candidate document. Returns nil, nil if not found.
 	GetCandidate(ctx context.Context, uid string) (*domain.Candidate, error)
 }

@@ -108,14 +108,15 @@ type EvidenceRef struct {
 }
 
 type Candidate struct {
-	ID              string           `firestore:"id"`
-	CV              CV               `firestore:"cv"`
-	Context         CandidateContext `firestore:"context"`
-	Preferences     string           `firestore:"preferences,omitempty"`
-	EvidenceLibrary []EvidenceItem   `firestore:"evidence_library,omitempty"`
-	StoryBank       []Story          `firestore:"story_bank,omitempty"`
-	CreatedAt       time.Time        `firestore:"created_at"`
-	UpdatedAt       time.Time        `firestore:"updated_at"`
+	ID                 string           `firestore:"id"`
+	CV                 CV               `firestore:"cv"`
+	CVValidationErrors []string         `firestore:"cv_validation_errors,omitempty"`
+	Context            CandidateContext `firestore:"context"`
+	Preferences        string           `firestore:"preferences,omitempty"`
+	EvidenceLibrary    []EvidenceItem   `firestore:"evidence_library,omitempty"`
+	StoryBank          []Story          `firestore:"story_bank,omitempty"`
+	CreatedAt          time.Time        `firestore:"created_at"`
+	UpdatedAt          time.Time        `firestore:"updated_at"`
 }
 
 type CV struct {
@@ -130,13 +131,11 @@ type CV struct {
 }
 
 type Contact struct {
-	Name     string `firestore:"name"`
-	Surname  string `firestore:"surname"`
-	Phone    Phone  `firestore:"phone"`
-	Email    string `firestore:"email"`
-	LinkedIn string `firestore:"linkedin"`
-	GitHub   string `firestore:"github,omitempty"`
-	WWW      string `firestore:"www,omitempty"`
+	Name    string `firestore:"name"`
+	Surname string `firestore:"surname"`
+	Phone   Phone  `firestore:"phone"`
+	Email   string `firestore:"email"`
+	Links   []Link `firestore:"links"`
 }
 
 type Phone struct {

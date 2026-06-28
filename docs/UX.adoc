@@ -119,6 +119,10 @@ The component is named `ThinkButton` so the name describes the semantic — it t
 .think-button-ghost   { background: var(--secondary-action-bg); color: var(--secondary-action-text); }
 ```
 
+*Button actions.* Any button actions should disable the button immediately, and enable it only when it is safe to do so, e.g. the operation has completed, or failed to complete in a given amount of time. In the latter case, it should be accompanied by an error message whose dismissal enables the button back. For instance, a "Save" button should be disabled immediately on click, and only enabled once the form can be saved again, i.e. it has changes. If the form fails to be saved, a message close to the button (or a modal) should indicate why saving did not succeed, and dismissing the message should re-enable the button.
+
+*Long-running button actions.* Any button that starts an operation which may take noticeable time must enter a local pending state immediately: disable the button (per the previous rule), show an in-button spinner, and keep the button disabled until the operation completes, fails, or times out. Completion removes the spinner and re-enables the button unless another gate still applies. Failure or timeout should show a specific, actionable message under the button or in the page's notification area; do not replace the button label with a persistent success or error message.
+
 *Verdict block.* The CLEAR FIT / FIT / etc. block is a rectangle.
 A 4 px left border in the verdict colour acts as the accent — thicker than the 1.5 px
 perimeter border, visually distinct without a decorative element.

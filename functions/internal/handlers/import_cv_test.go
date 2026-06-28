@@ -58,7 +58,7 @@ func TestImportCVNormalizesAbsentSourceFacts(t *testing.T) {
 	candidates := &fakeCandidates{}
 	importer := &fakeImporter{raw: json.RawMessage(`{
 		"summary":"Analytical engineer.",
-		"contact":{"name":"Ada","surname":"Lovelace","phone":{"prefix":"+44","number":"123456"},"email":"ada@example.test","linkedin":"https://linkedin.example/ada"},
+		"contact":{"name":"Ada","surname":"Lovelace","phone":{"prefix":"+44","number":"123456"},"email":"ada@example.test","links":[{"label":"LinkedIn","url":"https://linkedin.example/ada"}]},
 		"languages":[{"name":"English","level":"Native"}],
 		"certifications":[{"name":"Kubernetes","issuer":"CNCF","year":0}],
 		"education":[{"name":"Mathematics","type":"Degree","issuer":"University","year":0}],
@@ -86,6 +86,44 @@ func TestImportCVNormalizesAbsentSourceFacts(t *testing.T) {
 	}
 	if got := writtenCV.Experience[0].Positions[0].ID; got != "engines_ltd_staff_engineer_1" {
 		t.Fatalf("position id = %q", got)
+	}
+}
+
+func TestImportCVSavesIncompleteCV(t *testing.T) {
+	// CV that decodes successfully but fails validation (missing location).
+	incompleteCV := json.RawMessage(`{
+		"summary":"Engineer.",
+		"contact":{"name":"Ada","surname":"Lovelace","phone":{"prefix":"+44","number":"123456"},"email":"ada@example.test","links":[]},
+		"languages":[{"name":"English","level":"Native"}],
+		"certifications":[],
+		"education":[],
+		"experience":[{"company":"Engines Ltd","positions":[{"roles":["Engineer"],"start":"2021","location":"","tasks":["Built systems"]}]}],
+		"projects":{"items":[]}
+	}`)
+	accounts := &fakeAccounts{credits: 1}
+	actions := newFakeActions()
+	candidates := &fakeCandidates{}
+	handler := NewImportCVHandler(accounts, actions, candidates, &fakeImporter{raw: incompleteCV})
+
+	rec := httptest.NewRecorder()
+	handler.ImportCV(rec, importRequest(t, smallPDF()))
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	var body map[string]string
+	_ = json.NewDecoder(rec.Body).Decode(&body)
+	waitFor(t, func() bool {
+		action, _ := actions.Get(context.Background(), "uid-1", body["actionId"])
+		return action != nil && action.Status == domain.ActionComplete
+	})
+	if accounts.credits != 0 {
+		t.Fatalf("credits = %d, want 0 (no refund for incomplete CV)", accounts.credits)
+	}
+	if candidates.cv == nil {
+		t.Fatal("cv was not written")
+	}
+	if len(candidates.validationErrors) == 0 {
+		t.Fatal("validation errors were not stored")
 	}
 }
 
@@ -282,7 +320,7 @@ func smallPDF() []byte {
 func validCVJSON() json.RawMessage {
 	return json.RawMessage(`{
 		"summary":"Analytical engineer.",
-		"contact":{"name":"Ada","surname":"Lovelace","phone":{"prefix":"+44","number":"123456"},"email":"ada@example.test","linkedin":"https://linkedin.example/ada"},
+		"contact":{"name":"Ada","surname":"Lovelace","phone":{"prefix":"+44","number":"123456"},"email":"ada@example.test","links":[{"label":"LinkedIn","url":"https://linkedin.example/ada"}]},
 		"skills":["Go"],
 		"languages":[{"name":"English","level":"Native"}],
 		"certifications":[{"name":"Cloud","id":"C1","issuer":"Guild","year":2024}],
@@ -395,10 +433,11 @@ func (f *fakeActions) Get(ctx context.Context, uid string, actionID string) (*do
 }
 
 type fakeCandidates struct {
-	mu           sync.Mutex
-	cv           *domain.CV
-	candidate    *domain.Candidate
-	candidateErr error
+	mu               sync.Mutex
+	cv               *domain.CV
+	validationErrors []string
+	candidate        *domain.Candidate
+	candidateErr     error
 }
 
 func (f *fakeCandidates) GetCV(context.Context, string) (*domain.CV, error) {
@@ -406,10 +445,11 @@ func (f *fakeCandidates) GetCV(context.Context, string) (*domain.CV, error) {
 	defer f.mu.Unlock()
 	return f.cv, nil
 }
-func (f *fakeCandidates) WriteCV(ctx context.Context, uid string, cv domain.CV) error {
+func (f *fakeCandidates) WriteCV(ctx context.Context, uid string, cv domain.CV, validationErrors []string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.cv = &cv
+	f.validationErrors = validationErrors
 	if f.candidate != nil {
 		f.candidate.CV = cv
 	}

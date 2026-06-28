@@ -18,9 +18,9 @@ The flow is entirely client-side Firestore writes under the user's own
 
 The manual editor covers:
 
-- Personal: first name, surname, email, phone prefix, phone number, LinkedIn, GitHub, website.
+- Personal: first name, surname, email, phone prefix, phone number, and labelled links such as LinkedIn, GitHub, or website.
 - Summary: summary text.
-- Experience: company, roles, start, end, location, tasks and outcomes.
+- Experience: company, roles, start date, end date or current-position flag, location, tasks and outcomes.
 - Education: qualification, type, issuer, year.
 - Skills: one skill per line.
 - Certifications: certification, credential ID, issuer, year.
@@ -32,9 +32,10 @@ The manual editor covers:
 1. User opens `/profile/cv`.
 2. User selects **Start from scratch**.
 3. User fills each section and saves it.
-4. Each save writes directly to Firestore; no Cloud Function or API endpoint is called.
-5. The page receives the saved candidate document through `onSnapshot`.
-6. User reloads or returns later and sees all manually entered values in the editor.
+4. User reorders manually ordered lists, such as links, skills, and languages, with drag handles when the display order matters. Dated education and certification sections remain sorted newest first by year; experience entries without an end date are treated as current and shown before ended roles.
+5. Each save writes directly to Firestore; no Cloud Function or API endpoint is called.
+6. The page receives the saved candidate document through `onSnapshot`.
+7. User reloads or returns later and sees all manually entered values in the editor.
 
 ## Postconditions
 

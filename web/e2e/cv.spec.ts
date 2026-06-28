@@ -80,6 +80,7 @@ test.describe("UC-CV-002 import CV from PDF", () => {
     });
 
     await expect(page.getByRole("dialog", { name: "Import CV from PDF" })).toHaveCount(0);
+    await page.reload();
     await expect(page.getByLabel("First name")).toHaveValue("Ada");
   });
 
@@ -163,6 +164,21 @@ test.describe("UC-CV-002 import CV from PDF", () => {
 
     await expect(page.getByText("You need at least 1 credit to import a CV.")).toBeVisible();
   });
+
+  test("validation notice uses user-recognisable fields", async ({ page }) => {
+    await signIn(page, "cv.validation@example.test");
+    const session = await currentSession(page);
+    await writeCandidate(session, incompleteValidationCandidate());
+
+    const notice = page.getByRole("alert");
+    await expect(notice.getByRole("heading", { name: "These fields are missing" })).toBeVisible();
+    await expect(notice.getByText("Summary")).toBeVisible();
+    await expect(notice.getByText("location for Senior Operations Manager at Paragon Global Brands")).toBeVisible();
+    await expect(notice.getByText("tasks and outcomes for Senior Operations Manager at Paragon Global Brands")).toBeVisible();
+    await expect(page.getByText("cv.experience[0]")).toHaveCount(0);
+    await expect(page.getByText("item(s)")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Print" })).toBeDisabled();
+  });
 });
 
 test.describe("UC-CV-003 direct firestore write", () => {
@@ -179,7 +195,7 @@ test.describe("UC-CV-003 direct firestore write", () => {
     await page.getByLabel("Email").fill("ada@example.test");
     await page.getByRole("button", { name: "Save section" }).click();
 
-    await expect(page.getByText("Saved")).toBeVisible();
+    await waitForCVSave(page);
     await page.reload();
     await expect(page.getByLabel("First name")).toHaveValue("Ada");
     expect(apiCalls).toEqual([]);
@@ -198,14 +214,17 @@ test.describe("UC-CV-003 imported CV editor", () => {
     await saveVisibleSection(page);
 
     await openCVSection(page, "Languages");
-    await page.getByLabel("Language").fill("Esperanto");
+    await addEntryPanel(page);
+    await expect(page.locator(".entry-panel").first()).toContainText("New languages entry");
+    await page.getByRole("textbox", { name: "Language" }).fill("Esperanto");
     await page.getByLabel("Level").fill("Conversational");
     await saveVisibleSection(page);
 
     await page.reload();
     await expect(page.getByLabel("Surname")).toHaveValue("Candidate");
     await openCVSection(page, "Languages");
-    await expect(page.getByLabel("Language")).toHaveValue("Esperanto");
+    await editEntryPanel(page, "Esperanto");
+    await expect(page.getByRole("textbox", { name: "Language" })).toHaveValue("Esperanto");
     await expect(page.getByLabel("Level")).toHaveValue("Conversational");
   });
 
@@ -216,27 +235,30 @@ test.describe("UC-CV-003 imported CV editor", () => {
 
     await expect(page.getByLabel("First name")).toHaveValue("Proteus");
     await openCVSection(page, "Experience");
-    await expect(page.getByLabel("Experience entry").locator("option")).toHaveCount(28);
-    await page.getByLabel("Experience entry").selectOption("27");
-    await expect(page.getByLabel("Company")).toHaveValue("Institute 28");
-    await expect(page.getByLabel("Position").locator("option")).toHaveCount(3);
-    await page.getByLabel("Position").selectOption("2");
-    await expect(page.getByLabel("Roles, one per line")).toHaveValue("Visiting professor 28.3");
-    await page.getByLabel("Tasks and outcomes, one per line").fill("Published paper 28.3\nDelivered lecture 28.3\nWon impossible grant");
+    await expect(page.locator(".entry-panel")).toHaveCount(28);
+    await editEntryPanel(page, "Institute 28");
+    await expect(page.getByRole("textbox", { name: "Company" })).toHaveValue("Institute 28");
+    const openEditor = page.locator(".entry-panel-editor");
+    await expect(openEditor.getByRole("region", { name: /Visiting professor 28\.3/ })).toBeVisible();
+    await expect(openEditor.getByRole("region", { name: /Visiting professor 28\.1/ })).toBeVisible();
+    await expectTextBefore(openEditor, "Visiting professor 28.3", "Visiting professor 28.1");
+    await expect(openEditor.getByLabel("Roles, one per line").first()).toHaveValue("Visiting professor 28.3");
+    await expect(openEditor.getByLabel("Start").first()).toHaveValue("2007-01-01");
+    await expect(openEditor.getByLabel("Current position").first()).toBeChecked();
+    await openEditor.getByLabel("Tasks and outcomes, one per line").first().fill("Published paper 28.3\nDelivered lecture 28.3\nWon impossible grant");
     await saveVisibleSection(page);
 
     await openCVSection(page, "Languages");
-    await expect(page.getByLabel("Language entry").locator("option")).toHaveCount(14);
-    await page.getByLabel("Language entry").selectOption("13");
-    await expect(page.getByLabel("Language")).toHaveValue("Language 14");
+    await expect(page.locator(".entry-panel")).toHaveCount(14);
+    await editEntryPanel(page, "Language 14");
+    await expect(page.getByRole("textbox", { name: "Language" })).toHaveValue("Language 14");
     await expect(page.getByLabel("Level")).toHaveValue("Research fluency");
 
     await page.reload();
     await openCVSection(page, "Experience");
-    await expect(page.getByLabel("Experience entry").locator("option")).toHaveCount(28);
-    await page.getByLabel("Experience entry").selectOption("27");
-    await page.getByLabel("Position").selectOption("2");
-    await expect(page.getByLabel("Tasks and outcomes, one per line")).toHaveValue(
+    await expect(page.locator(".entry-panel")).toHaveCount(28);
+    await editEntryPanel(page, "Institute 28");
+    await expect(page.getByLabel("Tasks and outcomes, one per line").first()).toHaveValue(
       "Published paper 28.3\nDelivered lecture 28.3\nWon impossible grant",
     );
   });
@@ -247,42 +269,144 @@ test.describe("UC-CV-003 imported CV editor", () => {
     await writeCandidate(session, multiEntryCandidate());
 
     await openCVSection(page, "Experience");
-    await page.getByLabel("Experience entry").selectOption("1");
-    await expect(page.getByLabel("Company")).toHaveValue("Second Company");
-    await page.getByLabel("Company").fill("Second Company Edited");
+    await expectTextBefore(page.locator(".entry-panel-list"), "Second Company", "First Company");
+    await editEntryPanel(page, "Second Company");
+    await expect(page.getByRole("textbox", { name: "Company" })).toHaveValue("Second Company");
+    await page.getByRole("textbox", { name: "Company" }).fill("Second Company Edited");
     await saveVisibleSection(page);
 
     await openCVSection(page, "Education");
-    await page.getByLabel("Education entry").selectOption("1");
+    await expectTextBefore(page.locator(".entry-panel-list"), "PhD Systems", "MSc Computing");
+    await editEntryPanel(page, "PhD Systems");
     await expect(page.getByLabel("Qualification")).toHaveValue("PhD Systems");
     await page.getByLabel("Qualification").fill("PhD Systems Edited");
     await saveVisibleSection(page);
 
     await openCVSection(page, "Certifications");
-    await page.getByLabel("Certification entry").selectOption("1");
+    await expectTextBefore(page.locator(".entry-panel-list"), "Second Cert", "First Cert");
+    await editEntryPanel(page, "Second Cert");
     await expect(page.getByRole("textbox", { name: "Certification" })).toHaveValue("Second Cert");
     await page.getByRole("textbox", { name: "Certification" }).fill("Second Cert Edited");
     await saveVisibleSection(page);
 
     await openCVSection(page, "Languages");
-    await page.getByLabel("Language entry").selectOption("1");
-    await expect(page.getByLabel("Language")).toHaveValue("French");
+    await editEntryPanel(page, "French");
+    await expect(page.getByRole("textbox", { name: "Language" })).toHaveValue("French");
     await page.getByLabel("Level").fill("Professional");
     await saveVisibleSection(page);
 
+    await openCVSection(page, "Languages");
+    await dragListItem(page, "Move language entry 2", "Move language entry 1");
+    await expectTextBefore(page.locator(".entry-panel-list"), "French", "English");
+    await waitForCVSave(page);
+
     await page.reload();
     await openCVSection(page, "Experience");
-    await page.getByLabel("Experience entry").selectOption("1");
-    await expect(page.getByLabel("Company")).toHaveValue("Second Company Edited");
+    await editEntryPanel(page, "Second Company Edited");
+    await expect(page.getByRole("textbox", { name: "Company" })).toHaveValue("Second Company Edited");
     await openCVSection(page, "Education");
-    await page.getByLabel("Education entry").selectOption("1");
+    await editEntryPanel(page, "PhD Systems Edited");
     await expect(page.getByLabel("Qualification")).toHaveValue("PhD Systems Edited");
     await openCVSection(page, "Certifications");
-    await page.getByLabel("Certification entry").selectOption("1");
+    await editEntryPanel(page, "Second Cert Edited");
     await expect(page.getByRole("textbox", { name: "Certification" })).toHaveValue("Second Cert Edited");
     await openCVSection(page, "Languages");
-    await page.getByLabel("Language entry").selectOption("1");
+    await expectTextBefore(page.locator(".entry-panel-list"), "French", "English");
+    await editEntryPanel(page, "French");
     await expect(page.getByLabel("Level")).toHaveValue("Professional");
+  });
+
+  test("new position defaults current position to unchecked with End visible", async ({ page }) => {
+    await signIn(page, "cv.experience.defaults@example.test");
+    await page.getByRole("button", { name: "Start from scratch" }).click();
+    await openCVSection(page, "Experience");
+    await addEntryPanel(page);
+    await expect(page.getByLabel("Current position")).not.toBeChecked();
+    await expect(page.getByLabel("End")).toBeVisible();
+  });
+
+  test("checking current position hides End field and unchecking restores it", async ({ page }) => {
+    await signIn(page, "cv.experience.current-toggle@example.test");
+    await page.getByRole("button", { name: "Start from scratch" }).click();
+    await openCVSection(page, "Experience");
+    await addEntryPanel(page);
+    await expect(page.getByLabel("End")).toBeVisible();
+    await expect(page.getByLabel("End")).toBeEnabled();
+    await page.getByLabel("Current position").check();
+    await expect(page.getByLabel("End")).toBeHidden();
+    await expect(page.getByLabel("End")).toBeDisabled();
+    await page.getByLabel("Current position").uncheck();
+    await expect(page.getByLabel("End")).toBeVisible();
+    await expect(page.getByLabel("End")).toBeEnabled();
+  });
+
+  test("experience entry subtitle shows year-only period", async ({ page }) => {
+    await signIn(page, "cv.experience.subtitle-years@example.test");
+    const session = await currentSession(page);
+    await writeCandidate(session, currentAndEndedExperienceCandidate());
+
+    await openCVSection(page, "Experience");
+    await expect(regionByName(page, "Ended Recent Company")).toContainText("2024 – 2025");
+    await expect(regionByName(page, "Current Older Company")).toContainText("Since 2020");
+    await expect(regionByName(page, "Current Newer Company")).toContainText("Since 2022");
+  });
+
+  test("experience lists current roles first, then by most recent start", async ({ page }) => {
+    await signIn(page, "cv.current-order@example.test");
+    const session = await currentSession(page);
+    await writeCandidate(session, currentAndEndedExperienceCandidate());
+
+    await openCVSection(page, "Experience");
+    const list = page.locator(".entry-panel-list");
+    await expectTextBefore(list, "Current Newer Company", "Current Older Company");
+    await expectTextBefore(list, "Current Older Company", "Ended Recent Company");
+  });
+
+  test("manual saves recompute CV validation errors", async ({ page }) => {
+    await signIn(page, "cv.revalidate@example.test");
+    const session = await currentSession(page);
+    await writeCandidate(session, multiEntryCandidate());
+
+    await expect(page.getByRole("button", { name: "Print" })).toBeEnabled();
+
+    await openCVSection(page, "Summary");
+    await page.getByRole("textbox", { name: "Summary" }).fill("");
+    await saveVisibleSection(page);
+
+    const notice = page.getByRole("alert");
+    await expect(notice.getByText("Summary")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Print" })).toBeDisabled();
+
+    await page.getByRole("textbox", { name: "Summary" }).fill("Multi-entry imported CV.");
+    await saveVisibleSection(page);
+
+    await expect(page.getByRole("alert")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Print" })).toBeEnabled();
+  });
+
+  test("entry panels support cancel and confirmed removal", async ({ page }) => {
+    await signIn(page, "cv.panels@example.test");
+    const session = await currentSession(page);
+    await writeCandidate(session, multiEntryCandidate());
+
+    await openCVSection(page, "Languages");
+    await editEntryPanel(page, "English");
+    await page.getByLabel("Level").fill("Experimental");
+    await page.getByRole("button", { name: "Cancel" }).click();
+    await editEntryPanel(page, "English");
+    await expect(page.getByLabel("Level")).toHaveValue("Native");
+    await page.getByRole("button", { name: "Cancel" }).click();
+
+    const frenchPanel = regionByName(page, "French");
+    await frenchPanel.getByRole("button", { name: "Remove" }).click();
+    await expect(page.getByRole("dialog", { name: "Remove languages entry?" })).toBeVisible();
+    await page.getByRole("dialog", { name: "Remove languages entry?" }).getByRole("button", { name: "Cancel" }).click();
+    await expect(regionByName(page, "French")).toBeVisible();
+
+    await frenchPanel.getByRole("button", { name: "Remove" }).click();
+    await page.getByRole("dialog", { name: "Remove languages entry?" }).getByRole("button", { name: "Remove" }).click();
+    await expect(regionByName(page, "French")).toHaveCount(0);
+    await waitForCVSave(page);
   });
 });
 
@@ -291,10 +415,11 @@ test.describe("UC-CV-003 completeness advances", () => {
     await signIn(page, "cv.progress@example.test");
     await page.getByRole("button", { name: "Start from scratch" }).click();
     await page.getByRole("button", { name: "Experience", exact: true }).click();
-    await page.getByLabel("Company").fill("Analytical Engines Ltd");
+    await addEntryPanel(page);
+    await page.getByRole("textbox", { name: "Company" }).fill("Analytical Engines Ltd");
     await page.getByLabel("Roles, one per line").fill("Principal engineer");
     await page.getByLabel("Tasks and outcomes, one per line").fill("Shipped reliable systems");
-    await page.getByRole("button", { name: "Save section" }).click();
+    await saveVisibleSection(page);
     await openAccountPanel(page);
     await expect(page.getByRole("progressbar", { name: "CV completeness" })).not.toHaveAttribute(
       "aria-valuenow",
@@ -314,9 +439,11 @@ test.describe("candidate preferences", () => {
     await expect(page.getByText(`${preferences.length}/2000`)).toBeVisible();
     await page.getByRole("textbox", { name: "Preferences and constraints" }).fill("x".repeat(1801));
     await expect(page.getByText("1801/2000")).toHaveClass(/preference-count-warning/);
+    await page.getByRole("textbox", { name: "Preferences and constraints" }).fill("Remote-first roles ");
+    await expect(page.getByRole("textbox", { name: "Preferences and constraints" })).toHaveValue("Remote-first roles ");
     await page.getByRole("textbox", { name: "Preferences and constraints" }).fill(preferences);
     await page.getByRole("textbox", { name: "Preferences and constraints" }).blur();
-    await expect(page.getByText("Saved")).toBeVisible();
+    await expect(page.locator(".field[data-save-status='saved']")).toBeVisible();
 
     await page.reload();
     await expect(page.getByRole("textbox", { name: "Preferences and constraints" })).toHaveValue(preferences);
@@ -394,20 +521,22 @@ test.describe("UC-CV-004 CV print/PDF export", () => {
   test("print templates list work experience newest first", async ({ page }) => {
     await signIn(page, "cv.print.order@example.test");
     const session = await currentSession(page);
-    await writeCandidate(session, multiEntryCandidate());
+    await writeCandidate(session, currentAndEndedExperienceCandidate());
     await page.reload();
 
     await page.getByRole("button", { name: "Print" }).click();
     const frame = page.frameLocator("iframe[title='CV print preview']");
     const defaultLayout = frame.getByLabel("Printable CV default");
     await expect(defaultLayout).toBeVisible();
-    await expectTextBefore(defaultLayout, "Second Company", "First Company");
+    await expectTextBefore(defaultLayout, "Current Newer Company", "Current Older Company");
+    await expectTextBefore(defaultLayout, "Current Older Company", "Ended Recent Company");
 
     const dialog = page.getByRole("dialog", { name: "CV print preview" });
     await dialog.getByLabel("Print template").selectOption("ats");
     const atsLayout = frame.getByLabel("Printable CV ATS");
     await expect(atsLayout).toBeVisible();
-    await expectTextBefore(atsLayout, "Second Company", "First Company");
+    await expectTextBefore(atsLayout, "Current Newer Company", "Current Older Company");
+    await expectTextBefore(atsLayout, "Current Older Company", "Ended Recent Company");
   });
 
   test("ATS preview uses the same A4 page frame as the default template", async ({ page }) => {
@@ -484,29 +613,55 @@ test.describe("UC-CV-007 complete manual onboarding", () => {
     await page.getByLabel("Email").fill("ada@example.test");
     await page.getByLabel("Phone prefix").fill("+44");
     await page.getByLabel("Phone number").fill("02070000000");
-    await page.getByLabel("LinkedIn").fill("https://linkedin.example/ada");
-    await page.getByLabel("GitHub").fill("https://github.example/ada");
-    await page.getByLabel("Website").fill("https://ada.example");
+    await page.getByRole("button", { name: "Add link" }).click();
+    await expect(page.getByPlaceholder("LinkedIn, My portfolio, GitHub")).toBeVisible();
+    await expect(page.getByPlaceholder("https://linkedin.com/in/my-user")).toBeVisible();
+    await page.getByLabel("Link 1 label").fill("LinkedIn");
+    await page.getByLabel("Link 1 URL").fill("https://linkedin.example/ada");
+    await page.getByRole("button", { name: "Add link" }).click();
+    await page.getByLabel("Link 1 label").fill("GitHub");
+    await page.getByLabel("Link 1 URL").fill("https://github.example/ada");
+    await page.getByRole("button", { name: "Add link" }).click();
+    await page.getByLabel("Link 1 label").fill("Website");
+    await page.getByLabel("Link 1 URL").fill("https://ada.example");
+    await dragListItem(page, "Move link entry 3", "Move link entry 1");
     await saveVisibleSection(page);
 
     await openCVSection(page, "Summary");
     await page
       .getByRole("textbox", { name: "Summary" })
       .fill("Analytical engineer focused on reliable systems.");
+    await page
+      .getByRole("textbox", { name: "Summary" })
+      .fill("Analytical engineer focused on reliable systems. ");
+    await expect(page.getByRole("textbox", { name: "Summary" })).toHaveValue(
+      "Analytical engineer focused on reliable systems. ",
+    );
+    await page
+      .getByRole("textbox", { name: "Summary" })
+      .fill("Analytical engineer focused on reliable systems.");
     await saveVisibleSection(page);
 
     await openCVSection(page, "Experience");
-    await page.getByLabel("Company").fill("Analytical Engines Ltd");
+    await addEntryPanel(page);
+    await page.getByRole("textbox", { name: "Company" }).fill("Analytical Engines Ltd");
+    await page.getByLabel("Roles, one per line").fill("Principal engineer ");
+    await expect(page.getByLabel("Roles, one per line")).toHaveValue("Principal engineer ");
     await page.getByLabel("Roles, one per line").fill("Principal engineer\nSystems lead");
-    await page.getByLabel("Start").fill("2021-01");
-    await page.getByLabel("End").fill("Present");
+    await page.getByLabel("Start").fill("2021-01-01");
+    await page.getByLabel("Current position").check();
     await page.getByLabel("Location").fill("London");
+    await page
+      .getByLabel("Tasks and outcomes, one per line")
+      .fill("Designed deterministic workflows ");
+    await expect(page.getByLabel("Tasks and outcomes, one per line")).toHaveValue("Designed deterministic workflows ");
     await page
       .getByLabel("Tasks and outcomes, one per line")
       .fill("Designed deterministic workflows\nReduced incident rate");
     await saveVisibleSection(page);
 
     await openCVSection(page, "Education");
+    await addEntryPanel(page);
     await page.getByLabel("Qualification").fill("BSc Mathematics");
     await page.getByLabel("Type").fill("Degree");
     await page.getByLabel("Issuer").fill("University of London");
@@ -516,12 +671,14 @@ test.describe("UC-CV-007 complete manual onboarding", () => {
     await openCVSection(page, "Skills");
     await page.getByLabel("Skill 1").fill("TypeScript");
     await page.getByRole("button", { name: "Add skill" }).click();
-    await page.getByLabel("Skill 2").fill("Go");
+    await page.getByLabel("Skill 1").fill("Go");
     await page.getByRole("button", { name: "Add skill" }).click();
-    await page.getByLabel("Skill 3").fill("Distributed systems");
+    await page.getByLabel("Skill 1").fill("Distributed systems");
+    await dragListItem(page, "Move skill entry 3", "Move skill entry 1");
     await saveVisibleSection(page);
 
     await openCVSection(page, "Certifications");
+    await addEntryPanel(page);
     await page.getByRole("textbox", { name: "Certification" }).fill("Cloud Architect");
     await page.getByLabel("Credential ID").fill("CERT-123");
     await page.getByLabel("Issuer").fill("Cloud Guild");
@@ -529,6 +686,7 @@ test.describe("UC-CV-007 complete manual onboarding", () => {
     await saveVisibleSection(page);
 
     await openCVSection(page, "Languages");
+    await addEntryPanel(page);
     await page.getByRole("textbox", { name: "Language" }).fill("English");
     await page.getByLabel("Level").fill("Native");
     await saveVisibleSection(page);
@@ -546,9 +704,12 @@ test.describe("UC-CV-007 complete manual onboarding", () => {
     await expect(page.getByLabel("Email")).toHaveValue("ada@example.test");
     await expect(page.getByLabel("Phone prefix")).toHaveValue("+44");
     await expect(page.getByLabel("Phone number")).toHaveValue("02070000000");
-    await expect(page.getByLabel("LinkedIn")).toHaveValue("https://linkedin.example/ada");
-    await expect(page.getByLabel("GitHub")).toHaveValue("https://github.example/ada");
-    await expect(page.getByLabel("Website")).toHaveValue("https://ada.example");
+    await expect(page.getByLabel("Link 1 label")).toHaveValue("LinkedIn");
+    await expect(page.getByLabel("Link 1 URL")).toHaveValue("https://linkedin.example/ada");
+    await expect(page.getByLabel("Link 2 label")).toHaveValue("Website");
+    await expect(page.getByLabel("Link 2 URL")).toHaveValue("https://ada.example");
+    await expect(page.getByLabel("Link 3 label")).toHaveValue("GitHub");
+    await expect(page.getByLabel("Link 3 URL")).toHaveValue("https://github.example/ada");
 
     await openCVSection(page, "Summary");
     await expect(page.getByRole("textbox", { name: "Summary" })).toHaveValue(
@@ -556,18 +717,22 @@ test.describe("UC-CV-007 complete manual onboarding", () => {
     );
 
     await openCVSection(page, "Experience");
-    await expect(page.getByLabel("Company")).toHaveValue("Analytical Engines Ltd");
+    await editEntryPanel(page, "Analytical Engines Ltd");
+    await expect(page.getByRole("textbox", { name: "Company" })).toHaveValue("Analytical Engines Ltd");
     await expect(page.getByLabel("Roles, one per line")).toHaveValue(
       "Principal engineer\nSystems lead",
     );
-    await expect(page.getByLabel("Start")).toHaveValue("2021-01");
-    await expect(page.getByLabel("End")).toHaveValue("Present");
+    await expect(page.getByLabel("Start")).toHaveValue("2021-01-01");
+    await expect(page.getByLabel("Current position")).toBeChecked();
+    await expect(page.getByLabel("End")).toBeHidden();
+    await expect(page.getByLabel("End")).toBeDisabled();
     await expect(page.getByLabel("Location")).toHaveValue("London");
     await expect(page.getByLabel("Tasks and outcomes, one per line")).toHaveValue(
       "Designed deterministic workflows\nReduced incident rate",
     );
 
     await openCVSection(page, "Education");
+    await editEntryPanel(page, "BSc Mathematics");
     await expect(page.getByLabel("Qualification")).toHaveValue("BSc Mathematics");
     await expect(page.getByLabel("Type")).toHaveValue("Degree");
     await expect(page.getByLabel("Issuer")).toHaveValue("University of London");
@@ -575,19 +740,21 @@ test.describe("UC-CV-007 complete manual onboarding", () => {
 
     await openCVSection(page, "Skills");
     await expect(page.getByLabel("Skill 1")).toHaveValue("TypeScript");
-    await expect(page.getByLabel("Skill 2")).toHaveValue("Go");
-    await expect(page.getByLabel("Skill 3")).toHaveValue("Distributed systems");
+    await expect(page.getByLabel("Skill 2")).toHaveValue("Distributed systems");
+    await expect(page.getByLabel("Skill 3")).toHaveValue("Go");
 
     await openCVSection(page, "Certifications");
+    await editEntryPanel(page, "Cloud Architect");
     await expect(page.getByRole("textbox", { name: "Certification" })).toHaveValue("Cloud Architect");
     await expect(page.getByLabel("Credential ID")).toHaveValue("CERT-123");
     await expect(page.getByLabel("Issuer")).toHaveValue("Cloud Guild");
     await expect(page.getByLabel("Year")).toHaveValue("2023");
 
     await openCVSection(page, "Languages");
+    await editEntryPanel(page, "English");
     await expect(page.getByRole("textbox", { name: "Language" })).toHaveValue("English");
     await expect(page.getByLabel("Level")).toHaveValue("Native");
-    expect(apiCalls).toEqual([]);
+    expect(apiCalls.filter((url) => !url.endsWith("/api/account"))).toEqual([]);
   });
 });
 
@@ -606,6 +773,26 @@ async function openCVSection(page: Page, name: string) {
   await page.getByRole("button", { name, exact: true }).click();
 }
 
+async function addEntryPanel(page: Page) {
+  await page.getByRole("button", { name: "Add", exact: true }).click();
+}
+
+async function editEntryPanel(page: Page, name: string) {
+  await regionByName(page, name).getByRole("button", { name: "Edit" }).click();
+}
+
+async function dragListItem(page: Page, sourceLabel: string, targetLabel: string) {
+  await page.getByLabel(sourceLabel).dragTo(page.getByLabel(targetLabel));
+}
+
+function regionByName(page: Page, name: string) {
+  return page.getByRole("region", { name: new RegExp(escapeRegExp(name)) });
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 async function expectTextBefore(locator: ReturnType<Page["locator"]>, earlier: string, later: string) {
   await expect
     .poll(async () => {
@@ -616,8 +803,17 @@ async function expectTextBefore(locator: ReturnType<Page["locator"]>, earlier: s
 }
 
 async function saveVisibleSection(page: Page) {
-  await page.getByRole("button", { name: "Save section" }).click();
-  await expect(page.getByText("Saved")).toBeVisible();
+  const sectionSave = page.getByRole("button", { name: "Save section" });
+  if ((await sectionSave.count()) > 0) {
+    await sectionSave.click();
+  } else {
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+  }
+  await waitForCVSave(page);
+}
+
+async function waitForCVSave(page: Page) {
+  await expect(page.locator(".cv-section[data-save-status='saved']")).toBeVisible();
 }
 
 async function openAccountPanel(page: Page) {
@@ -681,7 +877,7 @@ function importedCandidate() {
         surname: "Lovelace",
         phone: { prefix: "+44", number: "123456" },
         email: "ada@example.test",
-        linkedin: "https://linkedin.example/ada",
+        links: [{ label: "LinkedIn", url: "https://linkedin.example/ada" }],
       },
       skills: ["Go"],
       languages: [{ name: "English", level: "Native" }],
@@ -710,9 +906,7 @@ function sparseImportedCandidate() {
         surname: "",
         phone: { prefix: "", number: "" },
         email: "",
-        linkedin: "",
-        github: "",
-        www: "",
+        links: [],
       },
       skills: [],
       languages: [],
@@ -721,6 +915,48 @@ function sparseImportedCandidate() {
       experience: [],
       projects: { items: [] },
     },
+    context: { version: 1, constraints: {}, preferences: {} },
+    created_at: new Date(),
+    updated_at: new Date(),
+  };
+}
+
+function incompleteValidationCandidate() {
+  return {
+    cv: {
+      summary: "",
+      contact: {
+        name: "Pat",
+        surname: "Example",
+        phone: { prefix: "+44", number: "123456" },
+        email: "pat@example.test",
+        links: [],
+      },
+      skills: ["Operations"],
+      languages: [{ name: "English", level: "Native" }],
+      certifications: [],
+      education: [],
+      experience: [
+        {
+          company: "Paragon Global Brands",
+          positions: [
+            {
+              id: "senior-ops",
+              roles: ["Senior Operations Manager"],
+              start: "2020",
+              location: "",
+              tasks: [],
+            },
+          ],
+        },
+      ],
+      projects: { items: [] },
+    },
+    cv_validation_errors: [
+      "cv.summary is required",
+      "cv.experience[0]: experience.positions[0]: cv_position.location is required",
+      "cv.experience[0]: experience.positions[0]: cv_position.tasks must contain at least 1 item(s)",
+    ],
     context: { version: 1, constraints: {}, preferences: {} },
     created_at: new Date(),
     updated_at: new Date(),
@@ -736,7 +972,7 @@ function multiEntryCandidate() {
         surname: "Entry",
         phone: { prefix: "+1", number: "5550100" },
         email: "multi@example.test",
-        linkedin: "https://linkedin.example/multi",
+        links: [{ label: "LinkedIn", url: "https://linkedin.example/multi" }],
       },
       skills: ["Go", "TypeScript"],
       languages: [
@@ -769,6 +1005,68 @@ function multiEntryCandidate() {
   };
 }
 
+function currentAndEndedExperienceCandidate() {
+  return {
+    cv: {
+      summary: "Current and ended roles.",
+      contact: {
+        name: "Current",
+        surname: "Order",
+        phone: { prefix: "+1", number: "5550199" },
+        email: "current-order@example.test",
+        links: [],
+      },
+      skills: ["Planning"],
+      languages: [{ name: "English", level: "Native" }],
+      certifications: [],
+      education: [],
+      experience: [
+        {
+          company: "Ended Recent Company",
+          positions: [
+            {
+              id: "ended-recent",
+              roles: ["Principal Consultant"],
+              start: "2024-01-01",
+              end: "2025-01-01",
+              location: "Remote",
+              tasks: ["Delivered recent programme"],
+            },
+          ],
+        },
+        {
+          company: "Current Older Company",
+          positions: [
+            {
+              id: "current-older",
+              roles: ["Operations Lead"],
+              start: "2020-01-01",
+              location: "London",
+              tasks: ["Runs current operations"],
+            },
+          ],
+        },
+        {
+          company: "Current Newer Company",
+          positions: [
+            {
+              id: "current-newer",
+              roles: ["Portfolio Director"],
+              start: "2022-01-01",
+              location: "Berlin",
+              tasks: ["Leads current portfolio"],
+            },
+          ],
+        },
+      ],
+      projects: { items: [] },
+    },
+    context: { version: 1, constraints: {}, preferences: {} },
+    created_at: new Date(),
+    updated_at: new Date(),
+  };
+}
+
 function largeAcademicCandidate() {
   return {
     cv: {
@@ -779,9 +1077,11 @@ function largeAcademicCandidate() {
         surname: "Polyglot",
         phone: { prefix: "+41", number: "5552800" },
         email: "proteus@example.test",
-        linkedin: "https://linkedin.example/proteus",
-        github: "https://github.example/proteus",
-        www: "https://proteus.example",
+        links: [
+          { label: "LinkedIn", url: "https://linkedin.example/proteus" },
+          { label: "GitHub", url: "https://github.example/proteus" },
+          { label: "Website", url: "https://proteus.example" },
+        ],
       },
       skills: Array.from({ length: 36 }, (_, index) => `Research skill ${index + 1}`),
       languages: Array.from({ length: 14 }, (_, index) => ({

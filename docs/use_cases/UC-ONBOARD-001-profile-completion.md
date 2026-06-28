@@ -77,8 +77,8 @@ when the meter is below green. Collapses once all 5 segments are satisfied.
 ┌─────────────────────────────────────────────────────────────┐
 │  Complete your profile                              [◑] 2/5 │
 │                                                             │
-│  ✓ Personal details          → already filled               │
-│  ✓ Work experience           → already filled               │
+│  ✓ Personal details          → complete                     │
+│  ✓ Work experience           → complete                     │
 │  ○ Story                     → Add a story                  │
 │  ○ Education                 → Add education                │
 │  ○ Portfolio evidence        → Add evidence item            │

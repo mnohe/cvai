@@ -36,6 +36,10 @@ func okHandler(t *testing.T, wantUID string) http.Handler {
 		if uid != wantUID {
 			t.Errorf("UIDFromContext = %q, want %q", uid, wantUID)
 		}
+		tok := TokenFromContext(r.Context())
+		if tok == nil || tok.UID != wantUID {
+			t.Errorf("TokenFromContext UID = %v, want %q", tok, wantUID)
+		}
 		w.WriteHeader(http.StatusOK)
 	})
 }
@@ -141,5 +145,11 @@ func TestUIDFromContext_Empty(t *testing.T) {
 	uid := UIDFromContext(context.Background())
 	if uid != "" {
 		t.Errorf("UIDFromContext on empty context = %q, want empty", uid)
+	}
+}
+
+func TestTokenFromContext_Empty(t *testing.T) {
+	if tok := TokenFromContext(context.Background()); tok != nil {
+		t.Errorf("TokenFromContext on empty context = %#v, want nil", tok)
 	}
 }

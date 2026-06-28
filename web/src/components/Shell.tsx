@@ -35,31 +35,25 @@ export function Shell() {
           ))}
         </nav>
         <div className="sidebar-user">
-          <span className="user-copy">
-            <span className="user-line">
-              <button
-                className="user-account-trigger"
-                aria-label="Open account panel"
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  setAccountOpen(true);
-                }}
-              >
+          <span className="user-line">
+            <button
+              className="user-account-trigger"
+              aria-label="Open account panel"
+              type="button"
+              onClick={() => setAccountOpen(true)}
+            >
+              <span className="user-copy">
                 {user?.displayName || "CVAI user"}
-              </button>
-              <ProfileCompletionMeter compact />
-              <button
-                className="settings-trigger"
-                aria-label="Open settings"
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  navigate("/settings");
-                }}
-              />
-            </span>
-            <span className="user-email">{user?.email}</span>
+                <span className="user-email">{user?.email}</span>
+              </span>
+            </button>
+            <ProfileCompletionMeter compact />
+            <button
+              className="settings-trigger"
+              aria-label="Open settings"
+              type="button"
+              onClick={() => navigate("/settings")}
+            />
           </span>
         </div>
       </aside>
