@@ -31,8 +31,17 @@ func (h *AccountHandler) GetAccount(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(acc)
 }
 
+type errorResponse struct {
+	Error  string `json:"error"`
+	Reason string `json:"reason,omitempty"`
+}
+
 func writeJSONError(w http.ResponseWriter, status int, msg string) {
+	writeJSONErrorReason(w, status, msg, "")
+}
+
+func writeJSONErrorReason(w http.ResponseWriter, status int, msg string, reason string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(map[string]string{"error": msg})
+	_ = json.NewEncoder(w).Encode(errorResponse{Error: msg, Reason: reason})
 }

@@ -118,7 +118,7 @@ func (h *ImportCVHandler) ImportCV(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.accounts.DeductCredit(r.Context(), uid); err != nil {
 		if errors.Is(err, repo.ErrInsufficientCredits) {
-			writeJSONError(w, http.StatusPaymentRequired, "not enough credits")
+			writeJSONErrorReason(w, http.StatusPaymentRequired, "not enough credits", "insufficient_credits")
 			return
 		}
 		writeJSONError(w, http.StatusInternalServerError, "failed to deduct credit")
