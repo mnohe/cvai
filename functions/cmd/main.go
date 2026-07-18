@@ -18,6 +18,7 @@ import (
 	"github.com/mnohe/cvai/functions/internal/observability"
 	"github.com/mnohe/cvai/functions/internal/repo"
 	fsrepo "github.com/mnohe/cvai/functions/internal/repo/firestore"
+	"github.com/mnohe/cvai/functions/internal/routing"
 )
 
 func main() {
@@ -79,12 +80,13 @@ func main() {
 
 	// Root handler: check public mux first, then apply RequireAuth to the auth mux.
 	root := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, pattern := publicMux.Handler(r)
+		routeReq := routing.StripAPIPrefix(r)
+		_, pattern := publicMux.Handler(routeReq)
 		if pattern != "" {
-			publicMux.ServeHTTP(w, r)
+			publicMux.ServeHTTP(w, routeReq)
 			return
 		}
-		authMW.RequireAuth(authMux).ServeHTTP(w, r)
+		authMW.RequireAuth(authMux).ServeHTTP(w, routeReq)
 	})
 
 	port := os.Getenv("PORT")

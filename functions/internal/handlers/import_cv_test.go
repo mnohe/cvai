@@ -286,6 +286,16 @@ func TestImportCVZeroCredits(t *testing.T) {
 	if rec.Code != http.StatusPaymentRequired {
 		t.Fatalf("status = %d", rec.Code)
 	}
+	var body struct {
+		Error  string `json:"error"`
+		Reason string `json:"reason"`
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	if body.Error != "not enough credits" || body.Reason != "insufficient_credits" {
+		t.Fatalf("body = %#v", body)
+	}
 	if len(actions.items) != 0 {
 		t.Fatal("action was created")
 	}
