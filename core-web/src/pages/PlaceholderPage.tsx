@@ -1,3 +1,5 @@
+import { Slots } from "@/slots";
+
 const pageCopy: Record<string, { title: string; body: string }> = {
   dashboard: {
     title: "Dashboard",
@@ -26,6 +28,7 @@ export function PlaceholderPage({ name }: { name: keyof typeof pageCopy }) {
       <div className="empty-panel">
         <h2>{copy.body}</h2>
       </div>
+      {name === "dashboard" && <Slots.DashboardExtra />}
     </section>
   );
 }

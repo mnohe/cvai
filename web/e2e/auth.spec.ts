@@ -34,8 +34,9 @@ test.describe("UC-AUTH-002", () => {
     await page.setViewportSize({ width: 1100, height: 800 });
     await signIn(page, "Google", "shell.user@example.test");
     await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible();
-    await expect(page.getByText("New User")).toBeVisible();
-    await expect(page.getByText("shell.user@example.test")).toBeVisible();
+    const sidebar = page.locator("aside.sidebar");
+    await expect(sidebar.getByText("New User")).toBeVisible();
+    await expect(sidebar.getByText("shell.user@example.test")).toHaveCount(0);
   });
 });
 
@@ -43,18 +44,20 @@ test.describe("UC-AUTH-003", () => {
   test("account panel opens and shows name/email", async ({ page }) => {
     await page.setViewportSize({ width: 1100, height: 800 });
     await signIn(page, "Google", "panel.user@example.test");
-    await page.getByText("panel.user@example.test").click();
+    await page.getByRole("button", { name: "Open account panel" }).click();
     const panel = page.getByRole("dialog", { name: "Account panel" });
     await expect(panel).toBeVisible();
     await expect(panel.getByRole("heading", { name: "New User" })).toBeVisible();
     await expect(panel.getByText("panel.user@example.test")).toBeVisible();
-    await expect(panel.getByText("Google")).toBeVisible();
+    await expect(panel.getByText("Google")).toHaveCount(0);
+    await expect(panel.getByText("Credits")).toHaveCount(0);
+    await expect(panel.getByRole("button", { name: "Sign out" })).toHaveCount(0);
   });
 
   test("signout redirects to login", async ({ page }) => {
     await page.setViewportSize({ width: 1100, height: 800 });
     await signIn(page, "Google", "signout.user@example.test");
-    await page.getByRole("button", { name: "Open account panel" }).click();
+    await page.getByRole("button", { name: "Open settings" }).click();
     await page.getByRole("button", { name: "Sign out" }).click();
     await expect(page).toHaveURL(/\/login$/);
   });
@@ -62,7 +65,7 @@ test.describe("UC-AUTH-003", () => {
   test("protected routes inaccessible after signout", async ({ page }) => {
     await page.setViewportSize({ width: 1100, height: 800 });
     await signIn(page, "Google", "postsignout.user@example.test");
-    await page.getByRole("button", { name: "Open account panel" }).click();
+    await page.getByRole("button", { name: "Open settings" }).click();
     await page.getByRole("button", { name: "Sign out" }).click();
     await expect(page).toHaveURL(/\/login$/);
     await page.goto("/dashboard");

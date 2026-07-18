@@ -18,7 +18,16 @@
     "jsx": "react-jsx",
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["../core-web/src/*"],
+      "@branding": ["src/branding/index.ts"],
+      "@cvai/core-web": ["../core-web/src/index.ts"],
+      "@cvai/core-web/styles.css": ["../core-web/src/index.css"],
+      "firebase": ["node_modules/firebase"],
+      "firebase/*": ["node_modules/firebase/*"],
+      "react": ["node_modules/@types/react"],
+      "react/jsx-runtime": ["node_modules/@types/react/jsx-runtime.d.ts"],
+      "react-dom/client": ["node_modules/@types/react-dom/client.d.ts"],
+      "react-router-dom": ["node_modules/react-router-dom"]
     }
   },
   "include": ["src", "vite.config.ts", "playwright.config.ts"]

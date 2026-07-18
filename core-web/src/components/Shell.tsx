@@ -1,9 +1,12 @@
 import { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { AccountPanelProvider } from "@/components/AccountPanelContext";
 import { AccountPanel } from "@/components/AccountPanel";
 import { LogoMark } from "@/components/LogoMark";
 import { ProfileCompletionMeter } from "@/components/ProfileCompletionMeter";
 import { useAuth } from "@/components/AuthProvider";
+import { useRuntimeStatus } from "@/components/RuntimeStatusProvider";
+import { Slots } from "@/slots";
 
 const navItems = [
   { to: "/dashboard", label: "Dashboard" },
@@ -14,13 +17,23 @@ const navItems = [
 
 export function Shell() {
   const [accountOpen, setAccountOpen] = useState(false);
+  const [accountStatusFlashToken, setAccountStatusFlashToken] = useState(0);
   const [mobileOpen, setMobileOpen] = useState(false);
   const { user } = useAuth();
+  const { backendIssueActive } = useRuntimeStatus();
   const navigate = useNavigate();
 
+  function openAccountPanel(options?: { flashStatus?: boolean }) {
+    setAccountOpen(true);
+    if (options?.flashStatus) {
+      setAccountStatusFlashToken(Date.now());
+    }
+  }
+
   return (
-    <div className="app-shell">
-      <aside className="sidebar">
+    <AccountPanelProvider value={{ openAccountPanel }}>
+      <div className="app-shell">
+      <aside className={`sidebar ${backendIssueActive ? "sidebar-backend-issue" : ""}`}>
         <LogoMark mode="dark" />
         <nav aria-label="Primary">
           {navItems.map((item) => (
@@ -40,11 +53,10 @@ export function Shell() {
               className="user-account-trigger"
               aria-label="Open account panel"
               type="button"
-              onClick={() => setAccountOpen(true)}
+              onClick={() => openAccountPanel()}
             >
               <span className="user-copy">
                 {user?.displayName || "CVAI user"}
-                <span className="user-email">{user?.email}</span>
               </span>
             </button>
             <ProfileCompletionMeter compact />
@@ -68,11 +80,14 @@ export function Shell() {
           ☰
         </button>
         <LogoMark />
+        <div className="top-nav-extra">
+          <Slots.HeaderRight />
+        </div>
         <button
           className="avatar-button"
           type="button"
           aria-label="Open account"
-          onClick={() => setAccountOpen(true)}
+          onClick={() => openAccountPanel()}
         >
           <span className="avatar-diamond">
             {getInitials(user?.displayName, user?.email)}
@@ -100,8 +115,14 @@ export function Shell() {
         <Outlet />
       </main>
 
-      {accountOpen && <AccountPanel onClose={() => setAccountOpen(false)} />}
-    </div>
+      {accountOpen && (
+        <AccountPanel
+          flashStatusToken={accountStatusFlashToken}
+          onClose={() => setAccountOpen(false)}
+        />
+      )}
+      </div>
+    </AccountPanelProvider>
   );
 }
 

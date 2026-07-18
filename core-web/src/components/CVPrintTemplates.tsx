@@ -6,6 +6,7 @@ import {
   hasLanguageContent,
   hasText,
 } from "@/lib/cv";
+import { printAttributionUrl, productName } from "@branding";
 
 export type CVPrintTemplate = "default" | "ats";
 
@@ -264,7 +265,7 @@ function DefinitionItem({ title, body }: { title: string; body: string }) {
 
 function CVAIPrintBrand({ className }: { className: string }) {
   return (
-    <div className={`${className}-brand-note`} aria-label="Built by CVirgil">
+    <div className={`${className}-brand-note`} aria-label={`Built by ${productName}`}>
       <svg className={`${className}-brand-logo`} viewBox="0 0 77.942 160" aria-hidden="true">
         <g transform="translate(-167.89 -14.169)" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.0337">
           <path d="m185.21 49.169 8e-4 60 51.961-30.001-17.32-9.9998-17.321 10.001-5e-4 -8.66e-4 6.7e-4 -20z" />
@@ -277,11 +278,11 @@ function CVAIPrintBrand({ className }: { className: string }) {
       <div>
         <p>
           <strong>
-            Made with <span>CVAI</span>
+            Made with <span>{productName}</span>
           </strong>
         </p>
         <p>
-          <a href="https://cvirgil.com/">https://cvirgil.com/</a>
+          <a href={printAttributionUrl}>{printAttributionUrl}</a>
         </p>
       </div>
     </div>
