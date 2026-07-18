@@ -84,16 +84,9 @@ test.describe("UC-CV-002 import CV from PDF", () => {
     await expect(page.getByLabel("First name")).toHaveValue("Ada");
   });
 
-  test("error shown on LLM failure and credit refunded", async ({ page }) => {
+  test("error shown on LLM failure with support reference", async ({ page }) => {
     await signIn(page, "cv.import.failure@example.test");
     const session = await currentSession(page);
-    await writeFirestore(session, "account", "profile", {
-      uid: session.uid,
-      credit_balance: 0,
-      has_ever_purchased: false,
-      created_at: new Date(),
-      updated_at: new Date(),
-    });
     await page.route("**/api/cv/imports", async (route) => {
       await route.fulfill({
         status: 202,
@@ -106,13 +99,6 @@ test.describe("UC-CV-002 import CV from PDF", () => {
     await choosePDF(page, "%PDF-1.7\nfailure");
     await page.getByRole("button", { name: "Start import" }).click();
     await expect(page.getByRole("progressbar", { name: "CV import progress" })).toBeVisible();
-    await writeFirestore(session, "account", "profile", {
-      uid: session.uid,
-      credit_balance: 1,
-      has_ever_purchased: false,
-      created_at: new Date(),
-      updated_at: new Date(),
-    });
     await writeFirestore(session, "actions", "import-failed", {
       id: "import-failed",
       type: "import_cv",
@@ -128,8 +114,6 @@ test.describe("UC-CV-002 import CV from PDF", () => {
     await expect(page.getByText("Reference ID")).toBeVisible();
     await expect(page.getByText("import-failed")).toBeVisible();
     await expect(page.getByRole("button", { name: "Copy" })).toBeVisible();
-    const creditBalance = await readAccountCredit(session);
-    expect(creditBalance).toBe(1);
   });
 
   test("oversized PDF rejected before API call", async ({ page }) => {
@@ -148,12 +132,12 @@ test.describe("UC-CV-002 import CV from PDF", () => {
     expect(called).toBe(false);
   });
 
-  test("blocked at zero credits", async ({ page }) => {
+  test("commercial import block uses OSS fallback message", async ({ page }) => {
     await page.route("**/api/cv/imports", async (route) => {
       await route.fulfill({
         status: 402,
         contentType: "application/json",
-        body: JSON.stringify({ error: "not enough credits" }),
+        body: JSON.stringify({ reason: "insufficient_credits" }),
       });
     });
 
@@ -162,7 +146,83 @@ test.describe("UC-CV-002 import CV from PDF", () => {
     await choosePDF(page, "%PDF-1.7\nzero");
     await page.getByRole("button", { name: "Start import" }).click();
 
-    await expect(page.getByText("You need at least 1 credit to import a CV.")).toBeVisible();
+    await expect(page.getByText("Import could not be started.")).toBeVisible();
+    await expect(page.getByText("Reference ID")).toBeVisible();
+    await expect(page.getByText(/^import-start-/)).toBeVisible();
+    await expect(page.getByRole("button", { name: "Copy" })).toBeVisible();
+  });
+
+  test("API outage status clears when backend health returns", async ({ page }) => {
+    let healthOnline = false;
+    await page.route("**/api/healthz", async (route) => {
+      if (healthOnline) {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ status: "ok" }),
+        });
+        return;
+      }
+      await route.abort("connectionrefused");
+    });
+    await page.route("**/api/cv/imports", async (route) => {
+      await route.abort("connectionrefused");
+    });
+
+    await signIn(page, "cv.import.api-down@example.test");
+    await page.getByRole("button", { name: /Import from PDF/ }).click();
+    await choosePDF(page, "%PDF-1.7\napi-down");
+    await page.getByRole("button", { name: "Start import" }).click();
+
+    await expect(page.getByText("Reference ID")).toBeVisible();
+    await expect(page.getByText(/^import-start-/)).toBeVisible();
+    await page.getByRole("button", { name: "Cancel" }).click();
+
+    await page.getByRole("button", { name: "Open account panel" }).click();
+    const accountPanel = page.getByRole("dialog", { name: "Account panel" });
+    const status = accountPanel.getByRole("status");
+    await expect(status.getByText("Status")).toBeVisible();
+    await expect(
+      status.getByText("Some services are not responding, and the features they support are unavailable. Help is on the way."),
+    ).toBeVisible();
+
+    healthOnline = true;
+    await expect(accountPanel.getByRole("status")).toHaveCount(0, {
+      timeout: 12000,
+    });
+  });
+
+  test("API outage status is visible from account panel after health check fails", async ({ page }) => {
+    await page.route("**/api/healthz", async (route) => {
+      await route.fulfill({
+        status: 502,
+        contentType: "text/plain",
+        body: "proxy error: backend unavailable",
+      });
+    });
+
+    await signIn(page, "cv.api.health@example.test");
+    await expect(page.locator("aside.sidebar")).toHaveClass(/sidebar-backend-issue/);
+
+    await page.getByRole("button", { name: "Open settings" }).click();
+    await expect(page.getByText("cv.api.health")).toBeVisible();
+    await expect(page.locator(".provider-pill", { hasText: "Google" })).toBeVisible();
+    await expect(page.getByText("Connected providers")).toHaveCount(0);
+
+    await page.getByRole("link", { name: "Profile" }).click();
+    await page.getByRole("button", { name: /Import from PDF/ }).click();
+
+    const accountPanel = page.getByRole("dialog", { name: "Account panel" });
+    const status = accountPanel.getByRole("status");
+    await expect(status.getByText("Status")).toBeVisible();
+    await expect(
+      status.getByText("Some services are not responding, and the features they support are unavailable. Help is on the way."),
+    ).toBeVisible();
+    await expect(status).toHaveClass(/account-status-flash/);
+    await expect(accountPanel.getByRole("button", { name: "Dismiss API backend notification" })).toHaveCount(0);
+    await expect(page.getByRole("dialog", { name: "Import CV from PDF" })).toHaveCount(0);
+    await accountPanel.getByRole("button", { name: "Close" }).click();
+    await expect(accountPanel).toHaveCount(0);
   });
 
   test("validation notice uses user-recognisable fields", async ({ page }) => {
@@ -857,15 +917,6 @@ async function writeFirestore(session: { uid: string; token: string }, collectio
 
 async function writeCandidate(session: { uid: string; token: string }, candidate: Record<string, unknown>) {
   await writeFirestore(session, "candidate", "profile", candidate);
-}
-
-async function readAccountCredit(session: { uid: string; token: string }): Promise<number> {
-  const response = await fetch(`http://localhost:8080/v1/projects/demo-cvai/databases/(default)/documents/users/${session.uid}/account/profile`, {
-    headers: { "Authorization": `Bearer ${session.token}` },
-  });
-  if (!response.ok) throw new Error(`Firestore read failed ${response.status}: ${await response.text()}`);
-  const body = await response.json();
-  return Number(body.fields.credit_balance.integerValue);
 }
 
 function importedCandidate() {

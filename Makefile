@@ -8,13 +8,22 @@ FIRESTORE_EMULATOR_HOST := localhost:8080
 FIREBASE_AUTH_EMULATOR_HOST := localhost:9099
 FIREBASE := XDG_CONFIG_HOME=$(CURDIR)/.cache/firebase-config firebase
 GO_ENV := GOCACHE=$(CURDIR)/.cache/go-build
+API_PORT ?= 8081
 
-.PHONY: emulate dev-web test-functions build-functions build-web deploy-functions lint test-rules test-e2e docker-build precommit setup
+.PHONY: emulate dev-api dev-web test-functions build-functions build-web deploy-functions lint test-rules test-e2e docker-build precommit setup
 
 # Start Firebase emulators (auth, firestore, storage, hosting).
 # Run the Go backend separately: cd functions && go run ./cmd/...
 emulate:
 	$(FIREBASE) emulators:start --project $(FIREBASE_PROJECT_ID) --import=emulator-data --export-on-exit=emulator-data
+
+dev-api:
+	cd $(FUNCTIONS_DIR) && \
+		FIRESTORE_EMULATOR_HOST=$(FIRESTORE_EMULATOR_HOST) \
+		FIREBASE_AUTH_EMULATOR_HOST=$(FIREBASE_AUTH_EMULATOR_HOST) \
+		FIREBASE_PROJECT_ID=$(FIREBASE_PROJECT_ID) \
+		PORT=$(API_PORT) \
+		$(GO_ENV) go run ./cmd
 
 dev-web:
 	cd $(WEB_DIR) && npm run dev

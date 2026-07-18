@@ -50,3 +50,18 @@ Makefile                Common contributor commands
 - [Use cases](docs/use_cases/index.md)
 
 For contributor setup and local development commands, see [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Local Runtime Ports
+
+For local web development, Firebase Auth runs on `9099`, Firestore runs on
+`8080`, and the Go API should run on `8081`:
+
+```bash
+make emulate
+make dev-api
+make dev-web
+```
+
+The web app proxies `/api/*` to `http://127.0.0.1:8081`. If Firebase is not
+reachable, the app shows a critical error page. If only the API is down, the app
+shows a sidebar `Status` section that clears when `/api/healthz` responds.

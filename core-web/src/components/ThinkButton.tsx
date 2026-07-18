@@ -1,4 +1,6 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { useAccountPanel } from "@/components/AccountPanelContext";
+import { useRuntimeStatus } from "@/components/RuntimeStatusProvider";
 
 interface ThinkButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   children: ReactNode;
@@ -15,11 +17,15 @@ export function ThinkButton({
   disabled,
   ...props
 }: ThinkButtonProps) {
+  const { openAccountPanel } = useAccountPanel();
+  const { backendIssueActive } = useRuntimeStatus();
   const locked = completionScore < 2;
   const isDisabled = disabled || locked || unavailable;
   const title = locked
     ? "Complete your profile first (2 of 5 required)"
-    : unavailable
+    : backendIssueActive
+      ? "Open status"
+      : unavailable
       ? "Not available yet"
       : props.title;
 
@@ -28,6 +34,14 @@ export function ThinkButton({
       {...props}
       className={`think-button ${variant === "primary" ? "think-button-primary" : "think-button-ghost"} ${props.className ?? ""}`}
       disabled={isDisabled}
+      onClick={(event) => {
+        if (backendIssueActive) {
+          event.preventDefault();
+          openAccountPanel({ flashStatus: true });
+          return;
+        }
+        props.onClick?.(event);
+      }}
       title={title}
       type={props.type ?? "button"}
     >

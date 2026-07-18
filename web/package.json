@@ -10,6 +10,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@cvai/core-web": "file:../core-web",
     "@vitejs/plugin-react": "^6.0.0",
     "firebase": "^12.14.0",
     "react": "^19.2.0",

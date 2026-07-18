@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import { ActionProgress } from "@/components/ActionProgress";
 import { ThinkButton } from "@/components/ThinkButton";
-import { ApiError, apiFetch } from "@/lib/api";
+import { apiFetch, getApiErrorMessage } from "@/lib/api";
 
 const maxPDFBytes = 10 * 1024 * 1024;
 
@@ -46,11 +46,8 @@ export function ImportCVModal({
       setActionId(response.actionId);
       setMessage("Import started.");
     } catch (error) {
-      if (error instanceof ApiError && error.status === 402) {
-        setMessage("You need at least 1 credit to import a CV.");
-      } else {
-        setMessage("Import could not be started.");
-      }
+      setMessage(getApiErrorMessage(error, "Import could not be started."));
+      setSupportReference(createSupportReference());
     } finally {
       setUploading(false);
     }
@@ -79,7 +76,7 @@ export function ImportCVModal({
         <div className="panel-row">
           <div>
             <h2>Import from PDF</h2>
-            <p className="muted">Upload a PDF CV. This uses 1 credit.</p>
+            <p className="muted">Upload a PDF CV.</p>
             {replacingExisting && <p className="form-error">Importing a PDF will replace the current CV.</p>}
           </div>
           <button type="button" className="icon-button" aria-label="Close import modal" onClick={onClose}>
@@ -109,4 +106,11 @@ export function ImportCVModal({
       </section>
     </div>
   );
+}
+
+function createSupportReference() {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return `import-start-${crypto.randomUUID()}`;
+  }
+  return `import-start-${Date.now().toString(36)}`;
 }
