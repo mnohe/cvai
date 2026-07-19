@@ -5,6 +5,10 @@ import { connectFirestoreEmulator, doc, getFirestore, setDoc } from "firebase/fi
 
 let app: FirebaseApp | undefined;
 
+test.beforeEach(async ({ page }) => {
+  await mockHealthyApi(page);
+});
+
 test.describe("UC-ONBOARD-001", () => {
   test("meter shows red at 0/5 on fresh account", async ({ page }) => {
     await signIn(page, "onboard.red@example.test");
@@ -148,4 +152,14 @@ function connectFirestoreEmulatorOnce(firestore: ReturnType<typeof getFirestore>
     connectFirestoreEmulator(firestore, "127.0.0.1", 8080);
     Object.assign(firestore, { _cvaiEmulatorConnected: true });
   }
+}
+
+async function mockHealthyApi(page: Page) {
+  await page.route("**/api/healthz", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ status: "ok" }),
+    });
+  });
 }
