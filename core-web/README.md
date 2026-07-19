@@ -15,9 +15,9 @@ Required consumer aliases:
 Release flow:
 
 1. Update `version` and `CHANGELOG.md`.
-2. Merge the release commit.
-3. Tag `core-web-vX.Y.Z`.
-4. Let the `publish-core-web` GitLab job publish `@cvai/core-web`.
+2. Commit with subject `release(core-web): X.Y.Z`.
+3. Merge the release commit to the default branch.
+4. Let the GitHub Actions `publish-core-web` job publish `@cvai/core-web` to npm.
 5. Update consuming apps to the published semver version and refresh their lockfiles.
 
 The package intentionally contains no hosted billing UI, credit prompts, or
