@@ -175,6 +175,23 @@ jobs:
           node-version: '24'
           registry-url: 'https://registry.npmjs.org'
 
+      - name: Read core-web package metadata
+        id: core-web-package
+        if: steps.release-changes.outputs.changed == 'true'
+        run: |
+          echo "name=$(node -p 'require("./package.json").name')" >> "$GITHUB_OUTPUT"
+          echo "version=$(node -p 'require("./package.json").version')" >> "$GITHUB_OUTPUT"
+
+      - name: Check npm package version
+        id: npm-package
+        if: steps.release-changes.outputs.changed == 'true'
+        run: |
+          if npm view "${{ steps.core-web-package.outputs.name }}@${{ steps.core-web-package.outputs.version }}" version >/dev/null 2>&1; then
+            echo "published=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "published=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - if: steps.release-changes.outputs.changed == 'true'
         run: npm ci
       - if: steps.release-changes.outputs.changed == 'true'
@@ -183,5 +200,7 @@ jobs:
         run: npm test
       - if: steps.release-changes.outputs.changed == 'true'
         run: npm run pack:dry-run
-      - if: steps.release-changes.outputs.changed == 'true'
+      - if: steps.release-changes.outputs.changed == 'true' && steps.npm-package.outputs.published == 'true'
+        run: echo "${{ steps.core-web-package.outputs.name }}@${{ steps.core-web-package.outputs.version }} is already published; skipping npm publish."
+      - if: steps.release-changes.outputs.changed == 'true' && steps.npm-package.outputs.published == 'false'
         run: npm publish --provenance --access public
