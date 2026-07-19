@@ -1,5 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
 
+test.beforeEach(async ({ page }) => {
+  await mockHealthyApi(page);
+});
+
 test.describe("UC-AUTH-001", () => {
   test("unauthenticated navigation redirects to login", async ({ page }) => {
     await page.goto("/dashboard");
@@ -83,4 +87,14 @@ async function signIn(
   }, email);
   await page.goto("/login");
   await page.getByRole("button", { name: `Sign in with ${provider}` }).click();
+}
+
+async function mockHealthyApi(page: Page) {
+  await page.route("**/api/healthz", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ status: "ok" }),
+    });
+  });
 }

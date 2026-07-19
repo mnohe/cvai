@@ -1,5 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
 
+test.beforeEach(async ({ page }) => {
+  await mockHealthyApi(page);
+});
+
 test.describe("UC-CV-001 empty state renders", () => {
   test("fresh CV page shows both entry points", async ({ page }) => {
     await signIn(page, "cv.empty@example.test");
@@ -153,7 +157,8 @@ test.describe("UC-CV-002 import CV from PDF", () => {
   });
 
   test("API outage status clears when backend health returns", async ({ page }) => {
-    let healthOnline = false;
+    let healthOnline = true;
+    await page.unroute("**/api/healthz");
     await page.route("**/api/healthz", async (route) => {
       if (healthOnline) {
         await route.fulfill({
@@ -166,6 +171,7 @@ test.describe("UC-CV-002 import CV from PDF", () => {
       await route.abort("connectionrefused");
     });
     await page.route("**/api/cv/imports", async (route) => {
+      healthOnline = false;
       await route.abort("connectionrefused");
     });
 
@@ -193,6 +199,7 @@ test.describe("UC-CV-002 import CV from PDF", () => {
   });
 
   test("API outage status is visible from account panel after health check fails", async ({ page }) => {
+    await page.unroute("**/api/healthz");
     await page.route("**/api/healthz", async (route) => {
       await route.fulfill({
         status: 502,
@@ -258,7 +265,7 @@ test.describe("UC-CV-003 direct firestore write", () => {
     await waitForCVSave(page);
     await page.reload();
     await expect(page.getByLabel("First name")).toHaveValue("Ada");
-    expect(apiCalls).toEqual([]);
+    expect(apiCalls.filter((url) => !url.endsWith("/api/healthz"))).toEqual([]);
   });
 });
 
@@ -814,9 +821,21 @@ test.describe("UC-CV-007 complete manual onboarding", () => {
     await editEntryPanel(page, "English");
     await expect(page.getByRole("textbox", { name: "Language" })).toHaveValue("English");
     await expect(page.getByLabel("Level")).toHaveValue("Native");
-    expect(apiCalls.filter((url) => !url.endsWith("/api/account"))).toEqual([]);
+    expect(
+      apiCalls.filter((url) => !url.endsWith("/api/account") && !url.endsWith("/api/healthz")),
+    ).toEqual([]);
   });
 });
+
+async function mockHealthyApi(page: Page) {
+  await page.route("**/api/healthz", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ status: "ok" }),
+    });
+  });
+}
 
 async function signIn(page: Page, email: string) {
   const unique = uniqueEmail(email);
