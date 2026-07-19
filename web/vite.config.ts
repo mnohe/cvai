@@ -1,9 +1,7 @@
 import path from "node:path";
-import type { ViteDevServer } from "vite";
 import { defineConfig } from "vite";
 
 export default defineConfig({
-  plugins: [localFirebaseHealthPlugin()],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "../core-web/src"),
@@ -32,33 +30,3 @@ export default defineConfig({
     outDir: "dist",
   },
 });
-
-function localFirebaseHealthPlugin() {
-  return {
-    name: "local-firebase-health",
-    configureServer(server: ViteDevServer) {
-      server.middlewares.use("/__local/firebase-auth-health", (_req, res) => {
-        void respondWithHealth(
-          res,
-          process.env.VITE_FIREBASE_AUTH_EMULATOR_URL ?? "http://localhost:9099",
-        );
-      });
-      server.middlewares.use("/__local/firestore-health", (_req, res) => {
-        const host = process.env.VITE_FIRESTORE_EMULATOR_HOST ?? "localhost";
-        const port = process.env.VITE_FIRESTORE_EMULATOR_PORT ?? "8080";
-        void respondWithHealth(res, `http://${host}:${port}`);
-      });
-    },
-  };
-}
-
-async function respondWithHealth(res: { statusCode: number; end: (body?: string) => void }, url: string) {
-  try {
-    const response = await fetch(url);
-    res.statusCode = response.ok || response.status < 500 ? 200 : 503;
-    res.end(res.statusCode === 200 ? "ok" : "unavailable");
-  } catch {
-    res.statusCode = 503;
-    res.end("unavailable");
-  }
-}
