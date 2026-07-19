@@ -20,9 +20,6 @@ Release flow:
 4. Let the `publish-core-web` GitLab job publish `@cvai/core-web`.
 5. Update consuming apps to the published semver version and refresh their lockfiles.
 
-The package intentionally contains no hosted billing UI, credit prompts, or
-CVirgil-specific branding.
-
 ## Runtime Failure UI
 
 `AuthProvider` blocks application rendering with a critical error page when
