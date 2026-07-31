@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -14,7 +13,6 @@ import (
 
 	"github.com/mnohe/cvai/functions/internal/auth"
 	"github.com/mnohe/cvai/functions/internal/handlers"
-	"github.com/mnohe/cvai/functions/internal/llm"
 	"github.com/mnohe/cvai/functions/internal/observability"
 	"github.com/mnohe/cvai/functions/internal/repo"
 	fsrepo "github.com/mnohe/cvai/functions/internal/repo/firestore"
@@ -54,6 +52,7 @@ func main() {
 	// Any route not registered on either mux returns 404 — not a silent auth bypass.
 	authMux := http.NewServeMux()
 	publicMux := http.NewServeMux()
+	registerTestControlRoutes(publicMux, llmClient)
 
 	// Public routes — no auth required.
 	publicMux.Handle("GET /healthz", auth.PublicHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -119,39 +118,6 @@ func main() {
 	if err := shutdownTelemetry(shutdownCtx); err != nil {
 		log.Printf("telemetry shutdown error: %v", err)
 	}
-}
-
-func newLLMClient() (llm.Completer, error) {
-	provider := envOrDefault("LLM_PROVIDER", llm.ProviderAnthropic)
-	apiKey := os.Getenv("LLM_API_KEY")
-	model := os.Getenv("LLM_MODEL")
-	baseURL := os.Getenv("LLM_BASE_URL")
-	if provider == llm.ProviderAnthropic {
-		apiKey = envOrDefaultValue(apiKey, os.Getenv("ANTHROPIC_API_KEY"))
-		model = envOrDefaultValue(model, os.Getenv("ANTHROPIC_MODEL"))
-		baseURL = envOrDefaultValue(baseURL, os.Getenv("ANTHROPIC_BASE_URL"))
-	}
-	if provider == llm.ProviderOpenAI {
-		apiKey = envOrDefaultValue(apiKey, os.Getenv("OPENAI_API_KEY"))
-		model = envOrDefaultValue(model, os.Getenv("OPENAI_MODEL"))
-	}
-	if apiKey == "" {
-		return nil, fmt.Errorf("LLM_API_KEY must be set")
-	}
-	if model == "" {
-		return nil, fmt.Errorf("LLM_MODEL must be set")
-	}
-	timeout := envDurationSeconds("LLM_TIMEOUT_SECONDS", 180*time.Second)
-	log.Printf("llm_client_init provider=%s model_set=%t timeout_seconds=%d max_retries=%d", provider, model != "", int(timeout.Seconds()), 2)
-	return llm.NewCompleter(llm.Config{
-		Provider:   provider,
-		APIKey:     apiKey,
-		Model:      model,
-		MaxTokens:  4096,
-		Timeout:    timeout,
-		MaxRetries: 2,
-		BaseURL:    baseURL,
-	})
 }
 
 func envOrDefault(key string, fallback string) string {

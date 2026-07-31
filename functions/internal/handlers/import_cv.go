@@ -152,7 +152,10 @@ func (h *ImportCVHandler) runImport(uid string, actionID string, pdfBytes []byte
 	timeout := importCVTimeout()
 	start := time.Now()
 	log.Printf("cv_import_started uid_set=true action_id=%s timeout_seconds=%d pdf_bytes=%d", actionID, int(timeout.Seconds()), len(pdfBytes))
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	// uid travels on the context (not just the uid parameter) because the LLM
+	// completer used here only sees ctx; a per-user test completer needs it
+	// to route to the right scripted response.
+	ctx, cancel := context.WithTimeout(auth.WithUID(context.Background(), uid), timeout)
 	defer cancel()
 	ctx, span := cvImportTracer.Start(ctx, "cv.import",
 		trace.WithAttributes(
