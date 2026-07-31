@@ -8,11 +8,14 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/mnohe/cvai/functions/internal/auth"
 	"github.com/mnohe/cvai/functions/internal/handlers"
+	"github.com/mnohe/cvai/functions/internal/health"
+	"github.com/mnohe/cvai/functions/internal/httpmw"
 	"github.com/mnohe/cvai/functions/internal/observability"
 	"github.com/mnohe/cvai/functions/internal/repo"
 	fsrepo "github.com/mnohe/cvai/functions/internal/repo/firestore"
@@ -55,11 +58,7 @@ func main() {
 	registerTestControlRoutes(publicMux, llmClient)
 
 	// Public routes — no auth required.
-	publicMux.Handle("GET /healthz", auth.PublicHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Deep Firestore probe added in Stage 9.
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
-	})))
+	publicMux.Handle("GET /healthz", auth.PublicHandler(health.Handler(fsClient)))
 	publicMux.Handle("POST /webhooks/stripe", auth.PublicHandler(stub501("StripeWebhook")))
 
 	// Authenticated routes — RequireAuth is applied to the entire authMux below.
@@ -77,16 +76,26 @@ func main() {
 	// DELETE /account also requires RequireRecentAuth(300) — chained inside the auth mux.
 	authMux.Handle("DELETE /account", authMW.RequireRecentAuth(300)(stub501("DeleteAccount")))
 
-	// Root handler: check public mux first, then apply RequireAuth to the auth mux.
-	root := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	// RequireAuth must run before the rate limiter, not after: it's what
+	// puts the uid the limiter keys on onto the request context.
+	rateLimiter := httpmw.NewRateLimiter(rateLimitPerMinute(), rateLimitBurst())
+	authenticatedHandler := authMW.RequireAuth(rateLimiter.Middleware(authMux))
+
+	// Root handler: check public mux first, then apply RequireAuth (and,
+	// behind it, per-user rate limiting) to the auth mux.
+	var root http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		routeReq := routing.StripAPIPrefix(r)
 		_, pattern := publicMux.Handler(routeReq)
 		if pattern != "" {
 			publicMux.ServeHTTP(w, routeReq)
 			return
 		}
-		authMW.RequireAuth(authMux).ServeHTTP(w, routeReq)
+		authenticatedHandler.ServeHTTP(w, routeReq)
 	})
+	root = httpmw.CORS(corsAllowedOrigins())(root)
+	root = httpmw.RequestLogger(root)
+	root = httpmw.Recover(root)
+	root = httpmw.WithRequestID(root)
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -145,6 +154,48 @@ func envDurationSeconds(key string, fallback time.Duration) time.Duration {
 		return fallback
 	}
 	return time.Duration(seconds) * time.Second
+}
+
+// corsAllowedOrigins returns the browser origins allowed to call this API
+// cross-origin. Empty (the default) preserves the prior no-CORS-headers
+// behaviour exactly, since production traffic reaches this service through
+// Firebase Hosting's same-origin /api/** rewrite, not a cross-origin call.
+func corsAllowedOrigins() []string {
+	raw := strings.TrimSpace(os.Getenv("CORS_ALLOWED_ORIGINS"))
+	if raw == "" {
+		return nil
+	}
+	origins := strings.Split(raw, ",")
+	for i, origin := range origins {
+		origins[i] = strings.TrimSpace(origin)
+	}
+	return origins
+}
+
+const (
+	defaultRateLimitPerMinute = 120
+	defaultRateLimitBurst     = 20
+)
+
+func rateLimitPerMinute() int {
+	return envInt("RATE_LIMIT_PER_MINUTE", defaultRateLimitPerMinute)
+}
+
+func rateLimitBurst() int {
+	return envInt("RATE_LIMIT_BURST", defaultRateLimitBurst)
+}
+
+func envInt(key string, fallback int) int {
+	raw := os.Getenv(key)
+	if raw == "" {
+		return fallback
+	}
+	value, err := strconv.Atoi(raw)
+	if err != nil || value <= 0 {
+		log.Printf("invalid_int_env key=%s value=%q", key, raw)
+		return fallback
+	}
+	return value
 }
 
 // stub501 returns a handler responding 501 Not Implemented.
