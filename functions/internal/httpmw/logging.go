@@ -31,9 +31,7 @@ func RequestLogger(next http.Handler) http.Handler {
 			slog.Int("status", sw.status),
 			slog.Int64("duration_ms", time.Since(start).Milliseconds()),
 			slog.String("request_id", RequestIDFromContext(r.Context())),
-		}
-		if uid := auth.UIDFromContext(r.Context()); uid != "" {
-			attrs = append(attrs, slog.Bool("uid_set", true))
+			slog.Bool("uid_set", auth.UIDFromContext(r.Context()) != ""),
 		}
 		Logger.LogAttrs(r.Context(), slog.LevelInfo, "http_request", attrs...)
 	})
