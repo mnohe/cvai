@@ -23,7 +23,9 @@ firebase-export-*/
 
 # Playwright outputs
 playwright-report/
+playwright-report-system/
 test-results/
+test-results-system/
 
 # devcontainer config is shared across all workspace projects, not repo-specific
 .devcontainer/
