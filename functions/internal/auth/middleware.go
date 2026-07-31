@@ -53,8 +53,10 @@ func New(ctx context.Context) (*Middleware, error) {
 	return &Middleware{verifier: client}, nil
 }
 
-// newWithVerifier creates a Middleware with an injected verifier; used in tests.
-func newWithVerifier(v TokenVerifier) *Middleware {
+// NewWithVerifier creates a Middleware with an injected verifier. Exported
+// so other packages' tests (e.g. internal/httpmw's composition tests) can
+// build a real, controllable Middleware without a live Firebase project.
+func NewWithVerifier(v TokenVerifier) *Middleware {
 	return &Middleware{verifier: v}
 }
 

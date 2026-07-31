@@ -45,7 +45,7 @@ func okHandler(t *testing.T, wantUID string) http.Handler {
 }
 
 func TestRequireAuth_ValidToken(t *testing.T) {
-	mw := newWithVerifier(okVerifier("user-123", time.Now().Unix()))
+	mw := NewWithVerifier(okVerifier("user-123", time.Now().Unix()))
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Authorization", "Bearer valid-token")
@@ -56,7 +56,7 @@ func TestRequireAuth_ValidToken(t *testing.T) {
 }
 
 func TestRequireAuth_MissingHeader(t *testing.T) {
-	mw := newWithVerifier(okVerifier("user-123", time.Now().Unix()))
+	mw := NewWithVerifier(okVerifier("user-123", time.Now().Unix()))
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	mw.RequireAuth(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -68,7 +68,7 @@ func TestRequireAuth_MissingHeader(t *testing.T) {
 }
 
 func TestRequireAuth_WrongScheme(t *testing.T) {
-	mw := newWithVerifier(okVerifier("user-123", time.Now().Unix()))
+	mw := NewWithVerifier(okVerifier("user-123", time.Now().Unix()))
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Authorization", "Basic dXNlcjpwYXNz")
@@ -81,7 +81,7 @@ func TestRequireAuth_WrongScheme(t *testing.T) {
 }
 
 func TestRequireAuth_InvalidToken(t *testing.T) {
-	mw := newWithVerifier(errVerifier())
+	mw := NewWithVerifier(errVerifier())
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Authorization", "Bearer bad-token")
@@ -111,7 +111,7 @@ func TestPublicHandler_Bypass(t *testing.T) {
 }
 
 func TestRequireRecentAuth_Fresh(t *testing.T) {
-	mw := newWithVerifier(okVerifier("user-123", time.Now().Unix()))
+	mw := NewWithVerifier(okVerifier("user-123", time.Now().Unix()))
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodDelete, "/account", nil)
 	req.Header.Set("Authorization", "Bearer valid-token")
@@ -127,7 +127,7 @@ func TestRequireRecentAuth_Fresh(t *testing.T) {
 
 func TestRequireRecentAuth_StaleToken(t *testing.T) {
 	staleAuthTime := time.Now().Unix() - 400 // older than 300s threshold
-	mw := newWithVerifier(okVerifier("user-123", staleAuthTime))
+	mw := NewWithVerifier(okVerifier("user-123", staleAuthTime))
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodDelete, "/account", nil)
 	req.Header.Set("Authorization", "Bearer stale-token")
