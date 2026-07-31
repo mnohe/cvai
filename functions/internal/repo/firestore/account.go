@@ -124,10 +124,10 @@ func (r *AccountRepo) GrantCredits(ctx context.Context, uid string, amount int, 
 		}
 
 		purchase := domain.PurchaseRecord{
-			ID:          uuid.New().String(),
-			Provider:    source,
+			ID:           uuid.New().String(),
+			Provider:     source,
 			CreditAmount: amount,
-			PurchasedAt: time.Now(),
+			PurchasedAt:  time.Now(),
 		}
 		if source == domain.PurchaseProviderStripe {
 			purchase.CheckoutSessionID = ref

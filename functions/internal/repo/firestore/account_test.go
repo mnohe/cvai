@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	fsrepo "github.com/mnohe/cvai/functions/internal/repo/firestore"
 	"github.com/mnohe/cvai/functions/internal/repo"
+	fsrepo "github.com/mnohe/cvai/functions/internal/repo/firestore"
 )
 
 func TestAccountRepo_GetProfile_CreatesOnFirstRead(t *testing.T) {

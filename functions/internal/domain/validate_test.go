@@ -131,11 +131,11 @@ func validCV() CV {
 	return CV{
 		Summary: "Staff engineer with platform experience.",
 		Contact: Contact{
-			Name:     "Ada",
-			Surname:  "Lovelace",
-			Phone:    Phone{Prefix: "+1", Number: "5551234"},
-			Email:    "ada@example.com",
-			Links:    []Link{{Label: "LinkedIn", URL: "https://linkedin.example/ada"}},
+			Name:    "Ada",
+			Surname: "Lovelace",
+			Phone:   Phone{Prefix: "+1", Number: "5551234"},
+			Email:   "ada@example.com",
+			Links:   []Link{{Label: "LinkedIn", URL: "https://linkedin.example/ada"}},
 		},
 		Languages: []Language{
 			{Name: "English", Level: "Native"},
