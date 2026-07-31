@@ -124,9 +124,10 @@ yourself.
 
 Add new browser-only UI assertions under `web/e2e/`. Add a case to `web/e2e-system/` only
 when the thing being proven genuinely requires the real backend (a real Firestore write, a
-real auth check, a real LLM-backed flow through the mock completer) — see `E2E-C752` in
-the coordination repo for the next batch of that work (CV import and billing through the
-real backend).
+real auth check, a real LLM-backed flow through the mock completer) — `web/e2e-system/cv-import.spec.ts`
+(`E2E-C752`) is the reference example: a real PDF upload, a scripted mock LLM response, and
+the resulting candidate profile and credit balance, all through the real backend and
+Firestore emulator.
 
 ## Branch And Commit Hygiene
 
