@@ -76,24 +76,28 @@ func main() {
 	// DELETE /account also requires RequireRecentAuth(300) — chained inside the auth mux.
 	authMux.Handle("DELETE /account", authMW.RequireRecentAuth(300)(stub501("DeleteAccount")))
 
-	// RequireAuth must run before the rate limiter, not after: it's what
-	// puts the uid the limiter keys on onto the request context.
+	// See httpmw.WrapAuthenticated's doc comment for why RequireAuth must be
+	// outermost here rather than wrapped by the logger/recovery pair.
 	rateLimiter := httpmw.NewRateLimiter(rateLimitPerMinute(), rateLimitBurst())
-	authenticatedHandler := authMW.RequireAuth(rateLimiter.Middleware(authMux))
+	authenticatedHandler := httpmw.WrapAuthenticated(authMW, rateLimiter, authMux)
+	publicHandler := httpmw.WrapPublic(publicMux)
 
-	// Root handler: check public mux first, then apply RequireAuth (and,
-	// behind it, per-user rate limiting) to the auth mux.
+	// Root handler: check public mux first, then apply the authenticated
+	// stack (auth, rate limiting, logging, recovery) to the auth mux.
 	var root http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		routeReq := routing.StripAPIPrefix(r)
 		_, pattern := publicMux.Handler(routeReq)
 		if pattern != "" {
-			publicMux.ServeHTTP(w, routeReq)
+			publicHandler.ServeHTTP(w, routeReq)
 			return
 		}
 		authenticatedHandler.ServeHTTP(w, routeReq)
 	})
 	root = httpmw.CORS(corsAllowedOrigins())(root)
-	root = httpmw.RequestLogger(root)
+	// Last-resort net for a panic in CORS or the routing decision itself
+	// (not in application code, which the per-branch Recover above already
+	// covers with a matching completion log line); this one has no logger
+	// of its own to avoid a second completion line for the same request.
 	root = httpmw.Recover(root)
 	root = httpmw.WithRequestID(root)
 
