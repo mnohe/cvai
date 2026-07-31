@@ -1,3 +1,5 @@
+//go:build !e2e_mock
+
 package main
 
 import (
