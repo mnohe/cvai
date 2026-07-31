@@ -144,10 +144,52 @@ jobs:
             --project demo-cvai \
             'npm --prefix web run test:e2e'
 
+  e2e-system:
+    name: E2E system (Playwright + real backend)
+    runs-on: ubuntu-latest
+    needs: [functions, web]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache: true
+          cache-dependency-path: functions/go.mod
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: ./web/package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools
+
+      - name: Install web dependencies
+        run: npm ci
+        working-directory: web
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+        working-directory: web
+
+      - name: Run Playwright against the real backend
+        run: |
+          firebase emulators:exec \
+            --only auth,firestore \
+            --project demo-cvai \
+            'npm --prefix web run test:e2e:system'
+
   publish-core-web:
     name: Publish @cvai/core-web
     runs-on: ubuntu-latest
-    needs: [functions, web, rules, e2e]
+    needs: [functions, web, rules, e2e, e2e-system]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     permissions:
       contents: read
