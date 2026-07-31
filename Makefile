@@ -10,7 +10,7 @@ FIREBASE := XDG_CONFIG_HOME=$(CURDIR)/.cache/firebase-config firebase
 GO_ENV := GOCACHE=$(CURDIR)/.cache/go-build
 API_PORT ?= 8081
 
-.PHONY: emulate dev-api dev-web test-functions build-functions build-web deploy-functions lint test-rules test-e2e docker-build precommit setup
+.PHONY: emulate dev-api dev-web test-functions build-functions build-web deploy-functions lint test-rules test-e2e test-e2e-system docker-build precommit setup
 
 # Start Firebase emulators (auth, firestore, storage, hosting).
 # Run the Go backend separately: cd functions && go run ./cmd/...
@@ -63,9 +63,25 @@ test-rules:
 		$(FIREBASE) emulators:exec --only firestore --project $(FIREBASE_PROJECT_ID) 'npm run test:rules'; \
 	fi
 
-# Run Playwright E2E tests. Requires the Firebase Auth emulator to be running.
+# Run the browser-only E2E target: the SPA against a mocked /api/**, no Go
+# backend needed. Requires the Firebase Auth emulator to be running.
 test-e2e:
 	cd $(WEB_DIR) && npm run test:e2e
+
+# Run the full-system E2E target: the real Go backend (built with -tags
+# e2e_mock, see functions/cmd/llm_wiring_e2e_mock.go) against the real
+# Firestore and Auth emulators. Playwright itself starts and stops both the
+# backend and the web server (see web/playwright.system.config.ts) on ports
+# separate from test-e2e's, so the two targets never collide even if run
+# back to back. Requires the Firestore and Auth emulators to be running.
+test-e2e-system:
+	if curl --silent --output /dev/null http://$(FIRESTORE_EMULATOR_HOST) && \
+		curl --silent --output /dev/null http://$(FIREBASE_AUTH_EMULATOR_HOST); then \
+		cd $(WEB_DIR) && npm run test:e2e:system; \
+	else \
+		$(FIREBASE) emulators:exec --only auth,firestore --project $(FIREBASE_PROJECT_ID) \
+			'cd $(WEB_DIR) && npm run test:e2e:system'; \
+	fi
 
 docker-build:
 	docker build -f $(FUNCTIONS_DIR)/Dockerfile -t cvai-ci .

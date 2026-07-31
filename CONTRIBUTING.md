@@ -100,6 +100,34 @@ npm run test:e2e
 
 `make test-e2e` expects the needed emulators and web server to be available. When in doubt, run `make emulate` first and keep it open while running tests.
 
+### Two E2E targets
+
+`web/e2e/` and `web/e2e-system/` are deliberately separate test targets with distinct
+contracts. Pick the one that matches what your change actually needs to prove; most
+frontend-only changes only need the first.
+
+| | `make test-e2e` (`web/e2e/`) | `make test-e2e-system` (`web/e2e-system/`) |
+|---|---|---|
+| Backend | None — `/api/**` is intercepted with `page.route()` | The real Go backend, built with `-tags e2e_mock` (see `functions/cmd/llm_wiring_e2e_mock.go`) |
+| LLM | N/A (mocked in the browser) | The deterministic in-memory completer, not a live provider |
+| Web port | 5174 (`PLAYWRIGHT_PORT`) | 5178 (`PLAYWRIGHT_SYSTEM_WEB_PORT`) |
+| API port | N/A | 8092 (`PLAYWRIGHT_SYSTEM_API_PORT`) |
+| Lifecycle | Playwright starts/stops one `webServer` (Vite) | Playwright starts/stops two `webServer`s (the Go backend, then Vite proxying to it) |
+| Reports | `web/playwright-report/`, `web/test-results/` | `web/playwright-report-system/`, `web/test-results-system/` |
+| Proves | UI behavior in isolation | That a real request reaches the real backend through the real Firestore/Auth emulators |
+
+Both need the Firestore and Auth emulators running (`make emulate`, or let `make
+test-e2e`/`make test-e2e-system` start them via `firebase emulators:exec`). The system
+target additionally needs a working `go` toolchain on `PATH`, since Playwright's own
+`webServer` runs `go run -tags e2e_mock ./cmd` for you — you don't start the backend
+yourself.
+
+Add new browser-only UI assertions under `web/e2e/`. Add a case to `web/e2e-system/` only
+when the thing being proven genuinely requires the real backend (a real Firestore write, a
+real auth check, a real LLM-backed flow through the mock completer) — see `E2E-C752` in
+the coordination repo for the next batch of that work (CV import and billing through the
+real backend).
+
 ## Branch And Commit Hygiene
 
 - Use small, reviewable commits.
