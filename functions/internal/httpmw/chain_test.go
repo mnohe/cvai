@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -14,6 +15,8 @@ import (
 
 	"github.com/mnohe/cvai/functions/internal/auth"
 )
+
+var errInvalidToken = errors.New("invalid token")
 
 // This file tests the exact production composition (WrapAuthenticated,
 // WrapPublic), not each middleware in isolation — the bugs these guard
@@ -134,6 +137,68 @@ func TestWrapAuthenticatedStillLogsExactlyOneCompletionEntryWhenTheHandlerPanics
 	}
 	if completions != 1 {
 		t.Fatalf("http_request completion lines = %d, want exactly 1 (lines: %v)", completions, lines)
+	}
+}
+
+// TestWrapAuthenticatedLogsRejectionsWithUIDSetFalse is the regression test
+// for the Attempt 2 review finding: RequestLogger sat inside RequireAuth, so
+// a rejected (401/403) request — which RequireAuth's rejection path answers
+// directly, without ever calling its next handler — never reached it and
+// produced no completion log at all.
+func TestWrapAuthenticatedLogsRejectionsWithUIDSetFalse(t *testing.T) {
+	tests := []struct {
+		name       string
+		authHeader string
+		verifyErr  error
+		wantStatus int
+	}{
+		{name: "missing bearer token", authHeader: "", wantStatus: http.StatusUnauthorized},
+		{name: "malformed authorization scheme", authHeader: "Basic dXNlcjpwYXNz", wantStatus: http.StatusUnauthorized},
+		{name: "invalid token", authHeader: "Bearer garbage", verifyErr: errInvalidToken, wantStatus: http.StatusForbidden},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			buf := withCapturedLog(t)
+			authMW := auth.NewWithVerifier(&fakeVerifier{err: tc.verifyErr})
+			rl := NewRateLimiter(120, 20)
+			called := false
+			handler := WithRequestID(WrapAuthenticated(authMW, rl, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				called = true
+				w.WriteHeader(http.StatusOK)
+			})))
+
+			req := httptest.NewRequest(http.MethodGet, "/account", nil)
+			if tc.authHeader != "" {
+				req.Header.Set("Authorization", tc.authHeader)
+			}
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, req)
+
+			if rec.Code != tc.wantStatus {
+				t.Fatalf("status = %d, want %d", rec.Code, tc.wantStatus)
+			}
+			if called {
+				t.Fatal("the real route handler ran despite a rejected auth check")
+			}
+
+			lines := logLines(t, buf)
+			var completions int
+			for _, line := range lines {
+				if line["msg"] != "http_request" {
+					continue
+				}
+				completions++
+				if line["status"] != float64(tc.wantStatus) {
+					t.Fatalf("completion log status = %v, want %d", line["status"], tc.wantStatus)
+				}
+				if line["uid_set"] != false {
+					t.Fatalf("uid_set = %v, want false for a rejected request", line["uid_set"])
+				}
+			}
+			if completions != 1 {
+				t.Fatalf("http_request completion lines = %d, want exactly 1 (lines: %v)", completions, lines)
+			}
+		})
 	}
 }
 
