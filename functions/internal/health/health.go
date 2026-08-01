@@ -11,6 +11,9 @@ import (
 	"time"
 
 	"cloud.google.com/go/firestore"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -19,6 +22,21 @@ import (
 // check request, so a struggling dependency degrades the check quickly
 // instead of risking Cloud Run's own health-check timeout.
 const probeTimeout = 2 * time.Second
+
+var (
+	healthMeter = otel.Meter("github.com/mnohe/cvai/functions/health")
+
+	// health_check_total is PROD-74C1's service-health signal: a counter
+	// rather than a gauge, since every /healthz call is an independent
+	// point-in-time observation and Cloud Run may probe from multiple
+	// instances concurrently — a rate of the "degraded" series over a
+	// window is what an alert or dashboard actually wants, not an
+	// instance's last-known state.
+	healthCheckTotal, _ = healthMeter.Int64Counter(
+		"health_check_total",
+		metric.WithDescription("Count of /healthz checks by dependency and outcome."),
+	)
+)
 
 // Handler serves a deep health check: always live (the process answered at
 // all), plus a real Firestore round trip. A missing probe document is
@@ -35,6 +53,10 @@ func Handler(fsClient *firestore.Client) http.Handler {
 			firestoreStatus = "unavailable"
 			httpStatus = http.StatusServiceUnavailable
 		}
+		healthCheckTotal.Add(r.Context(), 1, metric.WithAttributes(
+			attribute.String("dependency", "firestore"),
+			attribute.String("outcome", firestoreStatus),
+		))
 
 		body := struct {
 			Status       string            `json:"status"`
