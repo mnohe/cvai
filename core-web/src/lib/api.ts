@@ -12,26 +12,27 @@ import { ApiError } from "@/lib/api-errors";
 
 export async function apiFetch<T>(
   path: string,
-  options: RequestInit = {},
+  options: RequestInit & { timeoutMs?: number } = {},
 ): Promise<T> {
+  const { timeoutMs, ...requestOptions } = options;
   const token = await auth.currentUser?.getIdToken();
-  const headers = new Headers(options.headers);
+  const headers = new Headers(requestOptions.headers);
 
   if (token) {
     headers.set("Authorization", `Bearer ${token}`);
   }
 
-  if (options.body && !(options.body instanceof FormData) && !headers.has("Content-Type")) {
+  if (requestOptions.body && !(requestOptions.body instanceof FormData) && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
 
   let response: Response;
-  const timeout = createTimeoutSignal();
+  const timeout = createTimeoutSignal(timeoutMs);
   try {
     response = await fetch(`${import.meta.env.VITE_API_BASE_URL ?? "/api"}${path}`, {
-      ...options,
+      ...requestOptions,
       headers,
-      signal: mergeSignals(options.signal, timeout.signal),
+      signal: mergeSignals(requestOptions.signal, timeout.signal),
     });
   } catch (error) {
     notifyApiUnavailable();
@@ -55,22 +56,19 @@ export async function apiFetch<T>(
     throw apiError;
   }
 
-  if (response.status === 204) {
-    return undefined as T;
-  }
-
   try {
-    const body = (await response.json()) as T;
-    return body;
+    const text = await response.text();
+    if (!text) return undefined as T;
+    return JSON.parse(text) as T;
   } catch (error) {
     notifyApiUnavailable();
     throw error;
   }
 }
 
-function createTimeoutSignal() {
+function createTimeoutSignal(timeoutOverrideMs?: number) {
   const controller = new AbortController();
-  const timeoutMs = Number(import.meta.env.VITE_API_REQUEST_TIMEOUT_MS ?? "15000");
+  const timeoutMs = timeoutOverrideMs ?? Number(import.meta.env.VITE_API_REQUEST_TIMEOUT_MS ?? "15000");
   const timer = window.setTimeout(() => controller.abort(), timeoutMs);
   return {
     signal: controller.signal,

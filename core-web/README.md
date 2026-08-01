@@ -38,6 +38,12 @@ responds again. The status clears automatically on the first healthy
 `/api/healthz` response. Backend service calls time out after 15 seconds and
 raise the same outage signal.
 
+Callers for deliberately long-running operations may pass `timeoutMs` in the
+`apiFetch` options. Account export and deletion use this because their backend
+deadlines intentionally exceed the general 15-second request limit.
+Successful empty response bodies, including the account-deletion endpoint's
+`200 OK`, resolve as `undefined`.
+
 Import start failures that happen before an Action document exists display a
 copyable `import-start-*` support reference so users still have an error ID.
 
