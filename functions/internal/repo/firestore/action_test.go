@@ -2,12 +2,34 @@ package firestore_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
 	"github.com/mnohe/cvai/functions/internal/domain"
+	"github.com/mnohe/cvai/functions/internal/repo"
 	fsrepo "github.com/mnohe/cvai/functions/internal/repo/firestore"
 )
+
+// TestActionRepo_Create_RefusesATombstonedAccount is GDPR-A18E Finding 3's
+// regression test for the one Action write that creates new state (see
+// Create's doc comment for why Update/Complete/Fail don't need the same
+// check).
+func TestActionRepo_Create_RefusesATombstonedAccount(t *testing.T) {
+	ctx := context.Background()
+	client := mustNewClient(t, ctx)
+	r := fsrepo.NewActionRepo(client)
+	uid := newUID()
+	seedTombstone(t, ctx, client, uid)
+
+	actionID, err := r.Create(ctx, uid, domain.Action{Type: domain.ActionTypeImportCV, Status: domain.ActionPending})
+	if !errors.Is(err, repo.ErrAccountBeingDeleted) {
+		t.Fatalf("err = %v, want ErrAccountBeingDeleted", err)
+	}
+	if actionID != "" {
+		t.Fatalf("actionID = %q, want empty", actionID)
+	}
+}
 
 func TestActionRepo_Get_NotFound(t *testing.T) {
 	ctx := context.Background()

@@ -10,6 +10,25 @@ import (
 // ErrInsufficientCredits is returned by DeductCredit when the account balance is zero.
 var ErrInsufficientCredits = errors.New("insufficient credits")
 
+// ErrAccountBeingDeleted is returned by a write path instead of creating or
+// updating user-owned state, once DeletionBarrier.IsBeingDeleted reports
+// true for the acting uid.
+var ErrAccountBeingDeleted = errors.New("account is being deleted")
+
+// DeletionBarrier reports whether a uid has an active account-deletion
+// tombstone. Every backend write path that can create or update
+// user-owned Firestore or Storage state through the Admin SDK — which
+// bypasses Firestore/Storage Security Rules entirely — must consult this
+// immediately before its write commits (inside the same transaction, where
+// the write is transactional, so Firestore's own optimistic-concurrency
+// retry keeps the check and the write atomic), and skip the write in favor
+// of ErrAccountBeingDeleted if true. This mirrors, for privileged backend
+// writers, the same barrier Security Rules enforce for direct client
+// writes (see cvirgil's docker/firestore.local.rules isBeingDeleted(uid)).
+type DeletionBarrier interface {
+	IsBeingDeleted(ctx context.Context, uid string) (bool, error)
+}
+
 // AccountRepository manages account documents and credit balances.
 type AccountRepository interface {
 	// GetProfile returns the account, creating it with zero credits on first call.
