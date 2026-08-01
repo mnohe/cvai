@@ -41,10 +41,7 @@ export function SettingsPage() {
           </button>
         </section>
         <Slots.SettingsExtra />
-        <section className="settings-section">
-          <h2>Privacy</h2>
-          <p className="muted">Coming soon</p>
-        </section>
+        <Slots.PrivacySettings />
       </div>
     </section>
   );

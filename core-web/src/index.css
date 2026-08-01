@@ -623,6 +623,44 @@ button:disabled {
   padding: 16px;
 }
 
+.privacy-settings,
+.privacy-action,
+.privacy-result,
+.privacy-recovery {
+  display: grid;
+  gap: 12px;
+}
+
+.privacy-action + .privacy-action {
+  border-top: 1px solid var(--border);
+  padding-top: 18px;
+}
+
+.privacy-action h3,
+.privacy-action p,
+.privacy-result p,
+.privacy-recovery p {
+  margin: 0;
+}
+
+.privacy-danger-zone {
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
+}
+
+.privacy-result,
+.privacy-recovery {
+  border-left: 3px solid var(--border-strong);
+  padding-left: 12px;
+}
+
+.privacy-recovery {
+  border-left-color: var(--danger);
+}
+
+.privacy-delete-dialog {
+  width: min(92vw, 560px);
+}
+
 .completion-panel {
   border-top: 4px solid var(--section-panel-top-border);
 }
