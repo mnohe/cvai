@@ -11,6 +11,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/mnohe/cvai/functions/internal/domain"
+	"github.com/mnohe/cvai/functions/internal/repo"
 )
 
 // ActionRepo implements repo.ActionRepository against Firestore.
@@ -24,6 +25,14 @@ func NewActionRepo(client *firestore.Client) *ActionRepo {
 }
 
 // Create persists a pending action and returns its generated ID when needed.
+//
+// This is the one Action write that can create new state rather than only
+// update an existing document — Update/Complete/Fail below all call
+// Firestore's Update (not Set), which fails closed with NotFound against an
+// already-deleted account rather than recreating anything, so only Create
+// needs the deletion-barrier check. It runs inside a transaction so that
+// check and the write share one atomic commit — see
+// CandidateRepo.WriteCV's doc comment for why.
 func (r *ActionRepo) Create(ctx context.Context, uid string, action domain.Action) (string, error) {
 	now := time.Now()
 	if action.ID == "" {
@@ -39,8 +48,18 @@ func (r *ActionRepo) Create(ctx context.Context, uid string, action domain.Actio
 	if err := action.Validate(); err != nil {
 		return "", fmt.Errorf("validate action: %w", err)
 	}
-	if _, err := actionDoc(r.client, uid, action.ID).Set(ctx, action); err != nil {
-		return "", fmt.Errorf("create action: %w", err)
+	err := r.client.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
+		beingDeleted, err := IsBeingDeletedInTransaction(ctx, tx, r.client, uid)
+		if err != nil {
+			return fmt.Errorf("check deletion barrier for create action: %w", err)
+		}
+		if beingDeleted {
+			return repo.ErrAccountBeingDeleted
+		}
+		return tx.Set(actionDoc(r.client, uid, action.ID), action)
+	})
+	if err != nil {
+		return "", err
 	}
 	return action.ID, nil
 }
