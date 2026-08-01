@@ -50,9 +50,16 @@ var (
 		metric.WithDescription("Total duration of asynchronous CV import processing."),
 		metric.WithUnit("ms"),
 	)
+	// action_attempts_total is deliberately not cv-import-specific in name:
+	// it's the generic Action-failure signal PROD-74C1's dashboards and
+	// alerts query across every domain.Action type, distinguished by the
+	// action_type attribute. CV import is the only Action type today, but
+	// future handlers (role ingestion, bundle generation, ...) should record
+	// through the same metric name with their own action_type rather than
+	// minting a new counter per type.
 	cvImportAttempts, _ = cvImportMeter.Int64Counter(
-		"cv_import_attempts_total",
-		metric.WithDescription("Count of CV import attempts by terminal status and failure class."),
+		"action_attempts_total",
+		metric.WithDescription("Count of Action attempts by action type, terminal status, and failure class."),
 	)
 )
 
@@ -167,7 +174,7 @@ func (h *ImportCVHandler) runImport(uid string, actionID string, pdfBytes []byte
 	defer span.End()
 
 	cvImportPDFBytes.Record(ctx, int64(len(pdfBytes)))
-	cvImportAttempts.Add(ctx, 1, metric.WithAttributes(attribute.String("status", "started"), attribute.String("failure_class", "none")))
+	cvImportAttempts.Add(ctx, 1, metric.WithAttributes(attribute.String("action_type", "cv_import"), attribute.String("status", "started"), attribute.String("failure_class", "none")))
 	if err := h.actions.Update(ctx, uid, actionID, domain.ActionProgress{Step: "analysing", Message: "Analysing PDF", Percent: intPtr(35)}); err != nil {
 		log.Printf("action_update_failed uid_set=true action_id=%s", actionID)
 	}
@@ -252,7 +259,7 @@ func (h *ImportCVHandler) runImport(uid string, actionID string, pdfBytes []byte
 func (h *ImportCVHandler) recordImportSuccess(ctx context.Context, span trace.Span, start time.Time) {
 	duration := time.Since(start)
 	cvImportTotalDuration.Record(ctx, duration.Milliseconds(), metric.WithAttributes(attribute.String("status", "completed"), attribute.String("failure_class", "none")))
-	cvImportAttempts.Add(ctx, 1, metric.WithAttributes(attribute.String("status", "completed"), attribute.String("failure_class", "none")))
+	cvImportAttempts.Add(ctx, 1, metric.WithAttributes(attribute.String("action_type", "cv_import"), attribute.String("status", "completed"), attribute.String("failure_class", "none")))
 	span.SetAttributes(
 		attribute.String("cv_import.status", "completed"),
 		attribute.String("cv_import.failure_class", "none"),
@@ -263,7 +270,7 @@ func (h *ImportCVHandler) recordImportSuccess(ctx context.Context, span trace.Sp
 func (h *ImportCVHandler) recordImportFailure(ctx context.Context, span trace.Span, start time.Time, failureClass string) {
 	duration := time.Since(start)
 	cvImportTotalDuration.Record(ctx, duration.Milliseconds(), metric.WithAttributes(attribute.String("status", "failed"), attribute.String("failure_class", failureClass)))
-	cvImportAttempts.Add(ctx, 1, metric.WithAttributes(attribute.String("status", "failed"), attribute.String("failure_class", failureClass)))
+	cvImportAttempts.Add(ctx, 1, metric.WithAttributes(attribute.String("action_type", "cv_import"), attribute.String("status", "failed"), attribute.String("failure_class", failureClass)))
 	span.SetAttributes(
 		attribute.String("cv_import.status", "failed"),
 		attribute.String("cv_import.failure_class", failureClass),
