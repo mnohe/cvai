@@ -7,10 +7,12 @@ Consumers import the package API and provide their own routes before mounting
 
 Required consumer aliases:
 
-- `@` -> the package source entry resolved by the consuming build
+- `@` -> `node_modules/@cvai/core-web/src` (for the package's internal imports)
 - `@branding` -> the consuming app's branding module
-- `@cvai/core-web` -> `@cvai/core-web/src/index.ts`
-- `@cvai/core-web/styles.css` -> `@cvai/core-web/src/index.css`
+
+The package and stylesheet imports resolve through the package's `exports` map. Do not
+alias `@cvai/core-web` back to a sibling source checkout: doing so bypasses the declared
+immutable dependency and makes clean consumer builds non-reproducible.
 
 Release flow:
 
