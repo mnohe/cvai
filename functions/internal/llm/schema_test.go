@@ -1,10 +1,13 @@
 package llm
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
 	"testing"
+
+	"github.com/mnohe/cvai/functions/internal/llm/prompts"
 )
 
 func TestDeriveOpenAIStrictSchemaRequiresAllPropertiesAndNullsOptional(t *testing.T) {
@@ -86,6 +89,16 @@ func TestCanonicalCVSchemaDerivesOpenAICompatibleSubset(t *testing.T) {
 	}
 	if err := validateOpenAISchemaNode(schema, true, "$"); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestEmbeddedCVSchemaMatchesCanonicalSchema(t *testing.T) {
+	raw, err := os.ReadFile("../../../schemas/cv.schema.json")
+	if err != nil {
+		t.Fatalf("read schema: %v", err)
+	}
+	if !bytes.Equal(raw, []byte(prompts.CVSchemaFallback)) {
+		t.Fatal("embedded CV schema differs from schemas/cv.schema.json")
 	}
 }
 
