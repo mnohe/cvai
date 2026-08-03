@@ -45,6 +45,45 @@ func TestActionRepo_Get_NotFound(t *testing.T) {
 	}
 }
 
+func TestActionRepoValidationAndMissingDocumentFailures(t *testing.T) {
+	ctx := context.Background()
+	client := mustNewClient(t, ctx)
+	r := fsrepo.NewActionRepo(client)
+	uid := newUID()
+
+	if id, err := r.Create(ctx, uid, domain.Action{}); err == nil || id != "" {
+		t.Fatalf("Create invalid action = (%q, %v), want empty id and error", id, err)
+	}
+	if err := r.Update(ctx, uid, "missing", domain.ActionProgress{}); err == nil {
+		t.Fatal("Update invalid progress = nil error")
+	}
+	validProgress := domain.ActionProgress{Step: "working", Message: "Working"}
+	if err := r.Update(ctx, uid, "missing", validProgress); err == nil {
+		t.Fatal("Update missing action = nil error")
+	}
+	if err := r.Complete(ctx, uid, "missing", map[string]any{"ok": true}); err == nil {
+		t.Fatal("Complete missing action = nil error")
+	}
+	if err := r.Fail(ctx, uid, "missing", "failed"); err == nil {
+		t.Fatal("Fail missing action = nil error")
+	}
+}
+
+func TestActionRepoGetRejectsMalformedDocument(t *testing.T) {
+	ctx := context.Background()
+	client := mustNewClient(t, ctx)
+	r := fsrepo.NewActionRepo(client)
+	uid := newUID()
+	if _, err := client.Collection("users").Doc(uid).Collection("actions").Doc("malformed").Set(ctx, map[string]any{
+		"created_at": "not-a-timestamp",
+	}); err != nil {
+		t.Fatalf("seed malformed action: %v", err)
+	}
+	if _, err := r.Get(ctx, uid, "malformed"); err == nil {
+		t.Fatal("Get malformed action = nil error")
+	}
+}
+
 func TestActionRepo_Lifecycle(t *testing.T) {
 	ctx := context.Background()
 	client := mustNewClient(t, ctx)

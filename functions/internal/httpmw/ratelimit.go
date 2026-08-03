@@ -47,14 +47,20 @@ func NewRateLimiter(requestsPerMinute int, burst int) *RateLimiter {
 }
 
 func (rl *RateLimiter) evictStaleVisitors() {
-	for range time.Tick(5 * time.Minute) {
-		rl.mu.Lock()
-		for uid, v := range rl.visitors {
-			if time.Since(v.lastSeen) > rl.ttl {
-				delete(rl.visitors, uid)
-			}
+	ticker := time.NewTicker(5 * time.Minute)
+	defer ticker.Stop()
+	for now := range ticker.C {
+		rl.evictStaleVisitorsAt(now)
+	}
+}
+
+func (rl *RateLimiter) evictStaleVisitorsAt(now time.Time) {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+	for uid, v := range rl.visitors {
+		if now.Sub(v.lastSeen) > rl.ttl {
+			delete(rl.visitors, uid)
 		}
-		rl.mu.Unlock()
 	}
 }
 

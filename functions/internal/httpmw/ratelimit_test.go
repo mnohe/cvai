@@ -4,6 +4,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
+
+	"golang.org/x/time/rate"
 
 	"github.com/mnohe/cvai/functions/internal/auth"
 )
@@ -34,6 +37,22 @@ func TestRateLimiterBlocksAfterBurstForOneUser(t *testing.T) {
 	}
 	if rec.Header().Get("Retry-After") == "" {
 		t.Fatal("missing Retry-After header on 429")
+	}
+}
+
+func TestRateLimiterEvictsOnlyStaleVisitors(t *testing.T) {
+	rl := NewRateLimiter(60, 1)
+	now := time.Now()
+	rl.visitors["stale"] = &visitor{limiter: rate.NewLimiter(1, 1), lastSeen: now.Add(-rl.ttl - time.Second)}
+	rl.visitors["active"] = &visitor{limiter: rate.NewLimiter(1, 1), lastSeen: now}
+
+	rl.evictStaleVisitorsAt(now)
+
+	if _, ok := rl.visitors["stale"]; ok {
+		t.Fatal("stale visitor was not evicted")
+	}
+	if _, ok := rl.visitors["active"]; !ok {
+		t.Fatal("active visitor was evicted")
 	}
 }
 
