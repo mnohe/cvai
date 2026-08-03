@@ -200,12 +200,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          # The release commit may not be the final commit after a PR is rebased.
+          # Fetch the pushed range so version changes anywhere in that merge are seen.
+          fetch-depth: 0
 
       - name: Detect core-web release files
         id: release-changes
         run: |
-          if git diff --quiet HEAD^ HEAD -- package.json package-lock.json CHANGELOG.md; then
+          if git diff --quiet "${{ github.event.before }}" "${{ github.sha }}" -- package.json package-lock.json CHANGELOG.md; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"
