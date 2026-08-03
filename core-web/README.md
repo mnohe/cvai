@@ -20,7 +20,8 @@ Release flow:
 2. Commit with subject `release(core-web): X.Y.Z`.
 3. Merge the release commit to the default branch.
 4. Let the GitHub Actions `publish-core-web` job publish `@cvai/core-web` to npm.
-5. Update consuming apps to the published semver version and refresh their lockfiles.
+5. Verify the immutable registry version with `npm view @cvai/core-web@X.Y.Z`.
+6. Update consuming apps to the published semver version and refresh their lockfiles.
 
 ## Runtime Failure UI
 
