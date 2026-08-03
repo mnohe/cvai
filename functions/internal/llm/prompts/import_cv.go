@@ -1,5 +1,7 @@
 package prompts
 
+import _ "embed"
+
 import "strings"
 
 // ImportCVSystem is the system prompt for the CV import LLM call.
@@ -30,20 +32,9 @@ func sanitizeCandidatePreferences(preferences string) string {
 	return strings.ReplaceAll(strings.TrimSpace(preferences), candidatePreferencesClosingTag, "")
 }
 
-// CVSchemaFallback is used when the repository-level schemas/cv.schema.json
-// file is unavailable at runtime. Keep this in sync with that file.
-const CVSchemaFallback = `{
-  "type": "object",
-  "additionalProperties": false,
-  "required": ["summary", "contact", "languages", "certifications", "education", "experience", "projects"],
-  "properties": {
-    "summary": {"type": "string"},
-    "contact": {"type": "object"},
-    "skills": {"type": "array", "items": {"type": "string"}},
-    "languages": {"type": "array"},
-    "certifications": {"type": "array"},
-    "education": {"type": "array"},
-    "experience": {"type": "array"},
-    "projects": {"type": "object"}
-  }
-}`
+// CVSchemaFallback is the canonical CV schema embedded in the released functions
+// module. It keeps module consumers reproducible when no external schema override is
+// supplied.
+//
+//go:embed cv.schema.json
+var CVSchemaFallback string
