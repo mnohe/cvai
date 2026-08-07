@@ -210,7 +210,7 @@ The default LLM timeout ceiling is 180 s, configurable via `LLM_TIMEOUT_SECONDS`
 
 ### Observability
 
-LLM-backed actions emit OpenTelemetry metrics and spans for operational dashboards and alerting. Logs remain the drill-down surface for sanitised diagnostics such as provider status summaries, action IDs, and failure reasons. Metrics carry bounded labels only.
+LLM-backed actions emit OpenTelemetry metrics and spans for operational dashboards and alerting. Logs remain the drill-down surface for bounded diagnostics such as provider status/type/code/parameter summaries, action IDs, and failure classes. Provider-authored messages are response content and must not enter diagnostics. Metrics carry bounded labels only.
 
 The Go service wires vendor-neutral OTLP export when standard `OTEL_*` environment variables are present. With no OTLP endpoint configured, instrumentation remains no-op. Supported protocols are `grpc` and `http/protobuf`; examples:
 

@@ -76,13 +76,16 @@ func TestIsUserInputError(t *testing.T) {
 	}
 }
 
-func TestProviderStatusErrorIncludesSanitizedSummary(t *testing.T) {
-	err := providerStatusError(ProviderOpenAI, http.StatusBadRequest, []byte(`{"error":{"type":"invalid_request_error","code":"bad_pdf","param":"input[0].content[0]","message":"PDF could not be processed\ntry another file"}}`))
+func TestProviderStatusErrorExcludesProviderMessageContent(t *testing.T) {
+	err := providerStatusError(ProviderOpenAI, http.StatusBadRequest, []byte(`{"error":{"type":"invalid_request_error","code":"bad_pdf","param":"input[0].content[0]","message":"private-cv-marker from echoed request"}}`))
 	got := err.Error()
-	for _, want := range []string{"openai status 400", "type=invalid_request_error", "code=bad_pdf", "param=input[0].content[0]", "message=PDF could not be processed try another file"} {
+	for _, want := range []string{"openai status 400", "type=invalid_request_error", "code=bad_pdf", "param=input[0].content[0]"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("error = %q, want %q", got, want)
 		}
+	}
+	if strings.Contains(got, "private-cv-marker") || strings.Contains(got, "message=") {
+		t.Fatalf("error exposed provider-authored message content: %q", got)
 	}
 }
 

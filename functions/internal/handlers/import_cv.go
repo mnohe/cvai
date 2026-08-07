@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"io"
@@ -64,7 +63,7 @@ var (
 )
 
 type cvImporter interface {
-	Complete(ctx context.Context, systemPrompt string, messages []llm.Message, schema json.RawMessage) (json.RawMessage, error)
+	Complete(ctx context.Context, request llm.ImportCVRequest) (json.RawMessage, error)
 }
 
 // ImportCVHandler handles PDF CV imports.
@@ -77,12 +76,12 @@ type ImportCVHandler struct {
 }
 
 // NewImportCVHandler creates an ImportCVHandler.
-func NewImportCVHandler(accounts repo.AccountRepository, actions repo.ActionRepository, candidates repo.CandidateRepository, importer cvImporter) *ImportCVHandler {
+func NewImportCVHandler(accounts repo.AccountRepository, actions repo.ActionRepository, candidates repo.CandidateRepository, completer llm.Completer) *ImportCVHandler {
 	return &ImportCVHandler{
 		accounts:   accounts,
 		actions:    actions,
 		candidates: candidates,
-		llm:        importer,
+		llm:        llm.NewImportCVOperation(completer),
 		schemaPath: filepath.Join("..", "schemas", "cv.schema.json"),
 	}
 }
@@ -186,22 +185,20 @@ func (h *ImportCVHandler) runImport(uid string, actionID string, pdfBytes []byte
 		h.recordImportFailure(ctx, span, start, "schema")
 		return
 	}
-	systemPrompt := prompts.ImportCVSystemPrompt("")
+	preferences := ""
 	candidate, err := h.candidates.GetCandidate(ctx, uid)
 	if err != nil {
 		log.Printf("candidate_preferences_read_failed uid_set=true action_id=%s: %v", actionID, err)
 	} else if candidate != nil {
-		systemPrompt = prompts.ImportCVSystemPrompt(candidate.Preferences)
+		preferences = candidate.Preferences
 	}
 
 	llmStart := time.Now()
-	rawCV, err := h.llm.Complete(ctx, systemPrompt, []llm.Message{{
-		Role: "user",
-		Content: []llm.ContentBlock{
-			{Type: "document", Source: &llm.BlockSource{Type: "base64", MediaType: "application/pdf", Data: base64.StdEncoding.EncodeToString(pdfBytes)}},
-			{Type: "text", Text: prompts.ImportCVUser},
-		},
-	}}, schema)
+	rawCV, err := h.llm.Complete(ctx, llm.ImportCVRequest{
+		PDF:                  pdfBytes,
+		CandidatePreferences: preferences,
+		Schema:               schema,
+	})
 	llmDuration := time.Since(llmStart)
 	cvImportLLMDuration.Record(ctx, llmDuration.Milliseconds())
 	span.SetAttributes(attribute.Int64("cv_import.llm_duration_ms", llmDuration.Milliseconds()))
