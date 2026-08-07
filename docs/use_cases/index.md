@@ -8,7 +8,11 @@ E2E tests reference use cases by ID in their `describe` block names, making cove
 
 - **User** — a job seeker authenticated via Google or GitHub through Firebase Auth.
 - **LLM** — provider configured via `LLM_PROVIDER` and `LLM_MODEL`. Involved only in
-  use cases marked **LLM: Yes**. Every LLM-backed operation except Quick Analysis costs one reserved credit and runs asynchronously via the Action pattern. The reservation is refunded for program, provider, or infrastructure failures, but not for clearly
+  use cases marked **LLM: Yes** and registered in the
+  [LLM operation registry](../LLM_OPERATIONS.md). An LLM-marked use case is incomplete
+  until its registry contract, disclosure, typed input projection, and provider-payload
+  tests exist. Every LLM-backed operation except Quick Analysis costs one reserved credit
+  and runs asynchronously via the Action pattern. The reservation is refunded for program, provider, or infrastructure failures, but not for clearly
   user-caused input failures after the paid workflow starts.
 - **Stripe** — payment adapter for credit acquisition ([UC-BILLING-001](UC-BILLING-001-purchase-credits.md) only).
 

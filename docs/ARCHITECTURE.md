@@ -266,6 +266,12 @@ sequenceDiagram
 
 The LLM is an extraction and reasoning component, not a source of truth. Every LLM-backed workflow must:
 
+- Have a complete entry in the [LLM operation registry](LLM_OPERATIONS.md). An
+  unregistered operation is incomplete and must not be enabled.
+- Build its provider payload from the registry's operation-specific permitted inputs;
+  repository aggregates are not provider request objects.
+- Show the registry-defined disclosure immediately before a remote provider transfer.
+
 1. Convert bounded input into structured output via OpenAI function calling
 2. Validate the output against the domain schema before writing any state
 3. Write only validated state to Firestore
