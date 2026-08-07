@@ -341,16 +341,15 @@ func classifyLLMFailure(err error) string {
 func providerErrorSummary(body []byte) string {
 	var payload struct {
 		Error struct {
-			Type    string `json:"type"`
-			Code    any    `json:"code"`
-			Param   string `json:"param"`
-			Message string `json:"message"`
+			Type  string `json:"type"`
+			Code  any    `json:"code"`
+			Param string `json:"param"`
 		} `json:"error"`
 	}
 	if err := json.Unmarshal(body, &payload); err != nil {
 		return ""
 	}
-	parts := make([]string, 0, 4)
+	parts := make([]string, 0, 3)
 	if payload.Error.Type != "" {
 		parts = append(parts, "type="+cleanProviderErrorValue(payload.Error.Type, 80))
 	}
@@ -359,9 +358,6 @@ func providerErrorSummary(body []byte) string {
 	}
 	if payload.Error.Param != "" {
 		parts = append(parts, "param="+cleanProviderErrorValue(payload.Error.Param, 80))
-	}
-	if payload.Error.Message != "" {
-		parts = append(parts, "message="+cleanProviderErrorValue(payload.Error.Message, 240))
 	}
 	return strings.Join(parts, " ")
 }
