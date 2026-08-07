@@ -46,6 +46,34 @@ test.describe("UC-CV-001 import entry point", () => {
 });
 
 test.describe("UC-CV-002 import CV from PDF", () => {
+  test("shows the registered disclosure and sends nothing before confirmation", async ({ page }) => {
+    let called = false;
+    await page.route("**/api/cv/imports", async (route) => {
+      called = true;
+      await route.abort();
+    });
+
+    await signIn(page, "cv.import.disclosure@example.test");
+    await page.getByRole("button", { name: /Import from PDF/ }).click();
+    await choosePDF(page, "%PDF-1.7\ndisclosure");
+    await page.getByRole("button", { name: "Start import" }).click();
+
+    const disclosure = page.getByRole("alertdialog", { name: "Import CV with AI" });
+    await expect(disclosure).toContainText("E2E AI Provider");
+    await expect(disclosure).toContainText("the complete selected PDF");
+    await expect(disclosure).toContainText("candidate preferences");
+    await expect(disclosure).toContainText("enter or edit your CV manually");
+    await expect(disclosure.getByRole("link", { name: "provider processing and retention information" })).toHaveAttribute(
+      "href",
+      "https://provider.example/privacy",
+    );
+    expect(called).toBe(false);
+
+    await disclosure.getByRole("button", { name: "Cancel" }).click();
+    await expect(disclosure).toHaveCount(0);
+    expect(called).toBe(false);
+  });
+
   test("progress shown and CV populated on success", async ({ page }) => {
     await signIn(page, "cv.import.success@example.test");
     const session = await currentSession(page);
@@ -59,7 +87,7 @@ test.describe("UC-CV-002 import CV from PDF", () => {
 
     await page.getByRole("button", { name: /Import from PDF/ }).click();
     await choosePDF(page, "%PDF-1.7\nsuccess");
-    await page.getByRole("button", { name: "Start import" }).click();
+    await confirmImport(page);
     await writeFirestore(session, "actions", "import-success", {
       id: "import-success",
       type: "import_cv",
@@ -101,7 +129,7 @@ test.describe("UC-CV-002 import CV from PDF", () => {
 
     await page.getByRole("button", { name: /Import from PDF/ }).click();
     await choosePDF(page, "%PDF-1.7\nfailure");
-    await page.getByRole("button", { name: "Start import" }).click();
+    await confirmImport(page);
     await expect(page.getByRole("progressbar", { name: "CV import progress" })).toBeVisible();
     await writeFirestore(session, "actions", "import-failed", {
       id: "import-failed",
@@ -148,7 +176,7 @@ test.describe("UC-CV-002 import CV from PDF", () => {
     await signIn(page, "cv.import.zero@example.test");
     await page.getByRole("button", { name: /Import from PDF/ }).click();
     await choosePDF(page, "%PDF-1.7\nzero");
-    await page.getByRole("button", { name: "Start import" }).click();
+    await confirmImport(page);
 
     await expect(page.getByText("Import could not be started.")).toBeVisible();
     await expect(page.getByText("Reference ID")).toBeVisible();
@@ -178,7 +206,7 @@ test.describe("UC-CV-002 import CV from PDF", () => {
     await signIn(page, "cv.import.api-down@example.test");
     await page.getByRole("button", { name: /Import from PDF/ }).click();
     await choosePDF(page, "%PDF-1.7\napi-down");
-    await page.getByRole("button", { name: "Start import" }).click();
+    await confirmImport(page, false);
 
     await expect(page.getByText("Reference ID")).toBeVisible();
     await expect(page.getByText(/^import-start-/)).toBeVisible();
@@ -911,6 +939,15 @@ async function choosePDF(page: Page, content: string) {
     mimeType: "application/pdf",
     buffer: Buffer.from(content),
   });
+}
+
+async function confirmImport(page: Page, waitForResponse = true) {
+  await page.getByRole("button", { name: "Start import" }).click();
+  const disclosure = page.getByRole("alertdialog", { name: "Import CV with AI" });
+  await expect(disclosure).toBeVisible();
+  const response = waitForResponse ? page.waitForResponse("**/api/cv/imports") : null;
+  await disclosure.getByRole("button", { name: "Send PDF and start import" }).click();
+  await response;
 }
 
 async function currentSession(page: Page): Promise<{ uid: string; token: string }> {
