@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.1.2 - 2026-08-07
+
+- Add registry-backed, provider-configurable just-in-time LLM disclosure contracts and a reusable confirmation component.
+
 ## 0.1.1 - 2026-08-03
 
 - Add a hosted privacy-settings slot without adding hosted-only behavior to the shared application.

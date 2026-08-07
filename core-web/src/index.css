@@ -815,6 +815,25 @@ button:disabled {
   padding: 20px;
 }
 
+.llm-disclosure {
+  background: var(--panel-bg-soft);
+  border: 1px solid var(--panel-border);
+  border-left: 4px solid var(--accent);
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+}
+
+.llm-disclosure h3,
+.llm-disclosure p,
+.llm-disclosure ul {
+  margin: 0;
+}
+
+.llm-disclosure ul {
+  padding-left: 22px;
+}
+
 .support-reference {
   align-items: center;
   border: 1px solid var(--panel-border);
