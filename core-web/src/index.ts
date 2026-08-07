@@ -17,6 +17,7 @@ export { AuthProvider, useAuth } from "@/components/AuthProvider";
 export { CriticalFirebasePage } from "@/components/CriticalFirebasePage";
 export { CVPrintPreviewDialog } from "@/components/CVPrintPreviewDialog";
 export { ImportCVModal } from "@/components/ImportCVModal";
+export { LLMDisclosure } from "@/components/LLMDisclosure";
 export { LogoMark } from "@/components/LogoMark";
 export { ProfileCompletionMeter } from "@/components/ProfileCompletionMeter";
 export { ProtectedRoute } from "@/components/ProtectedRoute";
@@ -31,5 +32,14 @@ export { ProfilePage } from "@/pages/ProfilePage";
 export { SettingsPage } from "@/pages/SettingsPage";
 
 export { app, auth, db, githubProvider, googleProvider } from "@/lib/firebase";
+
+export {
+  getLLMOperationDisclosure,
+  llmOperationIds,
+  validateLLMDisclosureConfig,
+  type LLMDisclosureConfig,
+  type LLMOperationDisclosure,
+  type LLMOperationId,
+} from "@/lib/llm-disclosures";
 
 export type * from "@/lib/types";
