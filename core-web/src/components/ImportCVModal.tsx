@@ -1,7 +1,9 @@
 import { useCallback, useRef, useState } from "react";
 import { ActionProgress } from "@/components/ActionProgress";
+import { LLMDisclosure } from "@/components/LLMDisclosure";
 import { ThinkButton } from "@/components/ThinkButton";
 import { apiFetch, getApiErrorMessage } from "@/lib/api";
+import { getLLMDisclosureConfig } from "@/lib/config";
 
 const maxPDFBytes = 10 * 1024 * 1024;
 
@@ -18,9 +20,11 @@ export function ImportCVModal({
   const [actionId, setActionId] = useState<string | null>(null);
   const [supportReference, setSupportReference] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [confirmingTransfer, setConfirmingTransfer] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const selectedFileRef = useRef<File | null>(null);
 
-  async function upload() {
+  function prepareUpload() {
     const file = inputRef.current?.files?.[0];
     if (!file) {
       setMessage("Choose a PDF first.");
@@ -35,10 +39,24 @@ export function ImportCVModal({
       return;
     }
 
+    setMessage(null);
+    selectedFileRef.current = file;
+    setConfirmingTransfer(true);
+  }
+
+  async function upload() {
+    const file = selectedFileRef.current;
+    if (!file || file.type !== "application/pdf" || file.size > maxPDFBytes) {
+      setConfirmingTransfer(false);
+      setMessage("Choose a valid PDF file of 10 MB or smaller.");
+      return;
+    }
+
     const body = new FormData();
     body.append("pdf", file);
 
     try {
+      setConfirmingTransfer(false);
       setUploading(true);
       setMessage(null);
       setSupportReference(null);
@@ -83,26 +101,38 @@ export function ImportCVModal({
             x
           </button>
         </div>
-        <input ref={inputRef} type="file" accept="application/pdf" disabled={Boolean(actionId)} />
-        {actionId && <ActionProgress actionId={actionId} onComplete={handleComplete} onFailed={handleFailed} />}
-        {message && <p className="muted">{message}</p>}
-        {supportReference && (
-          <div className="support-reference">
-            <span className="muted">Reference ID</span>
-            <code>{supportReference}</code>
-            <button type="button" className="secondary-button" onClick={() => void copySupportReference()}>
-              Copy
-            </button>
-          </div>
+        {confirmingTransfer ? (
+          <LLMDisclosure
+            operation="import_cv"
+            config={getLLMDisclosureConfig()}
+            confirmLabel="Send PDF and start import"
+            onConfirm={() => void upload()}
+            onCancel={() => setConfirmingTransfer(false)}
+          />
+        ) : (
+          <>
+            <input ref={inputRef} type="file" accept="application/pdf" disabled={Boolean(actionId)} />
+            {actionId && <ActionProgress actionId={actionId} onComplete={handleComplete} onFailed={handleFailed} />}
+            {message && <p className="muted">{message}</p>}
+            {supportReference && (
+              <div className="support-reference">
+                <span className="muted">Reference ID</span>
+                <code>{supportReference}</code>
+                <button type="button" className="secondary-button" onClick={() => void copySupportReference()}>
+                  Copy
+                </button>
+              </div>
+            )}
+            <div className="panel-actions">
+              <ThinkButton completionScore={2} onClick={prepareUpload} disabled={uploading || Boolean(actionId)}>
+                {uploading ? "Uploading" : "Start import"}
+              </ThinkButton>
+              <button type="button" className="secondary-button" onClick={onClose}>
+                Cancel
+              </button>
+            </div>
+          </>
         )}
-        <div className="panel-actions">
-          <ThinkButton completionScore={2} onClick={() => void upload()} disabled={uploading || Boolean(actionId)}>
-            {uploading ? "Uploading" : "Start import"}
-          </ThinkButton>
-          <button type="button" className="secondary-button" onClick={onClose}>
-            Cancel
-          </button>
-        </div>
       </section>
     </div>
   );

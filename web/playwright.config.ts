@@ -30,6 +30,8 @@ export default defineConfig({
       VITE_API_BASE_URL: "/api",
       VITE_USE_EMULATOR: "true",
       VITE_E2E: "true",
+      VITE_LLM_PROVIDER_NAME: "E2E AI Provider",
+      VITE_LLM_RETENTION_POLICY_URL: "https://provider.example/privacy",
     },
   },
   projects: [

@@ -60,6 +60,8 @@ export default defineConfig({
         VITE_API_BASE_URL: "/api",
         VITE_USE_EMULATOR: "true",
         VITE_E2E: "true",
+        VITE_LLM_PROVIDER_NAME: "E2E AI Provider",
+        VITE_LLM_RETENTION_POLICY_URL: "https://provider.example/privacy",
         // Points the dev-server proxy at this config's own API port instead
         // of the default 8081 a developer's manually-run backend listens on.
         DEV_API_PROXY_TARGET: `http://127.0.0.1:${apiPort}`,
