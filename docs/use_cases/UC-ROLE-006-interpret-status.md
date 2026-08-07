@@ -1,10 +1,12 @@
 # UC-ROLE-006: Interpret status from free-form prompt
 
+> **Status: deferred.** Natural-language dispatch is not part of M3. It remains deferred until a compelling product use case is established beyond an authorised CVAI MCP server used from an external chatbot at the user's expense. This document preserves the earlier proposal and is not an implementation contract.
+
 | | |
 |---|---|
 | **Actor** | User |
 | **Preconditions** | Signed in; role exists; ≥ 1 credit |
-| **Milestone** | M3 |
+| **Milestone** | Deferred |
 | **Credit cost** | 1 |
 | **LLM** | Yes — prompt interpretation (streaming) |
 

@@ -15,7 +15,7 @@ The hosted product is available at https://seekvit.com/.
 - Assesses fit between a candidate profile and a role.
 - Produces application-supporting artefacts such as suitability analysis and role matrices.
 - Turns gaps into actionable tasks.
-- Supports evidence and story libraries for stronger applications and interview preparation.
+- Supports a structured evidence library for stronger applications; story capture is deferred pending a compelling use case and accepted privacy design.
 
 ## Stack
 

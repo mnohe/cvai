@@ -11,7 +11,7 @@
 ## Context
 
 Structured status changes: the user selects from a predefined transition set. For
-free-text interpretation see [UC-ROLE-006](UC-ROLE-006-interpret-status.md).
+the deferred free-text interpretation proposal, see [UC-ROLE-006](UC-ROLE-006-interpret-status.md).
 
 Valid transitions: `interested → applied → phone_screen → interview → offer →
 accepted / rejected / withdrawn`.

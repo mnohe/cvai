@@ -53,7 +53,7 @@ E2E tests reference use cases by ID in their `describe` block names, making cove
 | [UC-ROLE-003](UC-ROLE-003-generate-bundle.md) | Generate bundle | M3 | Yes | 1 |
 | [UC-ROLE-004](UC-ROLE-004-view-role.md) | View role details | M3 | No | — |
 | [UC-ROLE-005](UC-ROLE-005-record-status.md) | Record status update | M3 | No | — |
-| [UC-ROLE-006](UC-ROLE-006-interpret-status.md) | Interpret status from prompt | M3 | Yes | 1 |
+| [UC-ROLE-006](UC-ROLE-006-interpret-status.md) | Interpret status from prompt (deferred) | Deferred | Yes | 1 |
 | [UC-ROLE-007](UC-ROLE-007-regenerate-bundle.md) | Regenerate bundle | M3 | Yes | 1 |
 
 ## Tasks

@@ -18,7 +18,7 @@ These terms have precise meanings in CVAI. They appear in Firestore field names,
 | **Gap Task** | A personal development action derived from a Gap (e.g. "Obtain AWS Solutions Architect certification"). Tracked in the Tasks collection with `source: "gap"`. Carries `estimated_days`, `feasible_within_one_week`, `created_at`, `completed_at`, and an optional `actual_days` override used for calibration. |
 | **Requirement Coverage** | For each job requirement: whether the Candidate has evidence that meets it (`met`), partially meets it (`partial`), or does not meet it (`unmet`). Stored per-requirement in the Analysis document. |
 | **Evidence Library** | A structured collection of the Candidate's proof points (project outcomes, certifications, quantified achievements) that the LLM draws on when assessing Requirement Coverage. |
-| **Story Bank** | A collection of the Candidate's interview-ready narratives, each indexed to one or more competencies (leadership, technical depth, conflict resolution, etc.). |
+| **Story Bank** | A deferred candidate capability. Any future implementation requires a compelling use case and accepted privacy design, persists best-effort sanitised and minimised canonical content rather than raw narratives, and does not assume natural-language capture. |
 | **Quick Analysis** | A lightweight pre-ingestion LLM pass that assesses a Candidate's fit for a role before a full Bundle is generated. Returns a suitability summary, likely fit level, key matching abilities, important gaps, effort estimates to close those gaps, and a continue/abandon recommendation. Results are ephemeral; no Role document is written unless the user continues to full ingestion. Free; rate-limited per UID to prevent abuse. |
 | **Status** | The current lifecycle state of a Role application: `interested`, `applied`, `phone_screen`, `interview`, `offer`, `rejected`, `withdrawn`, `archived`. Stored as an enum; transitions are recorded as Events. |
 | **Outcome** | A terminal application result (`accepted`, `rejected`, or `closed`) recorded against a Role when it reaches a terminal Status. Paired with the Role's Analysis Verdict and recommendation for Calibration purposes. Never LLM-generated; derived directly from the Event that triggered the terminal status write. |
@@ -27,7 +27,7 @@ These terms have precise meanings in CVAI. They appear in Firestore field names,
 | **Task Calibration** | A statistical summary derived from completed Gap Task records: mean actual-vs-estimated effort ratio, per-category breakdown, and feasibility-prediction accuracy. Injected into LLM prompts at bundle generation and reassessment time to scale future `estimated_days` values. Computed from at least 3 completed gap tasks with both `estimated_days` and `actual_days` populated; omitted when data is insufficient. |
 | **Assessment Calibration** | A statistical summary of past Verdict and recommendation accuracy measured against eventual Outcomes. Includes per-verdict success rates, role-attribute patterns (remote vs. onsite, domain), recommendation accuracy, and detected Calibration Patterns. Injected into LLM prompts to improve verdict quality over time. Computed from at least 3 Roles with recorded Outcomes. |
 | **Calibration Pattern** | A detected divergence between AI assessment and eventual Outcome, with an inferred probable cause and a prompt-level calibration rule. Examples: `CLEAR_FIT` underperforming `FIT` (over-confidence bias), a domain attribute with persistently low success rate (blind spot), or `APPLY_NOW` recommendations not outperforming cautious ones (recommendation bar too low). Computed deterministically from Assessment Calibration data; never LLM-generated. |
-| **Premium Request** | Any operation that consumes server-side LLM compute: bundle generation, CV import, status interpretation, role reassessment, gap task reassessment. Counted against the credit balance. Quick Analysis is excluded — it is free and rate-limited. |
+| **Premium Request** | Any operation that consumes server-side LLM compute: bundle generation, CV import, role reassessment, or gap task reassessment. Counted against the credit balance. Quick Analysis is excluded — it is free and rate-limited. |
 | **Credit** | One unit of purchasing power for a Premium Request. Purchased in packs via Stripe. Never expires. |
 
 ---
@@ -38,7 +38,7 @@ Aggregates define consistency boundaries — what must be saved atomically, and 
 
 | Aggregate Root | Owns | Commands |
 |---|---|---|
-| **Candidate** | CV (structured document), Context (constraints, preferences), Evidence Library, Story Bank | ImportCV, UpdateCV, AddEvidence, UpdateEvidence, AddStory |
+| **Candidate** | CV (structured document), Context (constraints, preferences), Evidence Library; Story Bank is reserved but deferred | ImportCV, UpdateCV, AddEvidence, UpdateEvidence; AddStory is deferred |
 | **Role** | Metadata, Job, Analysis, State, Artefacts (resumeMd, coverLetterMd, etc.), Outcome | IngestRole, GenerateBundle, UpdateStatus, Reassess, ReassessGapTask, UpdateArtefacts, ArchiveRole, RecordOutcome |
 | **Task** | Description, completion state, source (gap/manual), due date, roleId link, estimated_days, actual_days, created_at, completed_at | CreateTask, CompleteTask, DeleteTask |
 | **Event** | Type, date, note, roleId link | RecordEvent (append-only; no update or delete) |
@@ -83,8 +83,7 @@ Each service maps to one or more HTTP endpoints or direct Firestore writes. See 
 | `QuickAnalysis(url\|text)` | Lightweight pre-ingestion LLM analysis. Returns suitability preview. Does not write a Role. Free; rate-limited per UID. | Go handler (async Action) |
 | `IngestRole(url\|text)` | Parse a job URL or pasted text into a Role document. SSRF protection applied. Does not generate a Bundle. | Go handler |
 | `GenerateBundle(roleId)` | Run the LLM pipeline: extract structured job data, generate analysis, produce markdown artefacts. Costs one credit. | Go handler (async Action) |
-| `InterpretStatusUpdate(roleId, prompt)` | Interpret a free-form user prompt into a structured Event. Costs one credit. | Go handler (async Action) |
-| `ReassessRole(roleId)` | Re-run analysis for a Role given the current CV and evidence library. Costs one credit. | Go handler (async Action) |
+| `ReassessRole(roleId)` | Re-run analysis for a Role using documented projections of the current CV and relevant evidence. Costs one credit. | Go handler (async Action) |
 | `ReassessGapTask(taskId)` | Re-evaluate whether a specific Gap Task is closed given updated CV or library data. Costs one credit. | Go handler (async Action) |
 | `ImportCV(source)` | Extract structured CV data from pasted text or URL using the LLM. Costs one credit. | Go handler (async Action) |
 | `UpdateCV(section, data)` | Directly edit a section of the structured CV (no LLM). Validates against `cv.schema.json`. | Direct Firestore write (SPA) |
@@ -132,7 +131,7 @@ graph TD
     end
 
     subgraph Supporting
-        CP["Candidate Profile\nCV · Context\nEvidence Library\nStory Bank"]
+        CP["Candidate Profile\nCV · Context\nEvidence Library\nStory Bank deferred"]
         CAL["Calibration\nTask Calibration\nAssessment Calibration\nPattern Detection"]
     end
 
@@ -142,11 +141,11 @@ graph TD
         ID["Account Identity\nFirebase Auth\nOAuth (Google · GitHub)"]
     end
 
-    CP -->|"CV + library\nas context"| JS
+    CP -->|"bounded CV + evidence\nprojections"| JS
     JS -->|"outcomes + tasks\nfor aggregation"| CAL
     CAL -->|"calibration blocks\nfor prompt injection"| AI
     JS -->|"structured data in\nstructured data out"| AI
-    CP -->|"CV + library\nas context"| AI
+    CP -->|"typed operation-specific\nprojections"| AI
     BILL --> ID
 ```
 
