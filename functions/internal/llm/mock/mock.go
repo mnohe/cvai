@@ -36,13 +36,26 @@ type QueuedResponse struct {
 // caller of Complete must carry the UID on the context (see
 // auth.WithUID) the same way the real async import pipeline does.
 type Completer struct {
-	mu     sync.Mutex
-	queues map[string][]QueuedResponse
+	mu       sync.Mutex
+	queues   map[string][]QueuedResponse
+	requests map[string][]CapturedRequest
+}
+
+// CapturedRequest is the exact provider-neutral boundary received by the
+// test completer. It is exposed only by e2e_mock binaries so system tests can
+// prove the production serializer's permitted and excluded context.
+type CapturedRequest struct {
+	System   string          `json:"system"`
+	Messages []llm.Message   `json:"messages"`
+	Schema   json.RawMessage `json:"schema"`
 }
 
 // NewCompleter creates an empty mock completer.
 func NewCompleter() *Completer {
-	return &Completer{queues: make(map[string][]QueuedResponse)}
+	return &Completer{
+		queues:   make(map[string][]QueuedResponse),
+		requests: make(map[string][]CapturedRequest),
+	}
 }
 
 // Enqueue appends a scripted response to uid's queue.
@@ -54,10 +67,11 @@ func (c *Completer) Enqueue(uid string, resp QueuedResponse) {
 
 // Complete consumes the next queued response for the context's UID. It
 // never contacts a network provider.
-func (c *Completer) Complete(ctx context.Context, _ string, _ []llm.Message, _ json.RawMessage) (json.RawMessage, error) {
+func (c *Completer) Complete(ctx context.Context, system string, messages []llm.Message, schema json.RawMessage) (json.RawMessage, error) {
 	uid := auth.UIDFromContext(ctx)
 
 	c.mu.Lock()
+	c.requests[uid] = append(c.requests[uid], CapturedRequest{System: system, Messages: messages, Schema: schema})
 	queue := c.queues[uid]
 	if len(queue) == 0 {
 		c.mu.Unlock()
@@ -71,6 +85,13 @@ func (c *Completer) Complete(ctx context.Context, _ string, _ []llm.Message, _ j
 		return nil, llm.StatusError{Provider: "mock", Status: next.StatusCode, Detail: next.Detail}
 	}
 	return next.Body, nil
+}
+
+// Captures returns a copy of the requests received for uid.
+func (c *Completer) Captures(uid string) []CapturedRequest {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return append([]CapturedRequest(nil), c.requests[uid]...)
 }
 
 type enqueueRequest struct {
@@ -100,5 +121,19 @@ func EnqueueHandler(c *Completer) http.Handler {
 		}
 		c.Enqueue(req.UID, QueuedResponse{Body: req.Body, StatusCode: req.StatusCode, Detail: req.Detail})
 		w.WriteHeader(http.StatusNoContent)
+	})
+}
+
+// CapturesHandler exposes captured provider-bound requests to the E2E harness.
+// Like the completer itself, this handler can only exist in e2e_mock binaries.
+func CapturesHandler(c *Completer) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		uid := r.URL.Query().Get("uid")
+		if uid == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(c.Captures(uid))
 	})
 }

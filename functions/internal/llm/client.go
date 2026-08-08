@@ -147,8 +147,8 @@ type Client struct {
 
 // Message is a provider-neutral chat message.
 type Message struct {
-	Role    string
-	Content []ContentBlock
+	Role    string         `json:"role"`
+	Content []ContentBlock `json:"content"`
 }
 
 // ContentBlock is one Messages API content block.

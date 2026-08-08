@@ -216,7 +216,7 @@ func (h *ImportCVHandler) runImport(uid string, actionID string, pdfBytes []byte
 	}
 	rawCV, err = llm.NormalizeStructuredOutput(rawCV)
 	if err != nil {
-		log.Printf("cv_normalize_failed uid_set=true action_id=%s: %v", actionID, err)
+		log.Printf("cv_normalize_failed uid_set=true action_id=%s", actionID)
 		h.failImport(uid, actionID, importCVParseErrorMessage)
 		h.recordImportFailure(ctx, span, start, "parse")
 		return
@@ -224,7 +224,9 @@ func (h *ImportCVHandler) runImport(uid string, actionID string, pdfBytes []byte
 
 	var cv domain.CV
 	if err := decodeStrict(rawCV, &cv); err != nil {
-		log.Printf("cv_decode_failed uid_set=true action_id=%s: %v", actionID, err)
+		// Decode errors can contain provider-authored field names. Keep the
+		// diagnostic bounded to the failure class and correlation identifier.
+		log.Printf("cv_decode_failed uid_set=true action_id=%s", actionID)
 		h.failImport(uid, actionID, importCVParseErrorMessage)
 		h.recordImportFailure(ctx, span, start, "parse")
 		return
@@ -232,7 +234,7 @@ func (h *ImportCVHandler) runImport(uid string, actionID string, pdfBytes []byte
 	normalizeImportedCV(&cv)
 	var validationErrors []string
 	if err := cv.Validate(); err != nil {
-		log.Printf("cv_validate_failed uid_set=true action_id=%s: %v", actionID, err)
+		log.Printf("cv_validate_failed uid_set=true action_id=%s", actionID)
 		for _, msg := range strings.Split(err.Error(), "\n") {
 			if msg = strings.TrimSpace(msg); msg != "" {
 				validationErrors = append(validationErrors, msg)

@@ -17,6 +17,7 @@ const apiBaseURL = `http://127.0.0.1:${apiPort}`;
 // looksLikePDF only checks the declared part Content-Type plus a "%PDF"
 // byte prefix — see functions/internal/handlers/import_cv.go.
 const minimalPDF = Buffer.from("%PDF-1.4\n%%EOF");
+const candidatePreferences = "Remote-first roles; privacy-boundary-preference-marker";
 
 function scriptedCV() {
   return {
@@ -75,6 +76,21 @@ async function seedCredit(request: import("@playwright/test").APIRequestContext,
   expect(response.ok()).toBeTruthy();
 }
 
+async function seedCandidatePreferences(
+  request: import("@playwright/test").APIRequestContext,
+  uid: string,
+  idToken: string,
+) {
+  const response = await request.patch(
+    `http://${firestoreEmulatorHost}/v1/projects/${projectId}/databases/(default)/documents/users/${uid}/candidate/profile?updateMask.fieldPaths=preferences`,
+    {
+      headers: { Authorization: `Bearer ${idToken}`, "Content-Type": "application/json" },
+      data: { fields: { preferences: { stringValue: candidatePreferences } } },
+    },
+  );
+  expect(response.ok()).toBeTruthy();
+}
+
 async function getFirestoreDoc(request: import("@playwright/test").APIRequestContext, uid: string, relativePath: string, idToken: string) {
   return request.get(
     `http://${firestoreEmulatorHost}/v1/projects/${projectId}/databases/(default)/documents/users/${uid}/${relativePath}`,
@@ -100,6 +116,7 @@ test.describe("CV import — full system", () => {
   test("a PDF upload, scripted mock LLM response, and the resulting candidate profile all go through the real backend", async ({ request }) => {
     const { idToken, uid } = await signUp(request, `cv-import-${Date.now()}@example.test`);
     await seedCredit(request, uid, idToken, 1);
+    await seedCandidatePreferences(request, uid, idToken);
 
     const enqueue = await request.post(`${apiBaseURL}/e2e/mock-llm/responses`, {
       data: { uid, body: scriptedCV() },
@@ -115,6 +132,32 @@ test.describe("CV import — full system", () => {
     expect(actionId).toBeTruthy();
 
     await pollActionStatus(request, uid, actionId, idToken, "complete");
+
+    const capturedResponse = await request.get(`${apiBaseURL}/e2e/mock-llm/requests?uid=${encodeURIComponent(uid)}`);
+    expect(capturedResponse.status()).toBe(200);
+    const captures = await capturedResponse.json();
+    expect(captures).toHaveLength(1);
+    const providerBoundary = captures[0];
+    expect(providerBoundary.system).toContain(candidatePreferences);
+    expect(providerBoundary.system).toContain("You extract structured CV data");
+    expect(providerBoundary.messages).toEqual([
+      {
+        role: "user",
+        content: [
+          {
+            type: "document",
+            source: { type: "base64", media_type: "application/pdf", data: minimalPDF.toString("base64") },
+          },
+          { type: "text", text: "Parse this PDF CV into the provided JSON schema." },
+        ],
+      },
+    ]);
+    expect(providerBoundary.schema).toMatchObject({ title: "CVAI CV Format" });
+
+    const serializedBoundary = JSON.stringify(providerBoundary);
+    for (const excluded of ["credit_balance", "has_ever_purchased", "ada@example.test", "actions", "billing", "stories", "events"]) {
+      expect(serializedBoundary).not.toContain(excluded);
+    }
 
     const candidateDoc = await getFirestoreDoc(request, uid, "candidate/profile", idToken);
     expect(candidateDoc.status()).toBe(200);
