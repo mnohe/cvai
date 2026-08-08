@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -124,6 +125,45 @@ func TestImportCVSavesIncompleteCV(t *testing.T) {
 	}
 	if len(candidates.validationErrors) == 0 {
 		t.Fatal("validation errors were not stored")
+	}
+}
+
+func TestImportCVProviderOutputDoesNotEnterDiagnostics(t *testing.T) {
+	const privateMarker = "provider-private-output-marker"
+	accounts := &fakeAccounts{credits: 1}
+	actions := newFakeActions()
+	handler := NewImportCVHandler(accounts, actions, &fakeCandidates{}, &fakeImporter{raw: json.RawMessage(`{"` + privateMarker + `":"secret"}`)})
+
+	var logs bytes.Buffer
+	previousWriter := log.Writer()
+	previousFlags := log.Flags()
+	log.SetOutput(&logs)
+	log.SetFlags(0)
+	t.Cleanup(func() {
+		log.SetOutput(previousWriter)
+		log.SetFlags(previousFlags)
+	})
+
+	rec := httptest.NewRecorder()
+	handler.ImportCV(rec, importRequest(t, smallPDF()))
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	var body map[string]string
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, func() bool {
+		action, _ := actions.Get(context.Background(), "uid-1", body["actionId"])
+		return action != nil && action.Status == domain.ActionFailed
+	})
+
+	if strings.Contains(logs.String(), privateMarker) {
+		t.Fatalf("provider output leaked into logs: %s", logs.String())
+	}
+	action, _ := actions.Get(context.Background(), "uid-1", body["actionId"])
+	if action == nil || strings.Contains(action.Error, privateMarker) {
+		t.Fatalf("provider output leaked into Action: %#v", action)
 	}
 }
 

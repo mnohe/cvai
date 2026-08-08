@@ -27,4 +27,5 @@ func registerTestControlRoutes(mux *http.ServeMux, completer llm.Completer) {
 		return
 	}
 	mux.Handle("POST /e2e/mock-llm/responses", mock.EnqueueHandler(mockCompleter))
+	mux.Handle("GET /e2e/mock-llm/requests", mock.CapturesHandler(mockCompleter))
 }
