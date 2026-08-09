@@ -4,6 +4,10 @@ import { LLMDisclosure } from "@/components/LLMDisclosure";
 import { ThinkButton } from "@/components/ThinkButton";
 import { apiFetch, getApiErrorMessage } from "@/lib/api";
 import { getLLMDisclosureConfig } from "@/lib/config";
+import {
+  hasLLMDisclosureAcknowledgement,
+  recordLLMDisclosureAcknowledgement,
+} from "@/lib/llm-disclosures";
 
 const maxPDFBytes = 10 * 1024 * 1024;
 
@@ -20,7 +24,13 @@ export function ImportCVModal({
   const [actionId, setActionId] = useState<string | null>(null);
   const [supportReference, setSupportReference] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [confirmingTransfer, setConfirmingTransfer] = useState(false);
+  const disclosureConfig = getLLMDisclosureConfig();
+  const [disclosureAcknowledged, setDisclosureAcknowledged] = useState(() =>
+    typeof window !== "undefined"
+      ? hasLLMDisclosureAcknowledgement("import_cv", disclosureConfig, window.localStorage)
+      : false,
+  );
+  const [disclosureExpanded, setDisclosureExpanded] = useState(!disclosureAcknowledged);
   const inputRef = useRef<HTMLInputElement>(null);
   const selectedFileRef = useRef<File | null>(null);
 
@@ -41,13 +51,11 @@ export function ImportCVModal({
 
     setMessage(null);
     selectedFileRef.current = file;
-    setConfirmingTransfer(true);
+    void upload(file);
   }
 
-  async function upload() {
-    const file = selectedFileRef.current;
+  async function upload(file = selectedFileRef.current) {
     if (!file || file.type !== "application/pdf" || file.size > maxPDFBytes) {
-      setConfirmingTransfer(false);
       setMessage("Choose a valid PDF file of 10 MB or smaller.");
       return;
     }
@@ -56,7 +64,6 @@ export function ImportCVModal({
     body.append("pdf", file);
 
     try {
-      setConfirmingTransfer(false);
       setUploading(true);
       setMessage(null);
       setSupportReference(null);
@@ -88,6 +95,12 @@ export function ImportCVModal({
     await navigator.clipboard?.writeText(supportReference);
   }
 
+  function continueToFileChooser() {
+    recordLLMDisclosureAcknowledgement("import_cv", disclosureConfig, window.localStorage);
+    setDisclosureAcknowledged(true);
+    setDisclosureExpanded(false);
+  }
+
   return (
     <div className="modal-backdrop" role="presentation">
       <section className="modal-card" role="dialog" aria-modal="true" aria-label="Import CV from PDF">
@@ -101,17 +114,19 @@ export function ImportCVModal({
             x
           </button>
         </div>
-        {confirmingTransfer ? (
-          <LLMDisclosure
-            operation="import_cv"
-            config={getLLMDisclosureConfig()}
-            confirmLabel="Send PDF and start import"
-            onConfirm={() => void upload()}
-            onCancel={() => setConfirmingTransfer(false)}
-          />
-        ) : (
+        <LLMDisclosure
+          operation="import_cv"
+          config={disclosureConfig}
+          expanded={disclosureExpanded}
+          onToggle={() => setDisclosureExpanded((current) => !current)}
+          continueLabel="Continue to choose PDF"
+          onContinue={disclosureAcknowledged ? undefined : continueToFileChooser}
+          onCancel={disclosureAcknowledged ? undefined : onClose}
+        />
+        {disclosureAcknowledged && (
           <>
-            <input ref={inputRef} type="file" accept="application/pdf" disabled={Boolean(actionId)} />
+            <label className="field-label" htmlFor="cv-import-pdf">Choose PDF</label>
+            <input id="cv-import-pdf" ref={inputRef} type="file" accept="application/pdf" disabled={Boolean(actionId)} />
             {actionId && <ActionProgress actionId={actionId} onComplete={handleComplete} onFailed={handleFailed} />}
             {message && <p className="muted">{message}</p>}
             {supportReference && (

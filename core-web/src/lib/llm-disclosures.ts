@@ -15,6 +15,7 @@ export type LLMDisclosureConfig = {
 };
 
 export type LLMOperationDisclosure = {
+  version: string;
   title: string;
   purpose: string;
   dataSent: readonly string[];
@@ -24,6 +25,7 @@ export type LLMOperationDisclosure = {
 
 const operationDisclosures = {
   import_cv: {
+    version: "1",
     title: "Import CV with AI",
     purpose: "extract an editable structured CV from your PDF",
     dataSent: ["the complete selected PDF", "your candidate preferences, when present"],
@@ -32,6 +34,7 @@ const operationDisclosures = {
     nonLLMPath: "You can cancel and enter or edit your CV manually without using an AI provider.",
   },
   quick_analysis: {
+    version: "1",
     title: "Run quick analysis with AI",
     purpose: "estimate your likely fit before you ingest this role",
     dataSent: ["the role text", "the documented quick-analysis projection of your candidate profile"],
@@ -40,6 +43,7 @@ const operationDisclosures = {
     nonLLMPath: "You can skip the preview and ingest the role directly.",
   },
   generate_bundle: {
+    version: "1",
     title: "Generate role analysis with AI",
     purpose: "extract the job, assess your fit, and create application-supporting artefacts",
     dataSent: [
@@ -52,6 +56,7 @@ const operationDisclosures = {
     nonLLMPath: "You can keep tracking the role without generating a Bundle.",
   },
   reassess_role: {
+    version: "1",
     title: "Reassess role with AI",
     purpose: "refresh the role analysis and artefacts after relevant candidate information changes",
     dataSent: [
@@ -64,6 +69,7 @@ const operationDisclosures = {
     nonLLMPath: "You can retain the existing Bundle without reassessing it.",
   },
   generate_gap_tasks: {
+    version: "1",
     title: "Generate gap tasks with AI",
     purpose: "turn selected analysis gaps into concrete linked tasks",
     dataSent: ["the selected gaps and requirements", "the minimum documented role context"],
@@ -72,6 +78,7 @@ const operationDisclosures = {
     nonLLMPath: "You can cancel and create tasks manually.",
   },
   reassess_gap_task: {
+    version: "1",
     title: "Reassess gap with AI",
     purpose: "decide whether one completed task and relevant evidence now satisfy its linked requirement",
     dataSent: [
@@ -104,4 +111,69 @@ export function validateLLMDisclosureConfig(config: LLMDisclosureConfig): LLMDis
   }
 
   return { providerName, retentionPolicyUrl: retentionPolicyUrl.toString() };
+}
+
+export type LLMDisclosureAcknowledgement = {
+  version: string;
+  fingerprint: string;
+};
+
+type AcknowledgementStorage = Pick<Storage, "getItem" | "setItem">;
+
+export function getLLMDisclosureAcknowledgement(
+  operation: LLMOperationId,
+  config: LLMDisclosureConfig,
+): LLMDisclosureAcknowledgement {
+  const disclosure = getLLMOperationDisclosure(operation);
+  const validatedConfig = validateLLMDisclosureConfig(config);
+  const material = JSON.stringify({
+    operation,
+    version: disclosure.version,
+    providerName: validatedConfig.providerName,
+    retentionPolicyUrl: validatedConfig.retentionPolicyUrl,
+    dataSent: disclosure.dataSent,
+    retainedByCVAI: disclosure.retainedByCVAI,
+    nonLLMPath: disclosure.nonLLMPath,
+  });
+  return { version: disclosure.version, fingerprint: fnv1a(material) };
+}
+
+export function hasLLMDisclosureAcknowledgement(
+  operation: LLMOperationId,
+  config: LLMDisclosureConfig,
+  storage: AcknowledgementStorage,
+) {
+  const expected = getLLMDisclosureAcknowledgement(operation, config);
+  try {
+    const stored = storage.getItem(acknowledgementKey(operation));
+    if (!stored) return false;
+    const parsed = JSON.parse(stored) as Partial<LLMDisclosureAcknowledgement>;
+    return parsed.version === expected.version && parsed.fingerprint === expected.fingerprint;
+  } catch {
+    return false;
+  }
+}
+
+export function recordLLMDisclosureAcknowledgement(
+  operation: LLMOperationId,
+  config: LLMDisclosureConfig,
+  storage: AcknowledgementStorage,
+) {
+  storage.setItem(
+    acknowledgementKey(operation),
+    JSON.stringify(getLLMDisclosureAcknowledgement(operation, config)),
+  );
+}
+
+function acknowledgementKey(operation: LLMOperationId) {
+  return `cvai.llm-disclosure-ack.${operation}`;
+}
+
+function fnv1a(value: string) {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
 }

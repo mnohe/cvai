@@ -46,7 +46,7 @@ test.describe("UC-CV-001 import entry point", () => {
 });
 
 test.describe("UC-CV-002 import CV from PDF", () => {
-  test("shows the registered disclosure and sends nothing before confirmation", async ({ page }) => {
+  test("shows the disclosure before file selection and sends nothing before continuing", async ({ page }) => {
     let called = false;
     await page.route("**/api/cv/imports", async (route) => {
       called = true;
@@ -55,10 +55,8 @@ test.describe("UC-CV-002 import CV from PDF", () => {
 
     await signIn(page, "cv.import.disclosure@example.test");
     await page.getByRole("button", { name: /Import from PDF/ }).click();
-    await choosePDF(page, "%PDF-1.7\ndisclosure");
-    await page.getByRole("button", { name: "Start import" }).click();
 
-    const disclosure = page.getByRole("alertdialog", { name: "Import CV with AI" });
+    const disclosure = page.getByRole("region", { name: "Import CV with AI" });
     await expect(disclosure).toContainText("E2E AI Provider");
     await expect(disclosure).toContainText("the complete selected PDF");
     await expect(disclosure).toContainText("candidate preferences");
@@ -67,11 +65,59 @@ test.describe("UC-CV-002 import CV from PDF", () => {
       "href",
       "https://provider.example/privacy",
     );
+    await expect(page.getByLabel("Choose PDF")).toHaveCount(0);
     expect(called).toBe(false);
 
     await disclosure.getByRole("button", { name: "Cancel" }).click();
-    await expect(disclosure).toHaveCount(0);
+    await expect(page.getByRole("dialog", { name: "Import CV from PDF" })).toHaveCount(0);
     expect(called).toBe(false);
+  });
+
+  test("remembers an unchanged disclosure and keeps its summary available", async ({ page }) => {
+    await signIn(page, "cv.import.repeat-disclosure@example.test");
+    await page.getByRole("button", { name: /Import from PDF/ }).click();
+    await page.getByRole("button", { name: "Continue to choose PDF" }).click();
+    await expect(page.getByLabel("Choose PDF")).toBeVisible();
+    await page.getByRole("button", { name: "Cancel" }).click();
+
+    await page.getByRole("button", { name: /Import from PDF/ }).click();
+    const summary = page.getByRole("button", { name: "Import CV with AI" });
+    await expect(summary).toHaveAttribute("aria-expanded", "false");
+    await expect(page.getByLabel("Choose PDF")).toBeVisible();
+    await summary.click();
+    await expect(page.getByText("the complete selected PDF")).toBeVisible();
+  });
+
+  test("invalidates an acknowledgement when the disclosure fingerprint changes", async ({ page }) => {
+    await signIn(page, "cv.import.changed-disclosure@example.test");
+    await page.evaluate(() => {
+      localStorage.setItem(
+        "cvai.llm-disclosure-ack.import_cv",
+        JSON.stringify({ version: "1", fingerprint: "obsolete" }),
+      );
+    });
+    await page.getByRole("button", { name: /Import from PDF/ }).click();
+
+    await expect(page.getByRole("button", { name: "Import CV with AI" })).toHaveAttribute("aria-expanded", "true");
+    await expect(page.getByRole("button", { name: "Continue to choose PDF" })).toBeVisible();
+    await expect(page.getByLabel("Choose PDF")).toHaveCount(0);
+  });
+
+  test("disclosure gate is keyboard-operable and fits a mobile viewport", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await signIn(page, "cv.import.mobile-disclosure@example.test");
+    await page.getByRole("button", { name: /Import from PDF/ }).click();
+
+    const modal = page.getByRole("dialog", { name: "Import CV from PDF" });
+    const summary = page.getByRole("button", { name: "Import CV with AI" });
+    await expect(summary).toHaveAttribute("aria-expanded", "true");
+    await summary.focus();
+    await page.keyboard.press("Enter");
+    await expect(summary).toHaveAttribute("aria-expanded", "false");
+    await page.keyboard.press("Enter");
+    await expect(summary).toHaveAttribute("aria-expanded", "true");
+    await expect(page.getByRole("button", { name: "Continue to choose PDF" })).toBeVisible();
+    expect(await modal.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
   });
 
   test("progress shown and CV populated on success", async ({ page }) => {
@@ -934,6 +980,8 @@ function uniqueEmail(email: string) {
 }
 
 async function choosePDF(page: Page, content: string) {
+  const continueButton = page.getByRole("button", { name: "Continue to choose PDF" });
+  if (await continueButton.isVisible()) await continueButton.click();
   await page.setInputFiles("input[type='file']", {
     name: "cv.pdf",
     mimeType: "application/pdf",
@@ -942,11 +990,8 @@ async function choosePDF(page: Page, content: string) {
 }
 
 async function confirmImport(page: Page, waitForResponse = true) {
-  await page.getByRole("button", { name: "Start import" }).click();
-  const disclosure = page.getByRole("alertdialog", { name: "Import CV with AI" });
-  await expect(disclosure).toBeVisible();
   const response = waitForResponse ? page.waitForResponse("**/api/cv/imports") : null;
-  await disclosure.getByRole("button", { name: "Send PDF and start import" }).click();
+  await page.getByRole("button", { name: "Start import" }).click();
   await response;
 }
 

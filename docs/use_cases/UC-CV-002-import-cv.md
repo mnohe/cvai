@@ -17,6 +17,13 @@ progress via a Firestore subscription.
 PDF bytes are never persisted. They are read from the request, sent to the LLM, then
 discarded. Firebase Storage is not involved.
 
+Before the file chooser is available, the import modal presents the complete,
+operation-specific AI disclosure. First use is expanded and continuing records only a
+version and content fingerprint for `import_cv` in browser-local storage. On repeat use,
+the disclosure summary remains available but starts collapsed. A provider, disclosed
+data category, retention reference, non-LLM alternative, or disclosure-version change
+invalidates the acknowledgement and restores the gate.
+
 ## Flow
 
 ```mermaid
@@ -27,7 +34,12 @@ sequenceDiagram
     participant Firestore
     participant LLM
 
-    User->>SPA: Click Import from PDF, select file (PDF ≤ 10 MB)
+    User->>SPA: Click Import from PDF
+    SPA-->>User: Expanded AI disclosure; no file control yet
+    User->>SPA: Continue past disclosure
+    SPA->>SPA: Store versioned import_cv acknowledgement
+    SPA-->>User: Show file chooser
+    User->>SPA: Select file (PDF ≤ 10 MB) and start import
     SPA->>Backend: PUT /cv (Content-Type: application/pdf)
     Backend->>Firestore: DeductCredit(uid) — transactional; fails if balance = 0
     Backend->>Firestore: Create Action {status: pending}
@@ -89,6 +101,9 @@ SPA shows error toast. No CV data is written.
 
 | Scenario | File | Describe block |
 |---|---|---|
+| First use shows disclosure before the file chooser | `e2e/cv.spec.ts` | `UC-CV-002 import CV from PDF` |
+| Repeat use collapses an always-available disclosure summary | `e2e/cv.spec.ts` | `UC-CV-002 import CV from PDF` |
+| Changed disclosure invalidates browser acknowledgement | `e2e/cv.spec.ts` | `UC-CV-002 import CV from PDF` |
 | PDF upload triggers action progress indicator | `e2e/cv.spec.ts` | `UC-CV-002 progress shown` |
 | CV populated after successful import | `e2e/cv.spec.ts` | `UC-CV-002 cv populated on success` |
 | Validation notice shown when imported CV has missing fields | `e2e/cv.spec.ts` | `UC-CV-002 validation notice on incomplete import` |

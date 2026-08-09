@@ -824,6 +824,30 @@ button:disabled {
   padding: 16px;
 }
 
+.llm-disclosure-summary {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  display: flex;
+  font: inherit;
+  font-weight: 700;
+  justify-content: space-between;
+  padding: 0;
+  text-align: left;
+  width: 100%;
+}
+
+.llm-disclosure-summary:focus-visible {
+  outline: 3px solid var(--coral);
+  outline-offset: 4px;
+}
+
+.llm-disclosure-details {
+  margin-top: var(--space-3);
+}
+
 .llm-disclosure h3,
 .llm-disclosure p,
 .llm-disclosure ul {
