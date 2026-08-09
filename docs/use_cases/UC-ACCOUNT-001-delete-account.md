@@ -3,66 +3,37 @@
 | | |
 |---|---|
 | **Actor** | User |
-| **Preconditions** | Signed in; re-authenticated within the last 5 minutes |
-| **Milestone** | M1 |
+| **Status** | Hosted extension; not implemented by CVAI |
+| **Milestone** | M1 hosted product |
 | **Credit cost** | None |
 | **LLM** | No |
 
-## Context
+## Open-core boundary
 
-Account deletion is irreversible. All user data is erased from Firestore, Cloud Storage,
-and Firebase Auth. A PII-free tombstone is written to `_admin/deleted_accounts/{uid}`
-for audit purposes.
+CVAI does not provide an account-deletion endpoint, UI flow, deletion tombstone,
+or Firebase Auth administration. A self-hosting operator owns account lifecycle
+and data-retention procedures for their deployment. CVAI must not claim a
+particular cascade, confirmation-token protocol, audit schema, or end-to-end test
+until such a capability is deliberately designed and implemented in this
+repository.
 
-Re-authentication is required both client-side (Firebase `reauthenticateWithPopup`) and
-server-side (`RequireRecentAuth(300)` — token `auth_time` must be within 5 minutes).
-Both checks are enforced independently.
+The hosted CVirgil product implements its own deletion workflow in the companion
+`cvirgil` repository. Its canonical specification is
+`docs/use_cases/UC-ACCOUNT-001-delete-account.md` in that repository. At the time
+this boundary note was reconciled, CVirgil uses one recently authenticated
+`DELETE /account` request and a non-PII write barrier at
+`_admin/deleted_accounts/records/{uid}` with fields `deleted_at` and `reason`.
+Those details describe CVirgil, not an API or storage contract exported by CVAI.
 
-## Flow
+## CVAI acceptance
 
-```mermaid
-sequenceDiagram
-    actor User
-    participant SPA
-    participant Firebase Auth
-    participant Backend
-    participant Firestore
-    participant Cloud Storage
-
-    User->>SPA: Click "Delete account" in account settings
-    SPA-->>User: Confirmation modal
-    User->>SPA: Confirm deletion
-    SPA->>Firebase Auth: reauthenticateWithPopup(provider)
-    Firebase Auth-->>SPA: Fresh token (auth_time ≤ 5 min ago)
-    SPA->>Backend: DELETE /account (Authorization: Bearer <fresh token>)
-    Backend->>Backend: RequireRecentAuth(300) — verify auth_time claim
-    Backend-->>SPA: 202 {confirmToken} (short-lived, single-use)
-    SPA-->>User: Show confirmation code; prompt to re-enter
-    User->>SPA: Type confirmation code
-    SPA->>Backend: DELETE /account (X-Confirm-Token: <confirmToken>)
-    Backend->>Firestore: Delete all subcollections under users/{uid}/
-    Backend->>Cloud Storage: Delete all objects under users/{uid}/
-    Backend->>Firebase Auth: Delete auth record for uid
-    Backend->>Firestore: Write _admin/deleted_accounts/{uid} {deletedAt, reason: user_request}
-    Backend-->>SPA: 200
-    SPA->>Firebase Auth: signOut()
-    SPA-->>User: Redirect to landing page
-```
-
-## Postconditions
-
-- All Firestore data under `users/{uid}/` deleted.
-- All Cloud Storage objects under `users/{uid}/` deleted.
-- Firebase Auth record deleted.
-- PII-free tombstone at `_admin/deleted_accounts/{uid}`.
-- User is signed out and on the landing page.
+- CVAI documentation does not advertise an unimplemented deletion endpoint or
+  confirmation-token exchange.
+- CVAI architecture does not reserve a malformed or hosted-only tombstone path.
+- Any future open-core deletion capability requires its own design, security
+  review, implementation, and executable tests before this use case can become
+  active.
 
 ## E2E scenarios
 
-| Scenario | File | Describe block |
-|---|---|---|
-| Delete account cascade deletes all user data | `e2e/account.spec.ts` | `UC-ACCOUNT-001 cascade delete` |
-| Old auth_time token rejected by backend | `e2e/account.spec.ts` | `UC-ACCOUNT-001 stale token rejected` |
-| Invalid confirm token rejected | `e2e/account.spec.ts` | `UC-ACCOUNT-001 invalid confirm token rejected` |
-| Tombstone written with no PII | `e2e/account.spec.ts` | `UC-ACCOUNT-001 tombstone written` |
-| Post-deletion redirect to landing page | `e2e/account.spec.ts` | `UC-ACCOUNT-001 redirect after delete` |
+None in CVAI. Hosted deletion scenarios belong to CVirgil and are verified there.

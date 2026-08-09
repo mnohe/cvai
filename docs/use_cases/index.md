@@ -77,5 +77,5 @@ E2E tests reference use cases by ID in their `describe` block names, making cove
 
 | ID | Title | Milestone | LLM | Credit |
 |---|---|---|---|---|
-| [UC-ACCOUNT-001](UC-ACCOUNT-001-delete-account.md) | Delete account | M1 | No | — |
+| [UC-ACCOUNT-001](UC-ACCOUNT-001-delete-account.md) | Delete account (hosted extension; not implemented by CVAI) | M1 hosted | No | — |
 | [UC-ACCOUNT-002](UC-ACCOUNT-002-export-data.md) | Export user data (GDPR) | M1 | No | — |

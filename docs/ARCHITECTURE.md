@@ -132,8 +132,6 @@ users/{uid}/
   tasks/{taskId}                   Task (optionally linked to a roleId)
   events/{eventId}                 Append-only event log
   actions/{actionId}               Async operation state machine
-
-_admin/deleted_accounts/{uid}      PII-free tombstone; no client access
 ```
 
 ### Repository pattern
@@ -318,7 +316,7 @@ Calibration blocks are computed at request time from `CalibrationRepository` (re
 | SSRF | `FetchURL` resolves DNS before connecting and checks all resolved IPs against a blocklist (RFC 1918, loopback, link-local, GCP metadata endpoint). DNS rebinding is mitigated by checking IPs, not the original hostname. |
 | Prompt injection | Source material is passed as delimited evidence with an explicit instruction that embedded directives have no authority. Output validation catches injection artefacts; correctness does not depend on detecting every attack string. |
 | PII in logs | Structured logging middleware hashes the UID (SHA-256) for correlation. Prompt content, CV text, job descriptions, and email addresses must never appear in any log line. |
-| Account deletion | `RequireRecentAuth(300)` enforced server-side. Cascade deletes all Firestore subcollections and Cloud Storage objects. A PII-free tombstone is written to `_admin/deleted_accounts/{uid}`. |
+| Account deletion | Not implemented by CVAI. Hosted products define and verify their own deletion endpoint, recent-auth policy, cascade, and audit/write-barrier schema. |
 
 ---
 

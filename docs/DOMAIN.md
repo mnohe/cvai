@@ -43,7 +43,7 @@ Aggregates define consistency boundaries — what must be saved atomically, and 
 | **Task** | Description, completion state, source (gap/manual), due date, roleId link, estimated_days, actual_days, created_at, completed_at | CreateTask, CompleteTask, DeleteTask |
 | **Event** | Type, date, note, roleId link | RecordEvent (append-only; no update or delete) |
 | **Action** | Type, status, progress, roleId link, result reference | CreateAction, UpdateProgress, CompleteAction, FailAction |
-| **Account** | Credits balance, purchase history, hasEverPurchased flag | PurchaseCredits, DeleteAccount, ExportData |
+| **Account** | Credits balance, purchase history, hasEverPurchased flag | PurchaseCredits, ExportData; DeleteAccount is a hosted extension, not a CVAI command |
 
 Tasks and Events are modelled as flat Firestore collections (`users/{uid}/tasks`, `users/{uid}/events`) rather than subcollections under Role. The `roleId` field creates a logical relationship without nesting — Firestore's query model does not support cross-collection joins so flat collections are required for cross-role task views.
 
@@ -70,7 +70,7 @@ Domain events are facts in the past tense. In Firestore they are recorded in the
 | `CVUpdated` | The candidate edited a section of their CV directly. |
 | `CreditsDeducted` | A Premium Request consumed one credit. |
 | `CreditsPurchased` | A Stripe payment was processed and credits were added to the balance. |
-| `AccountDeleted` | All user data was erased on the user's request. |
+| `AccountDeleted` | Reserved for a hosted extension; CVAI does not emit this event. |
 
 ---
 
@@ -93,7 +93,7 @@ Each service maps to one or more HTTP endpoints or direct Firestore writes. See 
 | `UpdateRoleStatus(roleId, status)` | Structured status update (no LLM). Writes an `OutcomeRecorded` event when the new status is terminal. | Direct Firestore write |
 | `PurchaseCredits(packId)` | Create a Stripe Checkout Session for a credit pack. | Go handler → Stripe API |
 | `ExportUserData()` | Collect all Firestore documents and Cloud Storage objects for the user and return as ZIP. | Go handler (GDPR) |
-| `DeleteAccount()` | Cascade-delete all user data from Firestore, Cloud Storage, and Firebase Auth. | Go handler (GDPR, requires recent auth) |
+| `DeleteAccount()` | Hosted-extension operation; not implemented or exported by CVAI. See UC-ACCOUNT-001 for the boundary. | Not handled by CVAI |
 
 ---
 
