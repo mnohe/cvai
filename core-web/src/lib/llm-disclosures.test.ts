@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   getLLMOperationDisclosure,
+  hasLLMDisclosureAcknowledgement,
   llmOperationIds,
+  recordLLMDisclosureAcknowledgement,
   validateLLMDisclosureConfig,
 } from "./llm-disclosures.ts";
 
@@ -24,6 +26,39 @@ test("every registered operation has a complete disclosure", () => {
     assert.ok(disclosure.retainedByCVAI.includes("CVAI"));
     assert.ok(disclosure.nonLLMPath);
   }
+});
+
+test("acknowledgements are operation-specific and invalidate when disclosed content changes", () => {
+  const values = new Map<string, string>();
+  const storage = {
+    getItem(key: string) {
+      return values.get(key) ?? null;
+    },
+    setItem(key: string, value: string) {
+      values.set(key, value);
+    },
+  };
+  const config = {
+    providerName: "Example AI",
+    retentionPolicyUrl: "https://provider.example/privacy",
+  };
+
+  assert.equal(hasLLMDisclosureAcknowledgement("import_cv", config, storage), false);
+  recordLLMDisclosureAcknowledgement("import_cv", config, storage);
+  assert.equal(hasLLMDisclosureAcknowledgement("import_cv", config, storage), true);
+  assert.equal(hasLLMDisclosureAcknowledgement("quick_analysis", config, storage), false);
+  assert.equal(
+    hasLLMDisclosureAcknowledgement("import_cv", { ...config, providerName: "Different AI" }, storage),
+    false,
+  );
+  assert.equal(
+    hasLLMDisclosureAcknowledgement(
+      "import_cv",
+      { ...config, retentionPolicyUrl: "https://provider.example/new-policy" },
+      storage,
+    ),
+    false,
+  );
 });
 
 test("hosted disclosure configuration requires a named provider and HTTPS retention link", () => {

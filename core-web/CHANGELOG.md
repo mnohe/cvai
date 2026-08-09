@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.1.3 - 2026-08-09
+
+- Gate CV-import file selection behind a first-use AI disclosure and retain only a
+  versioned, operation-specific browser acknowledgement.
+- Keep the disclosure summary available on repeat use and invalidate acknowledgements
+  when its provider, retention reference, data categories, alternative, or version changes.
+
 ## 0.1.2 - 2026-08-07
 
 - Add registry-backed, provider-configurable just-in-time LLM disclosure contracts and a reusable confirmation component.
