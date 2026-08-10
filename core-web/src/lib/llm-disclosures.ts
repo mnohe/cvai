@@ -159,10 +159,13 @@ export function recordLLMDisclosureAcknowledgement(
   config: LLMDisclosureConfig,
   storage: AcknowledgementStorage,
 ) {
-  storage.setItem(
-    acknowledgementKey(operation),
-    JSON.stringify(getLLMDisclosureAcknowledgement(operation, config)),
-  );
+  const acknowledgement = JSON.stringify(getLLMDisclosureAcknowledgement(operation, config));
+  try {
+    storage.setItem(acknowledgementKey(operation), acknowledgement);
+  } catch {
+    // Acknowledgement persistence is best-effort. The active UI session still
+    // advances when browser storage is unavailable or over quota.
+  }
 }
 
 function acknowledgementKey(operation: LLMOperationId) {

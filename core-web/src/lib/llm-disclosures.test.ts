@@ -61,6 +61,45 @@ test("acknowledgements are operation-specific and invalidate when disclosed cont
   );
 });
 
+test("acknowledgement write is best-effort when browser storage rejects it", () => {
+  const config = {
+    providerName: "Example AI",
+    retentionPolicyUrl: "https://provider.example/privacy",
+  };
+  const storage = {
+    getItem() {
+      return null;
+    },
+    setItem() {
+      throw new Error("storage unavailable");
+    },
+  };
+
+  assert.doesNotThrow(() => recordLLMDisclosureAcknowledgement("import_cv", config, storage));
+  assert.equal(hasLLMDisclosureAcknowledgement("import_cv", config, storage), false);
+});
+
+test("acknowledgement recording does not hide invalid disclosure configuration", () => {
+  const storage = {
+    getItem() {
+      return null;
+    },
+    setItem() {
+      throw new Error("storage unavailable");
+    },
+  };
+
+  assert.throws(
+    () =>
+      recordLLMDisclosureAcknowledgement(
+        "import_cv",
+        { providerName: "Example AI", retentionPolicyUrl: "http://provider.example/privacy" },
+        storage,
+      ),
+    /absolute HTTPS URL/,
+  );
+});
+
 test("hosted disclosure configuration requires a named provider and HTTPS retention link", () => {
   assert.deepEqual(
     validateLLMDisclosureConfig({
