@@ -20,25 +20,29 @@ export function SettingsPage() {
       <div className="settings-grid">
         <section className="settings-section">
           <h2>Account</h2>
-          <p>{user?.displayName || "CVAI user"}</p>
-          <p className="settings-email-row">
-            <span className="muted">{user?.email}</span>
-            {providerNames.map((providerName) => (
-              <span className="provider-pill" key={providerName}>
-                {providerName}
-              </span>
-            ))}
-          </p>
-          <button
-            type="button"
-            className="danger-button"
-            onClick={async () => {
-              await signOut(auth);
-              navigate("/login", { replace: true });
-            }}
-          >
-            Sign out
-          </button>
+          <div className="account-identity-row">
+            <div className="account-identity">
+              <p>{user?.displayName || "CVAI user"}</p>
+              <p className="settings-email-row">
+                <span className="muted">{user?.email}</span>
+                {providerNames.map((providerName) => (
+                  <span className="provider-pill" key={providerName}>
+                    {providerName}
+                  </span>
+                ))}
+              </p>
+            </div>
+            <button
+              type="button"
+              className="danger-button account-signout-button"
+              onClick={async () => {
+                await signOut(auth);
+                navigate("/login", { replace: true });
+              }}
+            >
+              Sign out
+            </button>
+          </div>
         </section>
         <Slots.SettingsExtra />
         <Slots.PrivacySettings />
