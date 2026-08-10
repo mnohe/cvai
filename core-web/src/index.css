@@ -491,6 +491,8 @@ button:disabled {
   flex-wrap: wrap;
   gap: 8px;
   margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .provider-pill {
@@ -737,6 +739,24 @@ button:disabled {
 .settings-section {
   display: grid;
   gap: 10px;
+}
+
+.account-identity-row {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  justify-content: space-between;
+}
+
+.account-identity {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.account-signout-button {
+  flex: 0 0 auto;
 }
 
 .section-tabs {
