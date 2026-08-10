@@ -88,6 +88,35 @@ test.describe("UC-CV-002 import CV from PDF", () => {
     await expect(page.getByText("the complete selected PDF")).toBeVisible();
   });
 
+  test("continues for the active session when disclosure storage is unavailable", async ({ page }) => {
+    await signIn(page, "cv.import.storage-unavailable@example.test");
+    await page.evaluate(() => {
+      const setItem = Storage.prototype.setItem;
+      Storage.prototype.setItem = function (key: string, value: string) {
+        if (key === "cvai.llm-disclosure-ack.import_cv") {
+          throw new DOMException("Storage is unavailable", "QuotaExceededError");
+        }
+        setItem.call(this, key, value);
+      };
+    });
+
+    await page.getByRole("button", { name: /Import from PDF/ }).click();
+    await page.getByRole("button", { name: "Continue to choose PDF" }).click();
+
+    await expect(page.getByLabel("Choose PDF")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Continue to choose PDF" })).toHaveCount(0);
+    await expect
+      .poll(() =>
+        page.evaluate(() => localStorage.getItem("cvai.llm-disclosure-ack.import_cv")),
+      )
+      .toBeNull();
+
+    await page.getByRole("button", { name: "Cancel" }).click();
+    await page.getByRole("button", { name: /Import from PDF/ }).click();
+    await expect(page.getByLabel("Choose PDF")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Continue to choose PDF" })).toBeVisible();
+  });
+
   test("invalidates an acknowledgement when the disclosure fingerprint changes", async ({ page }) => {
     await signIn(page, "cv.import.changed-disclosure@example.test");
     await page.evaluate(() => {
