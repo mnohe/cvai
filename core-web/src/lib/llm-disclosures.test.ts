@@ -2,9 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   getLLMOperationDisclosure,
-  hasLLMDisclosureAcknowledgement,
+  hasLLMDisclosureBeenDisplayed,
   llmOperationIds,
-  recordLLMDisclosureAcknowledgement,
+  recordLLMDisclosureDisplayed,
   validateLLMDisclosureConfig,
 } from "./llm-disclosures.ts";
 
@@ -28,7 +28,7 @@ test("every registered operation has a complete disclosure", () => {
   }
 });
 
-test("acknowledgements are operation-specific and invalidate when disclosed content changes", () => {
+test("displayed states are operation-specific and invalidate when disclosed content changes", () => {
   const values = new Map<string, string>();
   const storage = {
     getItem(key: string) {
@@ -43,16 +43,16 @@ test("acknowledgements are operation-specific and invalidate when disclosed cont
     retentionPolicyUrl: "https://provider.example/privacy",
   };
 
-  assert.equal(hasLLMDisclosureAcknowledgement("import_cv", config, storage), false);
-  recordLLMDisclosureAcknowledgement("import_cv", config, storage);
-  assert.equal(hasLLMDisclosureAcknowledgement("import_cv", config, storage), true);
-  assert.equal(hasLLMDisclosureAcknowledgement("quick_analysis", config, storage), false);
+  assert.equal(hasLLMDisclosureBeenDisplayed("import_cv", config, storage), false);
+  recordLLMDisclosureDisplayed("import_cv", config, storage);
+  assert.equal(hasLLMDisclosureBeenDisplayed("import_cv", config, storage), true);
+  assert.equal(hasLLMDisclosureBeenDisplayed("quick_analysis", config, storage), false);
   assert.equal(
-    hasLLMDisclosureAcknowledgement("import_cv", { ...config, providerName: "Different AI" }, storage),
+    hasLLMDisclosureBeenDisplayed("import_cv", { ...config, providerName: "Different AI" }, storage),
     false,
   );
   assert.equal(
-    hasLLMDisclosureAcknowledgement(
+    hasLLMDisclosureBeenDisplayed(
       "import_cv",
       { ...config, retentionPolicyUrl: "https://provider.example/new-policy" },
       storage,
@@ -61,7 +61,7 @@ test("acknowledgements are operation-specific and invalidate when disclosed cont
   );
 });
 
-test("acknowledgement write is best-effort when browser storage rejects it", () => {
+test("display-state write is best-effort when browser storage rejects it", () => {
   const config = {
     providerName: "Example AI",
     retentionPolicyUrl: "https://provider.example/privacy",
@@ -75,11 +75,11 @@ test("acknowledgement write is best-effort when browser storage rejects it", () 
     },
   };
 
-  assert.doesNotThrow(() => recordLLMDisclosureAcknowledgement("import_cv", config, storage));
-  assert.equal(hasLLMDisclosureAcknowledgement("import_cv", config, storage), false);
+  assert.doesNotThrow(() => recordLLMDisclosureDisplayed("import_cv", config, storage));
+  assert.equal(hasLLMDisclosureBeenDisplayed("import_cv", config, storage), false);
 });
 
-test("acknowledgement recording does not hide invalid disclosure configuration", () => {
+test("display-state recording does not hide invalid disclosure configuration", () => {
   const storage = {
     getItem() {
       return null;
@@ -91,7 +91,7 @@ test("acknowledgement recording does not hide invalid disclosure configuration",
 
   assert.throws(
     () =>
-      recordLLMDisclosureAcknowledgement(
+      recordLLMDisclosureDisplayed(
         "import_cv",
         { providerName: "Example AI", retentionPolicyUrl: "http://provider.example/privacy" },
         storage,
