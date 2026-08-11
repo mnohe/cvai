@@ -26,7 +26,7 @@ export type LLMOperationDisclosure = {
 const operationDisclosures = {
   import_cv: {
     version: "1",
-    title: "Import CV with AI",
+    title: "Warning: data is leaving CVAI",
     purpose: "extract an editable structured CV from your PDF",
     dataSent: ["the complete selected PDF", "your candidate preferences, when present"],
     retainedByCVAI:
@@ -113,17 +113,17 @@ export function validateLLMDisclosureConfig(config: LLMDisclosureConfig): LLMDis
   return { providerName, retentionPolicyUrl: retentionPolicyUrl.toString() };
 }
 
-export type LLMDisclosureAcknowledgement = {
+export type LLMDisclosureDisplayedState = {
   version: string;
   fingerprint: string;
 };
 
-type AcknowledgementStorage = Pick<Storage, "getItem" | "setItem">;
+type DisclosureStorage = Pick<Storage, "getItem" | "setItem">;
 
-export function getLLMDisclosureAcknowledgement(
+export function getLLMDisclosureDisplayedState(
   operation: LLMOperationId,
   config: LLMDisclosureConfig,
-): LLMDisclosureAcknowledgement {
+): LLMDisclosureDisplayedState {
   const disclosure = getLLMOperationDisclosure(operation);
   const validatedConfig = validateLLMDisclosureConfig(config);
   const material = JSON.stringify({
@@ -138,38 +138,45 @@ export function getLLMDisclosureAcknowledgement(
   return { version: disclosure.version, fingerprint: fnv1a(material) };
 }
 
-export function hasLLMDisclosureAcknowledgement(
+export function hasLLMDisclosureBeenDisplayed(
   operation: LLMOperationId,
   config: LLMDisclosureConfig,
-  storage: AcknowledgementStorage,
+  storage: DisclosureStorage,
 ) {
-  const expected = getLLMDisclosureAcknowledgement(operation, config);
+  const expected = getLLMDisclosureDisplayedState(operation, config);
   try {
-    const stored = storage.getItem(acknowledgementKey(operation));
+    const stored = storage.getItem(displayedStateKey(operation));
     if (!stored) return false;
-    const parsed = JSON.parse(stored) as Partial<LLMDisclosureAcknowledgement>;
+    const parsed = JSON.parse(stored) as Partial<LLMDisclosureDisplayedState>;
     return parsed.version === expected.version && parsed.fingerprint === expected.fingerprint;
   } catch {
     return false;
   }
 }
 
-export function recordLLMDisclosureAcknowledgement(
+export function recordLLMDisclosureDisplayed(
   operation: LLMOperationId,
   config: LLMDisclosureConfig,
-  storage: AcknowledgementStorage,
+  storage: DisclosureStorage,
 ) {
-  const acknowledgement = JSON.stringify(getLLMDisclosureAcknowledgement(operation, config));
+  const displayedState = JSON.stringify(getLLMDisclosureDisplayedState(operation, config));
   try {
-    storage.setItem(acknowledgementKey(operation), acknowledgement);
+    storage.setItem(displayedStateKey(operation), displayedState);
   } catch {
-    // Acknowledgement persistence is best-effort. The active UI session still
-    // advances when browser storage is unavailable or over quota.
+    // Display-state persistence is best-effort. The complete warning remains
+    // available in the active UI session when storage is unavailable.
   }
 }
 
-function acknowledgementKey(operation: LLMOperationId) {
-  return `cvai.llm-disclosure-ack.${operation}`;
+// Compatibility aliases for consumers of 0.1.3. New code should use the
+// displayed-state names because opening the disclosure, not consent, is stored.
+export type LLMDisclosureAcknowledgement = LLMDisclosureDisplayedState;
+export const getLLMDisclosureAcknowledgement = getLLMDisclosureDisplayedState;
+export const hasLLMDisclosureAcknowledgement = hasLLMDisclosureBeenDisplayed;
+export const recordLLMDisclosureAcknowledgement = recordLLMDisclosureDisplayed;
+
+function displayedStateKey(operation: LLMOperationId) {
+  return `cvai.llm-disclosure-displayed.${operation}`;
 }
 
 function fnv1a(value: string) {

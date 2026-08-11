@@ -46,7 +46,7 @@ test.describe("UC-CV-001 import entry point", () => {
 });
 
 test.describe("UC-CV-002 import CV from PDF", () => {
-  test("shows the disclosure before file selection and sends nothing before continuing", async ({ page }) => {
+  test("shows disclosure and file controls in one dialog and sends nothing before Start import", async ({ page }) => {
     let called = false;
     await page.route("**/api/cv/imports", async (route) => {
       called = true;
@@ -56,7 +56,13 @@ test.describe("UC-CV-002 import CV from PDF", () => {
     await signIn(page, "cv.import.disclosure@example.test");
     await page.getByRole("button", { name: /Import from PDF/ }).click();
 
-    const disclosure = page.getByRole("region", { name: "Import CV with AI" });
+    const modal = page.getByRole("dialog", { name: "Import CV from PDF" });
+    await expect(modal).toHaveCount(1);
+    const disclosure = page.getByRole("region", { name: "Warning: data is leaving CVAI" });
+    await expect(disclosure.getByRole("button", { name: "Warning: data is leaving CVAI" })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
     await expect(disclosure).toContainText("E2E AI Provider");
     await expect(disclosure).toContainText("the complete selected PDF");
     await expect(disclosure).toContainText("candidate preferences");
@@ -65,10 +71,12 @@ test.describe("UC-CV-002 import CV from PDF", () => {
       "href",
       "https://provider.example/privacy",
     );
-    await expect(page.getByLabel("Choose PDF")).toHaveCount(0);
+    await expect(page.getByLabel("Choose PDF")).toBeVisible();
     expect(called).toBe(false);
 
-    await disclosure.getByRole("button", { name: "Cancel" }).click();
+    await choosePDF(page, "%PDF-1.7\nnot-started");
+    expect(called).toBe(false);
+    await modal.getByRole("button", { name: "Cancel" }).click();
     await expect(page.getByRole("dialog", { name: "Import CV from PDF" })).toHaveCount(0);
     expect(called).toBe(false);
   });
@@ -76,12 +84,11 @@ test.describe("UC-CV-002 import CV from PDF", () => {
   test("remembers an unchanged disclosure and keeps its summary available", async ({ page }) => {
     await signIn(page, "cv.import.repeat-disclosure@example.test");
     await page.getByRole("button", { name: /Import from PDF/ }).click();
-    await page.getByRole("button", { name: "Continue to choose PDF" }).click();
     await expect(page.getByLabel("Choose PDF")).toBeVisible();
     await page.getByRole("button", { name: "Cancel" }).click();
 
     await page.getByRole("button", { name: /Import from PDF/ }).click();
-    const summary = page.getByRole("button", { name: "Import CV with AI" });
+    const summary = page.getByRole("button", { name: "Warning: data is leaving CVAI" });
     await expect(summary).toHaveAttribute("aria-expanded", "false");
     await expect(page.getByLabel("Choose PDF")).toBeVisible();
     await summary.click();
@@ -93,7 +100,7 @@ test.describe("UC-CV-002 import CV from PDF", () => {
     await page.evaluate(() => {
       const setItem = Storage.prototype.setItem;
       Storage.prototype.setItem = function (key: string, value: string) {
-        if (key === "cvai.llm-disclosure-ack.import_cv") {
+        if (key === "cvai.llm-disclosure-displayed.import_cv") {
           throw new DOMException("Storage is unavailable", "QuotaExceededError");
         }
         setItem.call(this, key, value);
@@ -101,35 +108,32 @@ test.describe("UC-CV-002 import CV from PDF", () => {
     });
 
     await page.getByRole("button", { name: /Import from PDF/ }).click();
-    await page.getByRole("button", { name: "Continue to choose PDF" }).click();
-
     await expect(page.getByLabel("Choose PDF")).toBeVisible();
-    await expect(page.getByRole("button", { name: "Continue to choose PDF" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Warning: data is leaving CVAI" })).toHaveAttribute("aria-expanded", "true");
     await expect
       .poll(() =>
-        page.evaluate(() => localStorage.getItem("cvai.llm-disclosure-ack.import_cv")),
+        page.evaluate(() => localStorage.getItem("cvai.llm-disclosure-displayed.import_cv")),
       )
       .toBeNull();
 
     await page.getByRole("button", { name: "Cancel" }).click();
     await page.getByRole("button", { name: /Import from PDF/ }).click();
-    await expect(page.getByLabel("Choose PDF")).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Continue to choose PDF" })).toBeVisible();
+    await expect(page.getByLabel("Choose PDF")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Warning: data is leaving CVAI" })).toHaveAttribute("aria-expanded", "true");
   });
 
-  test("invalidates an acknowledgement when the disclosure fingerprint changes", async ({ page }) => {
+  test("invalidates displayed state when the disclosure fingerprint changes", async ({ page }) => {
     await signIn(page, "cv.import.changed-disclosure@example.test");
     await page.evaluate(() => {
       localStorage.setItem(
-        "cvai.llm-disclosure-ack.import_cv",
+        "cvai.llm-disclosure-displayed.import_cv",
         JSON.stringify({ version: "1", fingerprint: "obsolete" }),
       );
     });
     await page.getByRole("button", { name: /Import from PDF/ }).click();
 
-    await expect(page.getByRole("button", { name: "Import CV with AI" })).toHaveAttribute("aria-expanded", "true");
-    await expect(page.getByRole("button", { name: "Continue to choose PDF" })).toBeVisible();
-    await expect(page.getByLabel("Choose PDF")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Warning: data is leaving CVAI" })).toHaveAttribute("aria-expanded", "true");
+    await expect(page.getByLabel("Choose PDF")).toBeVisible();
   });
 
   test("disclosure gate is keyboard-operable and fits a mobile viewport", async ({ page }) => {
@@ -138,14 +142,14 @@ test.describe("UC-CV-002 import CV from PDF", () => {
     await page.getByRole("button", { name: /Import from PDF/ }).click();
 
     const modal = page.getByRole("dialog", { name: "Import CV from PDF" });
-    const summary = page.getByRole("button", { name: "Import CV with AI" });
+    const summary = page.getByRole("button", { name: "Warning: data is leaving CVAI" });
     await expect(summary).toHaveAttribute("aria-expanded", "true");
     await summary.focus();
     await page.keyboard.press("Enter");
     await expect(summary).toHaveAttribute("aria-expanded", "false");
     await page.keyboard.press("Enter");
     await expect(summary).toHaveAttribute("aria-expanded", "true");
-    await expect(page.getByRole("button", { name: "Continue to choose PDF" })).toBeVisible();
+    await expect(page.getByLabel("Choose PDF")).toBeVisible();
     expect(await modal.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
   });
 
@@ -1009,8 +1013,6 @@ function uniqueEmail(email: string) {
 }
 
 async function choosePDF(page: Page, content: string) {
-  const continueButton = page.getByRole("button", { name: "Continue to choose PDF" });
-  if (await continueButton.isVisible()) await continueButton.click();
   await page.setInputFiles("input[type='file']", {
     name: "cv.pdf",
     mimeType: "application/pdf",

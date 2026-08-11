@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.1.4 - 2026-08-11
+
+- Put the CV-import AI warning, PDF chooser, and import actions in one dialog, with
+  no acknowledgement step or import side effect before `Start import`.
+- Persist only a best-effort, versioned displayed state so the complete warning is
+  expanded on first or changed display and collapsed by default on repeat display.
+
 ## 0.1.3 - 2026-08-09
 
 - Gate CV-import file selection behind a first-use AI disclosure and retain only a

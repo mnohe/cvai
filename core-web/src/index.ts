@@ -34,12 +34,16 @@ export { SettingsPage } from "@/pages/SettingsPage";
 export { app, auth, db, githubProvider, googleProvider } from "@/lib/firebase";
 
 export {
+  getLLMDisclosureDisplayedState,
   getLLMDisclosureAcknowledgement,
   getLLMOperationDisclosure,
+  hasLLMDisclosureBeenDisplayed,
   hasLLMDisclosureAcknowledgement,
   llmOperationIds,
+  recordLLMDisclosureDisplayed,
   recordLLMDisclosureAcknowledgement,
   validateLLMDisclosureConfig,
+  type LLMDisclosureDisplayedState,
   type LLMDisclosureAcknowledgement,
   type LLMDisclosureConfig,
   type LLMOperationDisclosure,

@@ -1,12 +1,12 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ActionProgress } from "@/components/ActionProgress";
 import { LLMDisclosure } from "@/components/LLMDisclosure";
 import { ThinkButton } from "@/components/ThinkButton";
 import { apiFetch, getApiErrorMessage } from "@/lib/api";
 import { getLLMDisclosureConfig } from "@/lib/config";
 import {
-  hasLLMDisclosureAcknowledgement,
-  recordLLMDisclosureAcknowledgement,
+  hasLLMDisclosureBeenDisplayed,
+  recordLLMDisclosureDisplayed,
 } from "@/lib/llm-disclosures";
 
 const maxPDFBytes = 10 * 1024 * 1024;
@@ -25,16 +25,21 @@ export function ImportCVModal({
   const [supportReference, setSupportReference] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const disclosureConfig = getLLMDisclosureConfig();
-  const [disclosureAcknowledged, setDisclosureAcknowledged] = useState(() =>
+  const [disclosureWasDisplayed] = useState(() =>
     typeof window !== "undefined"
-      ? hasLLMDisclosureAcknowledgement("import_cv", disclosureConfig, window.localStorage)
+      ? hasLLMDisclosureBeenDisplayed("import_cv", disclosureConfig, window.localStorage)
       : false,
   );
-  const [disclosureExpanded, setDisclosureExpanded] = useState(!disclosureAcknowledged);
+  const [disclosureExpanded, setDisclosureExpanded] = useState(!disclosureWasDisplayed);
   const inputRef = useRef<HTMLInputElement>(null);
   const selectedFileRef = useRef<File | null>(null);
 
+  useEffect(() => {
+    recordLLMDisclosureDisplayed("import_cv", disclosureConfig, window.localStorage);
+  }, [disclosureConfig]);
+
   function prepareUpload() {
+    setDisclosureExpanded(false);
     const file = inputRef.current?.files?.[0];
     if (!file) {
       setMessage("Choose a PDF first.");
@@ -95,12 +100,6 @@ export function ImportCVModal({
     await navigator.clipboard?.writeText(supportReference);
   }
 
-  function continueToFileChooser() {
-    recordLLMDisclosureAcknowledgement("import_cv", disclosureConfig, window.localStorage);
-    setDisclosureAcknowledged(true);
-    setDisclosureExpanded(false);
-  }
-
   return (
     <div className="modal-backdrop" role="presentation">
       <section className="modal-card" role="dialog" aria-modal="true" aria-label="Import CV from PDF">
@@ -119,35 +118,28 @@ export function ImportCVModal({
           config={disclosureConfig}
           expanded={disclosureExpanded}
           onToggle={() => setDisclosureExpanded((current) => !current)}
-          continueLabel="Continue to choose PDF"
-          onContinue={disclosureAcknowledged ? undefined : continueToFileChooser}
-          onCancel={disclosureAcknowledged ? undefined : onClose}
         />
-        {disclosureAcknowledged && (
-          <>
-            <label className="field-label" htmlFor="cv-import-pdf">Choose PDF</label>
-            <input id="cv-import-pdf" ref={inputRef} type="file" accept="application/pdf" disabled={Boolean(actionId)} />
-            {actionId && <ActionProgress actionId={actionId} onComplete={handleComplete} onFailed={handleFailed} />}
-            {message && <p className="muted">{message}</p>}
-            {supportReference && (
-              <div className="support-reference">
-                <span className="muted">Reference ID</span>
-                <code>{supportReference}</code>
-                <button type="button" className="secondary-button" onClick={() => void copySupportReference()}>
-                  Copy
-                </button>
-              </div>
-            )}
-            <div className="panel-actions">
-              <ThinkButton completionScore={2} onClick={prepareUpload} disabled={uploading || Boolean(actionId)}>
-                {uploading ? "Uploading" : "Start import"}
-              </ThinkButton>
-              <button type="button" className="secondary-button" onClick={onClose}>
-                Cancel
-              </button>
-            </div>
-          </>
+        <label className="field-label" htmlFor="cv-import-pdf">Choose PDF</label>
+        <input id="cv-import-pdf" ref={inputRef} type="file" accept="application/pdf" disabled={Boolean(actionId)} />
+        {actionId && <ActionProgress actionId={actionId} onComplete={handleComplete} onFailed={handleFailed} />}
+        {message && <p className="muted">{message}</p>}
+        {supportReference && (
+          <div className="support-reference">
+            <span className="muted">Reference ID</span>
+            <code>{supportReference}</code>
+            <button type="button" className="secondary-button" onClick={() => void copySupportReference()}>
+              Copy
+            </button>
+          </div>
         )}
+        <div className="panel-actions">
+          <ThinkButton completionScore={2} onClick={prepareUpload} disabled={uploading || Boolean(actionId)}>
+            {uploading ? "Uploading" : "Start import"}
+          </ThinkButton>
+          <button type="button" className="secondary-button" onClick={onClose}>
+            Cancel
+          </button>
+        </div>
       </section>
     </div>
   );
