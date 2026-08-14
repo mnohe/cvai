@@ -1,4 +1,5 @@
 import { signOut } from "firebase/auth";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/components/AuthProvider";
 import { getProviderNames } from "@/lib/auth-providers";
@@ -9,6 +10,20 @@ export function SettingsPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const providerNames = getProviderNames(user?.providerData.map((p) => p.providerId) ?? []);
+  const [signOutError, setSignOutError] = useState<string | null>(null);
+  const [signingOut, setSigningOut] = useState(false);
+
+  async function handleSignOut() {
+    setSignOutError(null);
+    setSigningOut(true);
+    try {
+      await signOut(auth);
+      navigate("/login", { replace: true });
+    } catch {
+      setSignOutError("Unable to sign out. Please try again.");
+      setSigningOut(false);
+    }
+  }
 
   return (
     <section className="page-stack">
@@ -35,14 +50,17 @@ export function SettingsPage() {
             <button
               type="button"
               className="danger-button account-signout-button"
-              onClick={async () => {
-                await signOut(auth);
-                navigate("/login", { replace: true });
-              }}
+              onClick={() => void handleSignOut()}
+              disabled={signingOut}
             >
-              Sign out
+              {signingOut ? "Signing out..." : "Sign out"}
             </button>
           </div>
+          {signOutError && (
+            <p className="form-error" role="alert">
+              {signOutError}
+            </p>
+          )}
         </section>
         <Slots.SettingsExtra />
         <Slots.PrivacySettings />

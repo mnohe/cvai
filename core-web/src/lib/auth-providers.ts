@@ -1,7 +1,7 @@
 export function getProviderNames(providerIds: string[]) {
   if (import.meta.env.VITE_E2E === "true") {
     const provider = window.localStorage.getItem("cvai:e2eProvider");
-    if (provider) return [provider];
+    if (provider) return provider.split(",").map((name) => name.trim());
   }
 
   return providerIds.map((providerId) => {

@@ -66,6 +66,56 @@ test.describe("UC-AUTH-003", () => {
     await expect(page).toHaveURL(/\/login$/);
   });
 
+  test("signout stays grouped and compact across responsive account layouts", async ({ page }) => {
+    const longEmail = "a.very.long.email.address.for.layout.testing@really-long-example-domain.test";
+    await page.setViewportSize({ width: 360, height: 740 });
+    await signIn(page, "Google", longEmail);
+    await page.evaluate(() => {
+      window.localStorage.setItem("cvai:e2eProvider", "Google,GitHub,Microsoft");
+    });
+    await page.goto("/settings");
+
+    const account = page.locator("section.settings-section").filter({
+      has: page.getByRole("heading", { name: "Account" }),
+    });
+    const identityRow = account.locator(".account-identity-row");
+    const signOutButton = identityRow.getByRole("button", { name: "Sign out" });
+    await expect(identityRow).toContainText(longEmail);
+    await expect(signOutButton).toBeVisible();
+    await expect(identityRow.locator(".provider-pill")).toHaveCount(3);
+    await signOutButton.focus();
+    await expect(signOutButton).toBeFocused();
+
+    const buttonBox = await signOutButton.boundingBox();
+    const emailBox = await identityRow.getByText(longEmail).boundingBox();
+    const accountBox = await account.boundingBox();
+    expect(buttonBox).not.toBeNull();
+    expect(emailBox).not.toBeNull();
+    expect(accountBox).not.toBeNull();
+    expect(buttonBox!.width).toBeLessThan(216);
+    expect(buttonBox!.x + buttonBox!.width).toBeLessThanOrEqual(360);
+    expect(accountBox!.x + accountBox!.width - (buttonBox!.x + buttonBox!.width)).toBeLessThan(24);
+    expect(emailBox!.x + emailBox!.width).toBeLessThanOrEqual(360);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(360);
+  });
+
+  test("signout failure remains on settings and exposes a retryable error", async ({ page }) => {
+    await signIn(page, "Google", "signout.failure@example.test");
+    await page.getByRole("button", { name: "Open settings" }).click();
+    await page.evaluate(() => {
+      Storage.prototype.removeItem = () => {
+        throw new Error("simulated persistence failure");
+      };
+    });
+
+    await page.getByRole("button", { name: "Sign out" }).click();
+    await expect(page).toHaveURL(/\/settings$/);
+    await expect(page.getByRole("alert")).toHaveText(
+      "Unable to sign out. Please try again.",
+    );
+    await expect(page.getByRole("button", { name: "Sign out" })).toBeEnabled();
+  });
+
   test("protected routes inaccessible after signout", async ({ page }) => {
     await page.setViewportSize({ width: 1100, height: 800 });
     await signIn(page, "Google", "postsignout.user@example.test");
