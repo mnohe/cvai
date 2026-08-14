@@ -66,9 +66,11 @@ func MarkAuthenticated(ctx context.Context) {
 // rejection can't reach — mutates that same box by pointer, regardless of
 // how many context/request layers sit between the two. See requestOutcome.
 //
-// It never logs headers, query strings, bodies, or — on a recovered panic —
-// the panic value itself, only its Go type, since any of those can carry
-// tokens or user/provider content.
+// It never logs headers, query strings, bodies, concrete URL paths, or — on a
+// recovered panic — the panic value itself, only its Go type. Concrete paths
+// can contain subject identifiers, so only the matched ServeMux pattern is
+// recorded. Any of those other values can carry tokens or user/provider
+// content.
 func RequestLogger(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
@@ -81,7 +83,7 @@ func RequestLogger(next http.Handler) http.Handler {
 				requestID := RequestIDFromContext(r.Context())
 				Logger.LogAttrs(r.Context(), slog.LevelError, "http_panic_recovered",
 					slog.String("request_id", requestID),
-					slog.String("path", r.URL.Path),
+					slog.String("route", safeRoutePattern(r)),
 					slog.String("panic_type", fmt.Sprintf("%T", rec)),
 					slog.String("stack", string(debug.Stack())),
 				)
@@ -90,7 +92,7 @@ func RequestLogger(next http.Handler) http.Handler {
 
 			attrs := []slog.Attr{
 				slog.String("method", r.Method),
-				slog.String("path", r.URL.Path),
+				slog.String("route", safeRoutePattern(r)),
 				slog.Int("status", sw.status),
 				slog.Int64("duration_ms", time.Since(start).Milliseconds()),
 				slog.String("request_id", RequestIDFromContext(r.Context())),
@@ -101,6 +103,15 @@ func RequestLogger(next http.Handler) http.Handler {
 
 		next.ServeHTTP(sw, r)
 	})
+}
+
+const unmatchedRoutePattern = "<unmatched>"
+
+func safeRoutePattern(r *http.Request) string {
+	if r.Pattern == "" {
+		return unmatchedRoutePattern
+	}
+	return r.Pattern
 }
 
 // statusWriter captures the status code a handler actually wrote, since

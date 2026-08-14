@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/google/uuid"
 )
 
 func TestWithRequestIDGeneratesAndSetsHeader(t *testing.T) {
@@ -23,7 +25,7 @@ func TestWithRequestIDGeneratesAndSetsHeader(t *testing.T) {
 	}
 }
 
-func TestWithRequestIDReusesInboundHeader(t *testing.T) {
+func TestWithRequestIDReplacesUntrustedInboundHeader(t *testing.T) {
 	var seen string
 	handler := WithRequestID(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		seen = RequestIDFromContext(r.Context())
@@ -34,8 +36,14 @@ func TestWithRequestIDReusesInboundHeader(t *testing.T) {
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
 
-	if seen != "upstream-id-123" {
-		t.Fatalf("request id = %q, want the inbound upstream-id-123", seen)
+	if seen == "upstream-id-123" {
+		t.Fatalf("request id reused user-controlled inbound value: %q", seen)
+	}
+	if _, err := uuid.Parse(seen); err != nil {
+		t.Fatalf("request id = %q, want generated UUID: %v", seen, err)
+	}
+	if got := rec.Header().Get(HeaderRequestID); got != seen {
+		t.Fatalf("response header = %q, context value = %q", got, seen)
 	}
 }
 

@@ -19,16 +19,14 @@ const requestIDKey contextKey = "request_id"
 // works for CV import failures.
 const HeaderRequestID = "X-Request-Id"
 
-// WithRequestID assigns a request id (reusing an inbound X-Request-Id from a
-// trusted upstream proxy, such as Cloud Run's, when present) and stores it
-// on the request context and response header before calling next. It must
-// run before Recover and RequestLogger so both can attribute to the id.
+// WithRequestID assigns a server-generated request id and stores it on the
+// request context and response header before calling next. An arbitrary
+// inbound X-Request-Id is not trusted: it is user-controlled and would
+// otherwise be copied into retained logs. It must run before Recover and
+// RequestLogger so both can attribute to the id.
 func WithRequestID(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		id := r.Header.Get(HeaderRequestID)
-		if id == "" {
-			id = uuid.NewString()
-		}
+		id := uuid.NewString()
 		w.Header().Set(HeaderRequestID, id)
 		ctx := context.WithValue(r.Context(), requestIDKey, id)
 		next.ServeHTTP(w, r.WithContext(ctx))
