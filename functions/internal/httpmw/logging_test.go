@@ -11,18 +11,20 @@ import (
 	"testing"
 )
 
-func TestRequestLoggerRecordsMethodPathStatusAndRequestID(t *testing.T) {
+func TestRequestLoggerRecordsMethodRouteStatusAndRequestID(t *testing.T) {
 	var buf bytes.Buffer
 	original := Logger
 	Logger = slog.New(slog.NewJSONHandler(&buf, nil))
 	t.Cleanup(func() { Logger = original })
 
-	handler := WithRequestID(RequestLogger(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /admin/users/{uid}", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusCreated)
-	})))
+	})
+	handler := WithRequestID(RequestLogger(mux))
 
 	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/cv/imports", nil))
+	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/admin/users/subject-poison", nil))
 
 	var entry map[string]any
 	if err := json.Unmarshal(buf.Bytes(), &entry); err != nil {
@@ -31,8 +33,11 @@ func TestRequestLoggerRecordsMethodPathStatusAndRequestID(t *testing.T) {
 	if entry["method"] != http.MethodPost {
 		t.Fatalf("method = %v", entry["method"])
 	}
-	if entry["path"] != "/cv/imports" {
-		t.Fatalf("path = %v", entry["path"])
+	if entry["route"] != "POST /admin/users/{uid}" {
+		t.Fatalf("route = %v", entry["route"])
+	}
+	if bytes.Contains(buf.Bytes(), []byte("subject-poison")) {
+		t.Fatalf("concrete path leaked into log: %s", buf.String())
 	}
 	if entry["status"] != float64(http.StatusCreated) {
 		t.Fatalf("status = %v, want 201", entry["status"])
@@ -104,6 +109,27 @@ func TestRequestLoggerRecoversPanicWithoutLoggingItsValue(t *testing.T) {
 	}
 	if entries[1]["status"] != float64(http.StatusInternalServerError) {
 		t.Fatalf("completion status = %v", entries[1]["status"])
+	}
+}
+
+func TestRequestLoggerUsesSentinelForUnmatchedRoute(t *testing.T) {
+	var buf bytes.Buffer
+	original := Logger
+	Logger = slog.New(slog.NewJSONHandler(&buf, nil))
+	t.Cleanup(func() { Logger = original })
+
+	handler := RequestLogger(http.NotFoundHandler())
+	handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/subject-poison", nil))
+
+	var entry map[string]any
+	if err := json.Unmarshal(buf.Bytes(), &entry); err != nil {
+		t.Fatalf("decode log: %v", err)
+	}
+	if entry["route"] != unmatchedRoutePattern {
+		t.Fatalf("route = %v, want %q", entry["route"], unmatchedRoutePattern)
+	}
+	if bytes.Contains(buf.Bytes(), []byte("subject-poison")) {
+		t.Fatalf("unmatched path leaked into log: %s", buf.String())
 	}
 }
 

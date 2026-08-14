@@ -24,7 +24,7 @@ func Recover(next http.Handler) http.Handler {
 				requestID := RequestIDFromContext(r.Context())
 				Logger.LogAttrs(r.Context(), slog.LevelError, "http_panic_recovered",
 					slog.String("request_id", requestID),
-					slog.String("path", r.URL.Path),
+					slog.String("route", safeRoutePattern(r)),
 					slog.String("panic_type", fmt.Sprintf("%T", rec)),
 					slog.String("stack", string(debug.Stack())),
 				)

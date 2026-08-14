@@ -1,7 +1,9 @@
 package httpmw
 
 import (
+	"bytes"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -35,6 +37,31 @@ func TestRecoverReturnsSafeErrorAndNeverLeaksThePanicValue(t *testing.T) {
 	}
 	if got := rec.Header().Get(HeaderRequestID); got != body["requestId"] {
 		t.Fatalf("response header request id = %q, body requestId = %q", got, body["requestId"])
+	}
+}
+
+func TestRecoverLogsRoutePatternWithoutConcretePath(t *testing.T) {
+	var buf bytes.Buffer
+	original := Logger
+	Logger = slog.New(slog.NewJSONHandler(&buf, nil))
+	t.Cleanup(func() { Logger = original })
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /admin/users/{uid}", func(http.ResponseWriter, *http.Request) {
+		panic("safe classification only")
+	})
+	handler := WithRequestID(Recover(mux))
+	handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/admin/users/subject-poison", nil))
+
+	var entry map[string]any
+	if err := json.Unmarshal(buf.Bytes(), &entry); err != nil {
+		t.Fatalf("decode log: %v", err)
+	}
+	if entry["route"] != "GET /admin/users/{uid}" {
+		t.Fatalf("route = %v", entry["route"])
+	}
+	if bytes.Contains(buf.Bytes(), []byte("subject-poison")) {
+		t.Fatalf("concrete path leaked into panic log: %s", buf.String())
 	}
 }
 
