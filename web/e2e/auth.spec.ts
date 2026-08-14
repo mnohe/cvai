@@ -69,11 +69,13 @@ test.describe("UC-AUTH-003", () => {
   test("signout stays grouped and compact across responsive account layouts", async ({ page }) => {
     const longEmail = "a.very.long.email.address.for.layout.testing@really-long-example-domain.test";
     await page.setViewportSize({ width: 360, height: 740 });
-    await signIn(page, "Google", longEmail);
-    await page.evaluate(() => {
+    await page.addInitScript(() => {
       window.localStorage.setItem("cvai:e2eProvider", "Google,GitHub,Microsoft");
     });
-    await page.goto("/settings");
+    await signIn(page, "Google", longEmail);
+    await page.locator(".settings-trigger").evaluate((button: HTMLButtonElement) => {
+      button.click();
+    });
 
     const account = page.locator("section.settings-section").filter({
       has: page.getByRole("heading", { name: "Account" }),

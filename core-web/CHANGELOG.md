@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.1.5 - 2026-08-14
+
+- Group each Settings account identity with its compact, right-aligned sign-out
+  control and keep long identities and provider labels responsive.
+- Report sign-out persistence failures accessibly and leave the action available
+  for retry.
+
 ## 0.1.4 - 2026-08-11
 
 - Put the CV-import AI warning, PDF chooser, and import actions in one dialog, with
