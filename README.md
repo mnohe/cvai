@@ -6,7 +6,7 @@
 
 CVAI is an AI-assisted job application management system. It helps a job seeker build a structured CV, track roles, generate role-specific analysis and application bundles, manage gap tasks, and keep application work in one focused workspace.
 
-The hosted product is available at https://seekvit.com/.
+The hosted product is available at https://cvirgil.com/.
 
 ## What It Does
 
