@@ -123,7 +123,9 @@ async function signInForE2E(providerName: "Google" | "GitHub") {
     (returning ? "returning.user@example.test" : "new.user@example.test");
   const password = "CorrectHorseBatteryStaple123!";
   const displayName = returning ? "Returning User" : "New User";
-  window.localStorage.setItem("cvai:e2eProvider", providerName);
+  if (!window.localStorage.getItem("cvai:e2eProvider")) {
+    window.localStorage.setItem("cvai:e2eProvider", providerName);
+  }
 
   try {
     return await signInWithEmailAndPassword(auth, email, password);
