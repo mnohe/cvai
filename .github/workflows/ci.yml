@@ -79,7 +79,6 @@ jobs:
 
   core-web:
     name: Core web (Node)
-    if: false # CVAI-61D0 temporary admission-gate proof; reverted after the run.
     runs-on: ubuntu-latest
     defaults:
       run:
