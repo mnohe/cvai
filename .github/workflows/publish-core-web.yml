@@ -1,0 +1,62 @@
+name: Publish core web
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  publish-core-web:
+    name: Publish @cvai/core-web
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: core-web
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Fetch the admitted range so release changes remain detectable when
+          # GitHub rebases a pull request onto main.
+          fetch-depth: 0
+
+      - name: Detect core-web release files
+        id: release-changes
+        run: |
+          if git diff --quiet "${{ github.event.before }}" "${{ github.sha }}" -- package.json package-lock.json CHANGELOG.md; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-node@v4
+        if: steps.release-changes.outputs.changed == 'true'
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Read core-web package metadata
+        id: core-web-package
+        if: steps.release-changes.outputs.changed == 'true'
+        run: |
+          echo "name=$(node -p 'require("./package.json").name')" >> "$GITHUB_OUTPUT"
+          echo "version=$(node -p 'require("./package.json").version')" >> "$GITHUB_OUTPUT"
+
+      - name: Check npm package version
+        id: npm-package
+        if: steps.release-changes.outputs.changed == 'true'
+        run: |
+          if npm view "${{ steps.core-web-package.outputs.name }}@${{ steps.core-web-package.outputs.version }}" version >/dev/null 2>&1; then
+            echo "published=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "published=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Report existing release
+        if: steps.release-changes.outputs.changed == 'true' && steps.npm-package.outputs.published == 'true'
+        run: echo "${{ steps.core-web-package.outputs.name }}@${{ steps.core-web-package.outputs.version }} is already published; skipping npm publish."
+
+      - name: Publish release
+        if: steps.release-changes.outputs.changed == 'true' && steps.npm-package.outputs.published == 'false'
+        run: npm publish --provenance --access public
