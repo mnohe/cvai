@@ -815,6 +815,17 @@ button:disabled {
   justify-items: start;
 }
 
+.profile-archive-import-disclosure {
+  margin-top: 1rem;
+  max-width: 34rem;
+}
+
+.profile-archive-import-disclosure summary {
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
 .tab-content {
   background: var(--panel-bg-soft);
   border: 1px solid var(--panel-border);

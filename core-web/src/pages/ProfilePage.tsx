@@ -14,6 +14,7 @@ import { useAuth } from "@/components/AuthProvider";
 import type { CVPrintTemplate } from "@/components/CVPrintTemplates";
 import { CVPrintPreviewDialog } from "@/components/CVPrintPreviewDialog";
 import { ImportCVModal } from "@/components/ImportCVModal";
+import { ImportProfileArchive } from "@/components/ImportProfileArchive";
 import { ThinkButton } from "@/components/ThinkButton";
 import {
   emptyCandidateContext,
@@ -27,6 +28,7 @@ import {
   validateCV,
 } from "@/lib/cv";
 import { db } from "@/lib/firebase";
+import { isProfileArchiveImportEnabled } from "@/lib/features";
 import {
   getProfileCompletion,
   type CompletionSegment,
@@ -79,12 +81,15 @@ export function ProfilePage() {
   const { user } = useAuth();
   const [candidate, setCandidate] = useState<Partial<Candidate> | null>(null);
   const [snapshotReady, setSnapshotReady] = useState(false);
+  const [candidateConfirmedAbsent, setCandidateConfirmedAbsent] = useState(false);
   const [completionDismissed, setCompletionDismissed] = useState(
     () => sessionStorage.getItem("cvai:completion-dismissed") === "true",
   );
   const [requestedCVSection, setRequestedCVSection] = useState<CVSection | null>(null);
 
   useEffect(() => {
+    setSnapshotReady(false);
+    setCandidateConfirmedAbsent(false);
     if (!user) {
       setCandidate(null);
       setSnapshotReady(true);
@@ -94,6 +99,7 @@ export function ProfilePage() {
     return onSnapshot(
       doc(db, "users", user.uid, "candidate", "profile"),
       (snapshot) => {
+        setCandidateConfirmedAbsent(!snapshot.exists());
         setCandidate(
           snapshot.exists()
             ? ({ id: user.uid, ...snapshot.data() } as Partial<Candidate>)
@@ -103,6 +109,7 @@ export function ProfilePage() {
       },
       () => {
         setCandidate(null);
+        setCandidateConfirmedAbsent(false);
         setSnapshotReady(true);
       },
     );
@@ -184,6 +191,7 @@ export function ProfilePage() {
           <CVProfile
             candidate={candidate}
             snapshotReady={snapshotReady}
+            candidateConfirmedAbsent={candidateConfirmedAbsent}
             requestedSection={requestedCVSection}
             onRequestedSectionHandled={() => setRequestedCVSection(null)}
           />
@@ -203,11 +211,13 @@ export function ProfilePage() {
 function CVProfile({
   candidate,
   snapshotReady,
+  candidateConfirmedAbsent,
   requestedSection,
   onRequestedSectionHandled,
 }: {
   candidate: Partial<Candidate> | null;
   snapshotReady: boolean;
+  candidateConfirmedAbsent: boolean;
   requestedSection: CVSection | null;
   onRequestedSectionHandled: () => void;
 }) {
@@ -215,6 +225,7 @@ function CVProfile({
   const [started, setStarted] = useState(false);
   const [activeSection, setActiveSection] = useState<CVSection>("personal");
   const [importOpen, setImportOpen] = useState(false);
+  const [archiveImportOpen, setArchiveImportOpen] = useState(false);
   const [printOpen, setPrintOpen] = useState(false);
   const [printTemplate, setPrintTemplate] = useState<CVPrintTemplate>("default");
   const [saveState, setSaveState] = useState<SaveState>({ status: "idle" });
@@ -295,6 +306,15 @@ function CVProfile({
               Import from PDF
             </ThinkButton>
           </div>
+          {candidateConfirmedAbsent && isProfileArchiveImportEnabled() && (
+            <details className="profile-archive-import-disclosure">
+              <summary>Have an encrypted profile archive?</summary>
+              <p className="muted">Import supported profile fields without restoring account or workspace data.</p>
+              <button type="button" className="secondary-button" onClick={() => setArchiveImportOpen(true)}>
+                Import encrypted archive
+              </button>
+            </details>
+          )}
         </div>
       ) : (
         <div className="tab-content cv-panel">
@@ -392,6 +412,14 @@ function CVProfile({
             setStarted(true);
           }}
           replacingExisting={hasExistingCV}
+        />
+      )}
+      {archiveImportOpen && (
+        <ImportProfileArchive
+          onClose={() => setArchiveImportOpen(false)}
+          onImported={() => {
+            setArchiveImportOpen(false);
+          }}
         />
       )}
       {printOpen && (

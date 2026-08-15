@@ -11,6 +11,7 @@ test.describe("UC-CV-001 empty state renders", () => {
     await expect(page.getByText("You haven't added a CV yet.")).toBeVisible();
     await expect(page.getByRole("button", { name: "Start from scratch" })).toBeVisible();
     await expect(page.getByRole("button", { name: /Import from PDF/ })).toBeVisible();
+    await expect(page.getByText("Have an encrypted profile archive?")).toHaveCount(0);
   });
 });
 
