@@ -232,7 +232,10 @@ jobs:
       - uses: actions/checkout@v4
       - name: Confirm the prospective merge checkout
         run: |
+          case "$GITHUB_REF" in
+            refs/pull/*/merge) ;;
+            *) echo "unexpected pull-request ref: $GITHUB_REF" >&2; exit 1 ;;
+          esac
           test "$GITHUB_SHA" = "$(git rev-parse HEAD)"
-          test "$(git show --no-patch --format='%P' HEAD | wc -w)" -eq 2
           echo "prospective_merge_sha=$(git rev-parse HEAD)"
           echo "prospective_merge_tree=$(git rev-parse 'HEAD^{tree}')"
