@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.1.6 - 2026-08-15
+
+- Add an unobtrusive, keyboard-accessible empty-profile flow for importing a
+  supported profile projection from an encrypted archive without implying full
+  backup or account restoration.
+
 ## 0.1.5 - 2026-08-14
 
 - Group each Settings account identity with its compact, right-aligned sign-out

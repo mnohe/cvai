@@ -50,6 +50,16 @@ Successful empty response bodies, including the account-deletion endpoint's
 Import start failures that happen before an Action document exists display a
 copyable `import-start-*` support reference so users still have an error ID.
 
+## Empty-profile archive import
+
+`ProfilePage` exposes a deliberately secondary, keyboard-accessible encrypted-archive
+option only after Firestore has conclusively reported that the candidate document is
+absent. It posts one `archive` file and one `secret` field to the host's authenticated
+`POST /profile/imports` endpoint. The package keeps both values in component memory only,
+clears them after success, and describes the result as a best-effort profile import—not a
+backup or account/workspace restoration. Hosts own decryption, hostile-archive validation,
+the eligible profile projection, and atomic create-only persistence.
+
 ## API Failure Reasons
 
 `ApiError.reason` is the stable API-visible discriminator used by host apps to
